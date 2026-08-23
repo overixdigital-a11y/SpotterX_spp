@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpotterX</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <button class="icon-btn">☰</button>
+            <div class="logo">
+                <span class="logo-x">X</span> SPOTTER<span class="logo-orange">X</span>
+            </div>
+            <button class="icon-btn">🔔</button>
+        </header>
+
+        <!-- Feed Principal -->
+        <main class="feed-container">
+            <div class="post-card">
+                <div class="post-header">
+                    <img src="https://i.pravatar.cc/100?img=32" alt="Avatar" class="avatar">
+                    <div class="user-info">
+                        <h3>Sarah Jensen <span class="badge">✓</span></h3>
+                        <p>@dynamicrunners</p>
+                    </div>
+                </div>
+
+                <div class="media-container">
+                    <!-- Video con atributos garantizados para móviles -->
+                    <video class="post-media" autoplay muted loop playsinline preload="auto">
+                        <source src="https://assets.mixkit.co/videos/preview/mixkit-woman-doing-heavy-weights-crossfit-in-a-gym-41580-large.mp4" type="video/mp4">
+                        Tu navegador no soporta videos.
+                    </video>
+                    
+                    <!-- Botones flotantes laterales -->
+                    <div class="side-actions">
+                        <button class="action-btn">
+                            <span class="icon">⚡</span>
+                            <span class="label">Pulse</span>
+                        </button>
+                        <button class="action-btn">
+                            <span class="icon">💬</span>
+                            <span class="label">Dialogue</span>
+                        </button>
+                        <button class="action-btn">
+                            <span class="icon">🔄</span>
+                            <span class="label">Remix</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="post-caption">
+                    <p>Clean barbell performing squat with common two handle bars... <span class="more">More</span></p>
+                    <a href="#" class="link-orange">Related Conversations</a>
+                </div>
+
+                <div class="co-authors">
+                    <span>Co-Authors</span>
+                    <div class="avatar-group">
+                        <img src="https://i.pravatar.cc/100?img=11" alt="Co-author">
+                        <img src="https://i.pravatar.cc/100?img=12" alt="Co-author">
+                        <img src="https://i.pravatar.cc/100?img=32" alt="Co-author">
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Barra de Navegación Inferior -->
+        <nav class="bottom-nav">
+            <button class="nav-btn active">🏠</button>
+            <button class="nav-btn">🔍</button>
+            <button class="nav-btn add-btn">➕</button>
+            <button class="nav-btn">🔔</button>
+            <button class="nav-btn">⚙️</button>
+        </nav>
+    </div>
+
+    <!-- Archivo de JavaScript -->
+    <script src="main.js"></script>
+</body>
+</html>

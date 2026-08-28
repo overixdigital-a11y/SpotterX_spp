@@ -4,15 +4,31 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { AppRole } from "@/lib/types";
 
+const homeByRole: Record<AppRole, string> = {
+  alumno: "/home",
+  profesor: "/entrenamiento",
+  gym: "/gimnasio",
+};
+
 export function useAuth() {
   const supabase = createClient();
   const router = useRouter();
 
+  const homeFor = async (userId: string): Promise<string> => {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", userId)
+      .maybeSingle();
+    const role = (profile?.role as AppRole) ?? "alumno";
+    return homeByRole[role];
+  };
+
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
     router.refresh();
-    router.push("/home");
+    router.push(await homeFor(data.user.id));
   };
 
   const signUp = async (opts: {
@@ -34,9 +50,10 @@ export function useAuth() {
       },
     });
     if (error) throw error;
-    if (data.session) {
+    if (data.session && data.user) {
       router.refresh();
-      router.push("/home");
+      const home = await homeFor(data.user.id);
+      router.push(home);
     }
     return data;
   };

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { TrainingShell } from "@/components/training/TrainingShell";
 
 export default async function TrainingLayout({
   children,
@@ -13,5 +14,5 @@ export default async function TrainingLayout({
 
   if (!user) redirect("/login");
 
-  return <div className="min-h-screen pb-24">{children}</div>;
+  return <TrainingShell>{children}</TrainingShell>;
 }

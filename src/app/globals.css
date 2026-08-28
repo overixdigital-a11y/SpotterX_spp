@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #05070a;
+  --bg-card: #161b22;
+  --bg-elevated: #1c222b;
+  --border: #232a35;
+  --text: #e6edf3;
+  --text-muted: #8b949e;
+  --cyan: #00f2fe;
+  --orange: #ff5e36;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-card: var(--bg-card);
+  --color-elevated: var(--bg-elevated);
+  --color-edge: var(--border);
+  --color-ink: var(--text);
+  --color-muted: var(--text-muted);
+  --color-neon: var(--cyan);
+  --color-ember: var(--orange);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar oscura sutil */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2a313c transparent;
+}
+
+::selection {
+  background: rgba(0, 242, 254, 0.25);
+}
+
+/* Utilidades neón reutilizables vía @utility (Tailwind v4) */
+@utility text-glow {
+  text-shadow: 0 0 12px rgba(0, 242, 254, 0.6);
+}
+
+@utility shadow-neon {
+  box-shadow: 0 0 18px rgba(0, 242, 254, 0.35);
+}
+
+@utility shadow-ember {
+  box-shadow: 0 0 18px rgba(255, 94, 54, 0.35);
+}

@@ -1,50 +1,62 @@
-import { TopBar } from "@/components/core/TopBar";
-import { BottomNav } from "@/components/core/BottomNav";
+"use client";
+
+import { useAuthState } from "@/lib/auth-context";
 import { MapPin, Zap } from "lucide-react";
 
 export default function PerfilPage() {
+  const { profile } = useAuthState();
+
+  const initial =
+    (profile?.full_name || profile?.username || "U").slice(0, 2).toUpperCase();
+
   return (
-    <>
-      <TopBar />
-      <main className="mx-auto max-w-md">
-        <div className="flex items-center gap-4 px-4 pt-4">
-          <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-neon bg-neon/20 text-xl font-bold text-neon shadow-neon">
-            AN
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-ink">Ariel Neón</h1>
-            <p className="text-sm text-muted">@ariel.fit</p>
+    <main className="mx-auto max-w-md">
+      <div className="flex items-center gap-4 px-4 pt-4">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-neon bg-neon/20 text-xl font-bold text-neon shadow-neon">
+          {initial}
+        </div>
+        <div>
+          <h1 className="text-xl font-bold text-ink">
+            {profile?.full_name || profile?.username}
+          </h1>
+          <p className="text-sm text-muted">@{profile?.username}</p>
+          {profile?.location && (
             <p className="mt-1 flex items-center gap-1 text-xs text-neon">
-              <MapPin className="h-3.5 w-3.5" /> Córdoba, AR
+              <MapPin className="h-3.5 w-3.5" /> {profile?.location}
             </p>
+          )}
+        </div>
+      </div>
+
+      {profile?.role === "profesor" && (
+        <div className="mx-4 mt-4 rounded-xl border border-ember/30 bg-ember/10 p-3 text-center">
+          <p className="text-sm font-semibold text-ember">Profesor</p>
+          <p className="text-xs text-muted">
+            Gimnasios donde trabajo y zona (próximamente)
+          </p>
+        </div>
+      )}
+
+      <div className="mt-5 grid grid-cols-3 divide-x divide-edge border-b border-t border-edge text-center">
+        {[
+          ["12", "Posts"],
+          ["1.2k", "Seguidores"],
+          ["890", "Siguiendo"],
+        ].map(([n, l]) => (
+          <div key={l} className="py-3">
+            <p className="text-lg font-bold text-ink">{n}</p>
+            <p className="text-xs text-muted">{l}</p>
           </div>
-        </div>
+        ))}
+      </div>
 
-        <div className="mt-5 grid grid-cols-3 divide-x divide-edge border-b border-t border-edge text-center">
-          {[
-            ["12", "Posts"],
-            ["1.2k", "Seguidores"],
-            ["890", "Siguiendo"],
-          ].map(([n, l]) => (
-            <div key={l} className="py-3">
-              <p className="text-lg font-bold text-ink">{n}</p>
-              <p className="text-xs text-muted">{l}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-3 gap-1 p-1">
-          {Array.from({ length: 9 }).map((_, i) => (
-            <div
-              key={i}
-              className="aspect-square rounded-lg bg-card"
-            >
-              <Zap className="h-full w-full p-4 text-muted/40" />
-            </div>
-          ))}
-        </div>
-      </main>
-      <BottomNav />
-    </>
+      <div className="grid grid-cols-3 gap-1 p-1">
+        {Array.from({ length: 9 }).map((_, i) => (
+          <div key={i} className="aspect-square rounded-lg bg-card">
+            <Zap className="h-full w-full p-4 text-muted/40" />
+          </div>
+        ))}
+      </div>
+    </main>
   );
 }

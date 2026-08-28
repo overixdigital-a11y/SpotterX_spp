@@ -190,3 +190,72 @@ create index if not exists idx_posts_user on public.posts (user_id);
 create index if not exists idx_notifications_user on public.notifications (user_id);
 create index if not exists idx_access_logs_gym on public.gym_access_logs (gym_id, created_at desc);
 create index if not exists idx_memberships_gym on public.gym_memberships (gym_id);
+
+-- ------------------------------------------------------------
+-- Triggers de notificaciones (red social)
+-- ------------------------------------------------------------
+-- Pulse
+create or replace function public.notify_pulse()
+returns trigger language plpgsql security definer set search_path = public
+as $$
+begin
+  insert into public.notifications (user_id, actor_id, type, post_id)
+  select p.user_id, new.user_id, 'pulse', new.post_id
+  from public.posts p where p.id = new.post_id and p.user_id <> new.user_id;
+  return new;
+end;
+$$;
+drop trigger if exists trg_notify_pulse on public.post_pulses;
+create trigger trg_notify_pulse after insert on public.post_pulses
+  for each row execute procedure public.notify_pulse();
+
+-- Comment
+create or replace function public.notify_comment()
+returns trigger language plpgsql security definer set search_path = public
+as $$
+begin
+  insert into public.notifications (user_id, actor_id, type, post_id)
+  select p.user_id, new.user_id, 'comment', new.post_id
+  from public.posts p where p.id = new.post_id and p.user_id <> new.user_id;
+  return new;
+end;
+$$;
+drop trigger if exists trg_notify_comment on public.post_comments;
+create trigger trg_notify_comment after insert on public.post_comments
+  for each row execute procedure public.notify_comment();
+
+-- Follow
+create or replace function public.notify_follow()
+returns trigger language plpgsql security definer set search_path = public
+as $$
+begin
+  insert into public.notifications (user_id, actor_id, type)
+  select new.following_id, new.follower_id, 'follow'
+  where new.following_id <> new.follower_id;
+  return new;
+end;
+$$;
+drop trigger if exists trg_notify_follow on public.follows;
+create trigger trg_notify_follow after insert on public.follows
+  for each row execute procedure public.notify_follow();
+
+-- RLS restantes (módulos: publicaciones de los módulos en fases siguientes)
+alter table public.post_pulses enable row level security;
+alter table public.post_comments enable row level security;
+alter table public.follows enable row level security;
+alter table public.notifications enable row level security;
+
+create policy "Pulses: lectura" on public.post_pulses for select using (true);
+create policy "Pulses: insert/delete propio" on public.post_pulses
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "Comments: lectura" on public.post_comments for select using (true);
+create policy "Comments: creación propia" on public.post_comments
+  for insert with check (auth.uid() = user_id);
+
+create policy "Follows: lectura" on public.follows for select using (true);
+create policy "Follows: gestión propia" on public.follows
+  for all using (auth.uid() = follower_id) with check (auth.uid() = follower_id);
+
+create policy "Notifs: solo el dueño" on public.notifications
+  for select using (auth.uid() = user_id);

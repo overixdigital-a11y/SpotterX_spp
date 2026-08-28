@@ -8,6 +8,7 @@ export interface Profile {
   role: AppRole;
   avatar_url: string | null;
   bio: string | null;
+  location: string | null;
   created_at: string;
 }
 

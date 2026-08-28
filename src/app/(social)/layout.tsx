@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { SocialShell } from "@/components/social/SocialShell";
 
 export default async function SocialLayout({
   children,
@@ -13,9 +14,5 @@ export default async function SocialLayout({
 
   if (!user) redirect("/login");
 
-  return (
-    <div className="min-h-screen pb-24">
-      {children}
-    </div>
-  );
+  return <SocialShell>{children}</SocialShell>;
 }

@@ -24,11 +24,11 @@ export function useAuth() {
     return homeByRole[role];
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string, next?: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
     router.refresh();
-    router.push(await homeFor(data.user.id));
+    router.push(next ?? (await homeFor(data.user.id)));
   };
 
   const signUp = async (opts: {

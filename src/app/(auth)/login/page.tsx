@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 
-export default function LoginPage() {
+function LoginForm() {
   const { signIn } = useAuth();
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next") ?? undefined;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -16,7 +19,7 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      await signIn(email, password);
+      await signIn(email, password, next);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al iniciar sesión");
     } finally {
@@ -25,7 +28,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen max-w-md flex-col justify-center px-6">
+    <>
       <div className="text-center">
         <h1 className="text-3xl font-extrabold tracking-tight">
           <span className="text-neon text-glow">Spotter</span>
@@ -75,6 +78,16 @@ export default function LoginPage() {
           Crear cuenta
         </Link>
       </p>
+    </>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <div className="flex min-h-screen max-w-md flex-col justify-center px-6">
+      <Suspense>
+        <LoginForm />
+      </Suspense>
     </div>
   );
 }

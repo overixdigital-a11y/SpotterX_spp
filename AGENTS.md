@@ -40,7 +40,8 @@ SpotterX_spp/
 │   │   ├── (auth)/          → login, registro por rol (gym / profesor / alumno)
 │   │   ├── (social)/        → feed, discover, notifications, perfil, crear
 │   │   ├── (training)/      → (Fase 3) gestión alumno/profesor
-│   │   └── (gyms)/          → (Fase 4) control de acceso del gym + cobro de cuota
+│   │   ├── (gyms)/          → (Fase 4) panel gym: gimnasio, miembros, planes, qr, accesos
+│   │   └── (checkin)/       → (Fase 4) /checkin/[qrCode]: escaneo del QR público
 │   ├── components/
 │   │   ├── core/            → primitivas compartidas (Button, Avatar, Nav, Modal)
 │   │   ├── social/          → PostCard, PulseButton, CommentsSheet, etc.
@@ -83,7 +84,7 @@ Tablas planificadas (schema en evolución):
 14. Vincular gyms donde trabaja → geolocalización/contratación por zona
 15. Monetización preparada (suscripción/comisión del profe a futuro)
 
-### Fase 4 — Control de Acceso del Gimnasio
+### ✅ Fase 4 — Control de Acceso del Gimnasio
 16. Panel gym (admin): gestiona gym, miembros, planes/membresías, aforo en tiempo real
 17. **Growth loop**: el gym **CREA las cuentas** de alumnos (rol alumno) y profesores (rol profesor) en la app → miembros automáticos → más usuarios para la plataforma
 18. El gym configura **planes/membresías** (mensual/trimestral/etc.) con precio + vigencia
@@ -91,6 +92,16 @@ Tablas planificadas (schema en evolución):
     - **Alumno**: escanea QR del gym → muestra su info + si está **habilitado** (membresía vigente)
     - **Profesor**: escanea al entrar y al salir → **cuenta horas de trabajo**
 20. Historial de accesos + estadísticas de asistencia
+
+**Implementación Fase 4 (hecha):**
+- `GymShell` + nav del gym (Panel / Miembros / Planes / QR / Accesos) en `src/components/gyms/`
+- Panel `/gimnasio`: crear/editar gym, dirección, ciudad, capacidad, **geolocalización GPS** + mapa **Leaflet** (sin API key), QR generado con `qrcode.react`
+- Miembros `/gimnasio/miembros`: **creación masiva** vía **Edge Function `invite-member`** (crea cuenta con contraseña provisional + rol + membresía/staff) + lista de miembros
+- Planes `/gimnasio/planes`: CRUD de `gym_plans`
+- Check-in `/checkin/[qrCode]`: ruta pública, QR codifica URL `https://spotterx-five.vercel.app/checkin/<CODIGO>`, registra ingreso/egreso (alumno) y entrada/salida (profe, horas); si no está logueado redirige a `/login?next=...`
+- Accesos `/gimnasio/accesos`: aforo en vivo (vista `gym_presence`), asistencia del día (función `gym_attendance_today`), historial
+- Migración `supabase/migrations/00003_gyms.sql` (corrida)
+- Dependencias nuevas: `qrcode.react`, `leaflet`, `react-leaflet`, `@types/leaflet`
 
 ### Fase 5 — Cobro de Cuota del gym (panel gym)
 - Cobro de membresías/cuotas de los alumnos (manual primero, pasarela MercadoPago/Stripe después)
@@ -104,8 +115,23 @@ Tablas planificadas (schema en evolución):
 - Gym como SaaS (freemium por cantidad de usuarios)
 - Conexión/integración con otras apps (login compartido / API / deep links)
 
+## Deploy / Producción
+- **Vercel**: proyecto `pump13/spotterx` → producción `https://spotterx-five.vercel.app` (deploy `https://spotterx-aejk06equ-pump13.vercel.app`). Env vars de Supabase configuradas en production/preview/development. Redploy: `vercel --prod --yes` (requiere login o `VERCEL_TOKEN`).
+- **Supabase** (proyecto `dzalgziofiwcljgnphap`): URL `https://dzalgziofiwcljgnphap.supabase.co`. `.env.local` usa la **anon key clásica** (la publishable no lista Storage). Edge function deployada: `invite-member`.
+- **Edge Function `invite-member`**: crea cuentas (rol alumno/profesor) con la **service role key** guardada como **secreto** `SPOTTERX_SERVICE_ROLE` en Supabase (nunca en frontend). Deploy/secretos con `supabase functions deploy invite-member` y `supabase secrets set` (CLI + access token `sbp_...`). **ATENCIÓN**: la service role key se expuso en el chat → regenerarla luego del deploy si se quiere máxima seguridad. Para crear `auth.users` desde la app solo se puede vía esta edge function (el frontend usa anon key).
+- **Migraciones**: no se pueden ejecutar desde la app; el usuario las corre manualmente en **SQL Editor** de Supabase. Sessions previas muestran completadas 00001, 00002, 00003.
+
 ## Reglas / recordatorios
 - NO tocar `fitpro`. Este proyecto es independiente.
 - Texto en español. Identidad visual neón/dark.
 - Preferir `[IO.File]` sobre `Get-Content/Set-Content` de PowerShell al manejar UTF-8 (corrompen acentos).
 - Realtime de Supabase para notificaciones en vivo.
+- Las Edge Functions (carpeta `supabase/functions/`) corren en **Deno**, no Node: están **excluidas del tsconfig** de Next (`exclude: ["node_modules", "supabase/functions"]`) para que el build no las type-checkee.
+
+## Estado de fases
+- ✅ Fase 1 — Fundación (Next + Supabase + auth roles + theme + route groups + schema 00001)
+- ✅ Fase 2 — Red social (feed real, crear contenido via Storage, discover, perfiles, notificaciones realtime)
+- ✅ Fase 3 — Gestión de alumnos del profe (+ schema 00002_training)
+- ✅ Fase 4 — Control de Acceso del gym (panel, memberships, QR check-in, accesos/aforo, edge function invite-member, schema 00003, mapa Leaflet)
+- ⏭️ Fase 5 — Cobro de Cuota (próxima)
+- ⏸️ Fase 6 — Marketplace Fit

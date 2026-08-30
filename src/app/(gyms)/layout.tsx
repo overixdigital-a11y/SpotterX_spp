@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { GymShell } from "@/components/gyms/GymShell";
 
 export default async function GymsLayout({
   children,
@@ -13,5 +14,5 @@ export default async function GymsLayout({
 
   if (!user) redirect("/login");
 
-  return <div className="min-h-screen pb-24">{children}</div>;
+  return <GymShell>{children}</GymShell>;
 }

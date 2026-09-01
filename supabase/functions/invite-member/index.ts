@@ -34,7 +34,7 @@ Deno.serve(async (req: Request) => {
 
     // 2) Leer body
     const body = await req.json();
-    const { gym_id, role, full_name, username, email } = body ?? {};
+    const { gym_id, role, full_name, username, email, plan_name, pay_status, expires_on } = body ?? {};
     if (!gym_id || !role || !full_name || !username || !email) {
       return json({ error: "Faltan campos: gym_id, role, full_name, username, email" }, 400);
     }
@@ -83,8 +83,10 @@ Deno.serve(async (req: Request) => {
       await supabase.from("gym_memberships").insert({
         gym_id,
         user_id: created.user!.id,
-        plan_name: "Plan inicial",
+        plan_name: plan_name ?? "Plan inicial",
         status: "activa",
+        pay_status: pay_status ?? "pendiente",
+        expires_on: expires_on ?? null,
       });
     }
 

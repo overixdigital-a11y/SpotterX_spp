@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Users, Receipt, QrCode, Activity } from "lucide-react";
+import { LayoutDashboard, Users, Receipt, QrCode, Activity, Wallet } from "lucide-react";
 import { AuthProvider } from "@/lib/auth-context";
 import { createClient } from "@/lib/supabase/client";
 
@@ -36,6 +36,7 @@ const nav = [
   { href: "/gimnasio", label: "Panel", icon: LayoutDashboard },
   { href: "/gimnasio/miembros", label: "Miembros", icon: Users },
   { href: "/gimnasio/planes", label: "Planes", icon: Receipt },
+  { href: "/gimnasio/cobros", label: "Cobros", icon: Wallet },
   { href: "/gimnasio/qr", label: "QR", icon: QrCode },
   { href: "/gimnasio/accesos", label: "Accesos", icon: Activity },
 ];

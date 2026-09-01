@@ -26,6 +26,7 @@ interface MemberInfo {
   role: AppRole;
   plan_name: string | null;
   status: string | null;
+  pay_status: string | null;
   expires_on: string | null;
 }
 
@@ -60,7 +61,7 @@ export default function CheckinPage({ params }: { params: { qrCode: string } }) 
           supabase.from("gym_staff").select("id, role").eq("gym_id", g.id).eq("user_id", userId).maybeSingle(),
           supabase
             .from("gym_memberships")
-            .select("plan_name, status, expires_on")
+            .select("plan_name, status, pay_status, expires_on")
             .eq("gym_id", g.id)
             .eq("user_id", userId)
             .maybeSingle(),
@@ -74,6 +75,7 @@ export default function CheckinPage({ params }: { params: { qrCode: string } }) 
             role: (profile?.role as AppRole) ?? "alumno",
             plan_name: memRes.data?.plan_name ?? null,
             status: memRes.data?.status ?? null,
+            pay_status: memRes.data?.pay_status ?? null,
             expires_on: memRes.data?.expires_on ?? null,
           });
         }
@@ -127,6 +129,11 @@ export default function CheckinPage({ params }: { params: { qrCode: string } }) 
     );
   }
 
+  const expires = member?.expires_on ? new Date(member.expires_on) : null;
+  const notExpired = !expires || expires >= new Date(new Date().toDateString());
+  const paidOk = member?.pay_status === "pagado" || member?.pay_status === "promo";
+  const isEnabled = !!member?.isMember && member?.status === "activa" && paidOk && notExpired;
+
   return (
     <div className="flex min-h-screen flex-col px-5 py-8">
       <div className="mx-auto w-full max-w-md">
@@ -165,10 +172,10 @@ export default function CheckinPage({ params }: { params: { qrCode: string } }) 
                   <div className="mt-1">
                     <span
                       className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                        member.status === "activa" ? "bg-neon/20 text-neon" : "bg-ember/20 text-ember"
+                        isEnabled ? "bg-neon/20 text-neon" : "bg-ember/20 text-ember"
                       }`}
                     >
-                      {member.status === "activa" ? "Membresía activa" : "Sin membresía vigente"}
+                      {member.pay_status === "promo" ? "Promo 🎁 (primer mes)" : isEnabled ? "Membresía activa" : "Sin membresía vigente"}
                     </span>
                     {member.plan_name && (
                       <p className="mt-1 text-xs text-muted">
@@ -199,7 +206,7 @@ export default function CheckinPage({ params }: { params: { qrCode: string } }) 
                     <DoorClosed className="h-4 w-4" /> Salida
                   </button>
                 </div>
-              ) : member?.isMember && member.status === "activa" ? (
+              ) : member?.isMember && isEnabled ? (
                 <div className="mt-4 grid grid-cols-2 gap-2">
                   <button
                     onClick={() => register("ingreso")}

@@ -107,6 +107,14 @@ Tablas planificadas (schema en evolución):
 - Cobro de membresías/cuotas de los alumnos (manual primero, pasarela MercadoPago/Stripe después)
 - Monetización directa del gym
 
+**Implementación Fase 5 + pulido de planes (hecho):**
+- **Planes** (`/gimnasio/planes`): duración por **meses** (1/2/3/6/12), precio libre, **promos de captación** (`promo_type` 2x1/3x2/4x3), **editar/borrar**. Migración 00004.
+- **Alta de miembro** (`/gimnasio/miembros`): elegir **plan**, con promo se crean N cuentas (1º `pagado`, extras `promo` gratis el 1º mes). Edge function `invite-member` extendida: acepta `plan_name`, `pay_status`, `expires_on`.
+- **Cobros** (`/gimnasio/cobros`): lista de miembros activos con estado (Pagó/Promo/Pendiente), botón **"Marcar pagó"** (inserta en `gym_payments` con método manual, cambia `pay_status` a `pagado`, **extiende `expires_on`** sumando los meses del plan). Historial de pagos.
+- **Check-in** (`/checkin/[qrCode]`): habilita solo si `pay_status` es `pagado` o `promo` y no venció; bloquea vencidos/pendientes. Badge "Promo 🎁 (primer mes)".
+- Nav del gym: agregado tab **Cobros**.
+- **Pendiente/futuro**: pasarela MercadoPago/Stripe por gym (se dejó `gym_payments.method` preparado con `manual`/`mercadopago`/`stripe`).
+
 ### Fase 6 — Marketplace Fit
 - Venta de productos de fitness, tipo **MercadoLibre** → comisiones
 
@@ -133,5 +141,6 @@ Tablas planificadas (schema en evolución):
 - ✅ Fase 2 — Red social (feed real, crear contenido via Storage, discover, perfiles, notificaciones realtime)
 - ✅ Fase 3 — Gestión de alumnos del profe (+ schema 00002_training)
 - ✅ Fase 4 — Control de Acceso del gym (panel, memberships, QR check-in, accesos/aforo, edge function invite-member, schema 00003, mapa Leaflet)
-- ⏭️ Fase 5 — Cobro de Cuota (próxima)
+- ✅ Fase 5 — Cobro de Cuota manual (+ pulido de planes con promos, schema 00004)
 - ⏸️ Fase 6 — Marketplace Fit
+- 🔜 Empaquetar como app móvil (Play Store / App Store via Capacitor) al final del roadmap

@@ -61,6 +61,12 @@ function LoginForm() {
           />
         </div>
 
+        <div className="text-right">
+          <Link href="/recuperar" className="text-xs font-medium text-neon hover:underline">
+            ¿Olvidaste tu contraseña?
+          </Link>
+        </div>
+
         {error && <p className="text-sm text-ember">{error}</p>}
 
         <button

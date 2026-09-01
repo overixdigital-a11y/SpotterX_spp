@@ -121,6 +121,12 @@ Tablas planificadas (schema en evolución):
 - **Aviso al gym**: trigger `notify_gym_checkin` (migración 00005) inserta notificación `type='checkin'` (columna `gym_id` nueva + tipo habilitado) al dueño por cada ingreso. **Campanita** en el header del GymShell con contador de no leídas + desplegable "Quién entró".
 - **Precio guardado en membresía**: migración 00005 agrega `gym_memberships.price`; se setea al alta (`invite-member` recibe `price`) y al "Marcar pagó" (Cobros registra el monto real y lo persiste). El alumno siempre ve la cifra aunque el plan se borre/edite.
 
+### Recuperación de contraseña (hecho)
+- **`/recuperar`** (auth): ingresa email → `resetPasswordForEmail` con `redirectTo = <origin>/actualizar-contrasena` (funciona en localhost y producción). Muestra confirmación sin filtrar cuentas existentes.
+- **`/actualizar-contrasena`** (auth): se abre con el token del correo (`type=recovery`), valida que haya sesión, pide clave nueva + confirmación, `updateUser({ password })` → redirige a `/login`.
+- Link **"¿Olvidaste tu contraseña?"** en `/login`.
+- ⚠️ Requiere registrar la URL de redirección en Supabase **Auth → URL Configuration**: `https://spotterx-five.vercel.app/actualizar-contrasena` (y `http://localhost:3000/actualizar-contrasena` para pruebas locales).
+
 ### Fase 6 — Marketplace Fit
 - Venta de productos de fitness, tipo **MercadoLibre** → comisiones
 

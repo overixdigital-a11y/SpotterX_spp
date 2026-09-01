@@ -134,83 +134,121 @@ export default function GymCobrosPage() {
   const nameOf = (profiles: ProfileRef[] | null | undefined) =>
     profiles?.[0]?.full_name ?? profiles?.[0]?.username ?? profiles?.[0]?.email ?? "Usuario";
 
-  return (
-    <main className="mx-auto max-w-md px-4 pt-5">
-      <h1 className="flex items-center gap-1.5 text-xl font-bold text-ink">
-        <Wallet className="h-5 w-5 text-neon" /> Cobros
-      </h1>
-      <p className="mt-1 text-sm text-muted">Cobrá las cuotas y registrá los pagos.</p>
+  const paidCount = memberships.filter((m) => m.pay_status === "pagado").length;
+  const pendingCount = memberships.filter((m) => m.pay_status !== "pagado").length;
+  const totalCollected = payments.reduce((acc, p) => acc + (p.amount || 0), 0);
 
-      <div className="mt-5">
-        <p className="text-sm font-semibold text-ink">Miembros activos</p>
-        {memberships.length === 0 ? (
-          <p className="mt-3 text-xs text-muted">Todavía no hay miembros activos.</p>
-        ) : (
-          <div className="mt-3 space-y-2">
-            {memberships.map((m) => (
-              <div key={m.id} className="rounded-xl border border-edge bg-card p-3">
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-ink">{nameOf(m.profiles)}</p>
-                    <p className="text-xs text-muted">
-                      {m.plan_name} · vence {m.expires_on ?? "—"}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {m.pay_status === "pagado" ? (
-                      <span className="flex items-center gap-1 rounded-full bg-neon/20 px-2 py-0.5 text-[10px] font-semibold text-neon">
-                        <CheckCircle2 className="h-3 w-3" /> Pagó
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 rounded-full bg-muted/20 px-2 py-0.5 text-[10px] font-semibold text-muted">
-                        <Clock3 className="h-3 w-3" />
-                        {m.pay_status === "promo" ? "Promo" : "Pendiente"}
-                      </span>
-                    )}
-                    {m.pay_status !== "pagado" && (
-                      <button
-                        onClick={() => markPaid(m)}
-                        disabled={busy === m.id}
-                        className="rounded-lg bg-ember px-2.5 py-1.5 text-[11px] font-semibold text-bg disabled:opacity-60"
-                      >
-                        {busy === m.id ? "…" : "Marcar pagó"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+  return (
+    <main className="mx-auto max-w-5xl px-4 pt-2 md:pt-4">
+      <div className="border-b border-edge/60 pb-4">
+        <h1 className="flex items-center gap-2 text-2xl font-bold text-ink">
+          <Wallet className="h-6 w-6 text-neon" /> Cobros y Cuotas
+        </h1>
+        <p className="mt-0.5 text-sm text-muted">
+          Controlá la cobrabilidad de membresías, acreditá cuotas manuales y revisá el historial de caja.
+        </p>
       </div>
 
-      <div className="mt-6">
-        <p className="text-sm font-semibold text-ink">Historial de pagos</p>
-        {payments.length === 0 ? (
-          <p className="mt-3 text-xs text-muted">Todavía no hay pagos registrados.</p>
-        ) : (
-          <div className="mt-3 space-y-1.5">
-            {payments.map((p) => (
-              <div key={p.id} className="flex items-center justify-between rounded-xl border border-edge bg-card p-2.5">
-                <div>
-                  <p className="text-sm font-medium text-ink">{nameOf(p.profiles)}</p>
-                  <p className="text-[11px] text-muted">
-                    {new Date(p.paid_at).toLocaleString("es-AR", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "2-digit",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </p>
-                </div>
-                <span className="text-sm font-bold text-neon">
-                  ${p.amount > 0 ? p.amount : "—"}
-                </span>
-              </div>
-            ))}
+      {/* KPI Cards Grid */}
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="rounded-2xl border border-edge bg-card p-4 space-y-1">
+          <p className="text-xs font-semibold text-muted">Total Recaudado (Reciente)</p>
+          <p className="text-2xl font-black text-neon">${totalCollected.toLocaleString("es-AR")}</p>
+        </div>
+        <div className="rounded-2xl border border-edge bg-card p-4 space-y-1">
+          <p className="text-xs font-semibold text-muted">Miembros al Día</p>
+          <p className="text-2xl font-black text-ink">{paidCount} <span className="text-xs font-normal text-muted">/ {memberships.length}</span></p>
+        </div>
+        <div className="rounded-2xl border border-edge bg-card p-4 space-y-1">
+          <p className="text-xs font-semibold text-muted">Cuotas Pendientes / Promo</p>
+          <p className="text-2xl font-black text-ember">{pendingCount}</p>
+        </div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Miembros Activos & Gestión de Cuotas */}
+        <div className="space-y-4 rounded-2xl border border-edge bg-card p-5">
+          <div className="flex items-center justify-between">
+            <p className="text-base font-bold text-ink">Miembros Activos</p>
+            <span className="rounded-full bg-elevated px-2.5 py-1 text-xs font-semibold text-muted">
+              {memberships.length} alumnos
+            </span>
           </div>
-        )}
+
+          {memberships.length === 0 ? (
+            <p className="py-8 text-center text-xs text-muted">Todavía no hay miembros activos.</p>
+          ) : (
+            <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
+              {memberships.map((m) => (
+                <div key={m.id} className="rounded-xl border border-edge bg-bg p-3.5 transition hover:border-neon/30">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-ink">{nameOf(m.profiles)}</p>
+                      <p className="text-xs text-muted">
+                        {m.plan_name} · Vence: <span className="font-mono">{m.expires_on ? new Date(m.expires_on).toLocaleDateString("es-AR") : "—"}</span>
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {m.pay_status === "pagado" ? (
+                        <span className="flex items-center gap-1 rounded-full bg-neon/20 px-2.5 py-1 text-[10px] font-semibold text-neon border border-neon/30">
+                          <CheckCircle2 className="h-3 w-3" /> Pagó
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 rounded-full bg-muted/20 px-2.5 py-1 text-[10px] font-semibold text-muted border border-edge">
+                          <Clock3 className="h-3 w-3" />
+                          {m.pay_status === "promo" ? "Promo" : "Pendiente"}
+                        </span>
+                      )}
+                      {m.pay_status !== "pagado" && (
+                        <button
+                          onClick={() => markPaid(m)}
+                          disabled={busy === m.id}
+                          className="rounded-xl bg-ember px-3 py-1.5 text-xs font-bold text-bg shadow-lg transition hover:opacity-90 disabled:opacity-60"
+                        >
+                          {busy === m.id ? "…" : "Marcar pagó"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Historial de Pagos */}
+        <div className="space-y-4 rounded-2xl border border-edge bg-card p-5">
+          <div className="flex items-center justify-between">
+            <p className="text-base font-bold text-ink">Historial de Pagos Recientes</p>
+            <span className="text-xs font-semibold text-neon">Últimos {payments.length}</span>
+          </div>
+
+          {payments.length === 0 ? (
+            <p className="py-8 text-center text-xs text-muted">Todavía no hay pagos registrados.</p>
+          ) : (
+            <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+              {payments.map((p) => (
+                <div key={p.id} className="flex items-center justify-between rounded-xl border border-edge bg-bg p-3">
+                  <div>
+                    <p className="text-sm font-semibold text-ink">{nameOf(p.profiles)}</p>
+                    <p className="text-[11px] text-muted">
+                      {new Date(p.paid_at).toLocaleString("es-AR", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </div>
+                  <span className="text-sm font-black text-neon">
+                    ${p.amount > 0 ? p.amount.toLocaleString("es-AR") : "0"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </main>
   );

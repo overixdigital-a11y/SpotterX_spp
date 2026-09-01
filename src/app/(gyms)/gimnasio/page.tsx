@@ -114,112 +114,146 @@ export default function GymPanelPage() {
   }
 
   return (
-    <main className="mx-auto max-w-md px-4 pt-5">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-ink">Mi gimnasio</h1>
+    <main className="mx-auto max-w-5xl px-4 pt-2 md:pt-4">
+      <div className="flex items-center justify-between border-b border-edge/60 pb-4">
+        <div>
+          <h1 className="text-2xl font-bold text-ink">Mi gimnasio</h1>
+          <p className="mt-0.5 text-sm text-muted">
+            Configurá tu gimnasio, datos de contacto, ubicación GPS y pase QR de acceso.
+          </p>
+        </div>
         {gym && !editing && (
-          <button onClick={() => setEditing(true)} className="flex items-center gap-1 text-xs font-medium text-neon">
-            <Pencil className="h-3.5 w-3.5" /> Editar
+          <button
+            onClick={() => setEditing(true)}
+            className="flex items-center gap-1.5 rounded-xl border border-neon/40 bg-neon/10 px-3.5 py-2 text-xs font-semibold text-neon transition hover:bg-neon/20"
+          >
+            <Pencil className="h-4 w-4" /> Editar Datos
           </button>
         )}
       </div>
-      <p className="mt-1 text-sm text-muted">
-        Configurá tu gimnasio para el control de acceso.
-      </p>
 
-      {!gym && !editing ? (
-        <button
-          onClick={() => setEditing(true)}
-          className="mt-6 w-full rounded-xl bg-neon py-3 font-semibold text-bg shadow-neon"
-        >
-          Crear mi gimnasio
-        </button>
-      ) : (
-        <div className="mt-5 space-y-3">
-          <input
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            placeholder="Nombre del gimnasio"
-            className="w-full rounded-xl border border-edge bg-card px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-          />
-          <input
-            value={form.address}
-            onChange={(e) => setForm({ ...form, address: e.target.value })}
-            placeholder="Dirección"
-            className="w-full rounded-xl border border-edge bg-card px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-          />
-          <input
-            value={form.city}
-            onChange={(e) => setForm({ ...form, city: e.target.value })}
-            placeholder="Ciudad / Barrio"
-            className="w-full rounded-xl border border-edge bg-card px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-          />
-          <input
-            value={form.capacity}
-            onChange={(e) => setForm({ ...form, capacity: e.target.value })}
-            placeholder="Capacidad (aforo)"
-            type="number"
-            className="w-full rounded-xl border border-edge bg-card px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-          />
+      <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
+        {/* Columna Izquierda: Formulario & Ubicación */}
+        <div className="space-y-4 rounded-2xl border border-edge bg-card p-5">
+          <h2 className="text-base font-bold text-ink">Información del Establecimiento</h2>
 
-          <button
-            onClick={locate}
-            disabled={locating}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-neon/40 bg-neon/10 py-2.5 text-sm font-medium text-neon disabled:opacity-60"
-          >
-            <MapPin className="h-4 w-4" />
-            {locating ? "Obteniendo ubicación…" : "Obtener mi ubicación (GPS)"}
-          </button>
-
-          {gym?.latitude && gym?.longitude ? (
-            <GymMap latitude={gym.latitude} longitude={gym.longitude} name={gym.name} />
-          ) : (
-            <p className="rounded-xl border border-dashed border-edge bg-card p-4 text-center text-xs text-muted">
-              Usá &quot;Obtener mi ubicación&quot; para mostrar tu gimnasio en el mapa.
-            </p>
-          )}
-
-          {editing && (
+          {!gym && !editing ? (
             <button
-              onClick={saveGym}
-              disabled={saving || !form.name.trim()}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-neon py-3 font-semibold text-bg shadow-neon disabled:opacity-60"
+              onClick={() => setEditing(true)}
+              className="mt-4 w-full rounded-xl bg-neon py-3 font-semibold text-bg shadow-neon"
             >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-              Guardar
+              Crear mi gimnasio
             </button>
+          ) : (
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-muted">Nombre Comercial</label>
+                <input
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="Ej: PowerGym Centro"
+                  className="w-full rounded-xl border border-edge bg-bg px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-muted">Dirección Completa</label>
+                <input
+                  value={form.address}
+                  onChange={(e) => setForm({ ...form, address: e.target.value })}
+                  placeholder="Ej: Av. Corrientes 1234"
+                  className="w-full rounded-xl border border-edge bg-bg px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-muted">Ciudad / Barrio</label>
+                  <input
+                    value={form.city}
+                    onChange={(e) => setForm({ ...form, city: e.target.value })}
+                    placeholder="Ej: Palermo"
+                    className="w-full rounded-xl border border-edge bg-bg px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-muted">Aforo Máximo</label>
+                  <input
+                    value={form.capacity}
+                    onChange={(e) => setForm({ ...form, capacity: e.target.value })}
+                    placeholder="Ej: 100 personas"
+                    type="number"
+                    className="w-full rounded-xl border border-edge bg-bg px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={locate}
+                disabled={locating}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-neon/40 bg-neon/10 py-2.5 text-sm font-medium text-neon transition hover:bg-neon/20 disabled:opacity-60"
+              >
+                <MapPin className="h-4 w-4" />
+                {locating ? "Obteniendo ubicación…" : "Obtener mi ubicación (GPS)"}
+              </button>
+
+              {gym?.latitude && gym?.longitude && (
+                <p className="text-xs text-muted">
+                  📍 Ubicación guardada: {gym.latitude.toFixed(5)}, {gym.longitude.toFixed(5)}
+                </p>
+              )}
+
+              {editing && (
+                <button
+                  onClick={saveGym}
+                  disabled={saving || !form.name.trim()}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-neon py-3 font-semibold text-bg shadow-neon transition hover:opacity-90 disabled:opacity-60"
+                >
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                  Guardar cambios
+                </button>
+              )}
+            </div>
           )}
         </div>
-      )}
 
-      {gym?.latitude && gym?.longitude && (
-        <p className="mt-2 text-xs text-muted">
-          📍 {gym.latitude.toFixed(5)}, {gym.longitude.toFixed(5)}
-        </p>
-      )}
-
-      {gym && (
-        <div className="mt-6 rounded-2xl border border-edge bg-card p-5 text-center">
-          <p className="text-sm font-semibold text-ink">Código QR de tu gimnasio</p>
-          <p className="mt-0.5 text-xs text-muted">
-            Imprimilo y pegalo en la entrada. Los miembros lo escanean con su celular.
-          </p>
-          <div className="mx-auto mt-4 w-fit rounded-xl bg-white p-3">
-            <QRCodeSVG
-              value={`https://spotterx-five.vercel.app/checkin/${gym.qr_code}`}
-              size={180}
-              fgColor="#05070a"
-            />
+        {/* Columna Derecha: Mapa & Pase QR */}
+        <div className="space-y-6">
+          {/* Leaflet Map Card */}
+          <div className="rounded-2xl border border-edge bg-card p-5">
+            <h2 className="mb-3 text-base font-bold text-ink">Mapa de Ubicación</h2>
+            {gym?.latitude && gym?.longitude ? (
+              <GymMap latitude={gym.latitude} longitude={gym.longitude} name={gym.name} />
+            ) : (
+              <p className="rounded-xl border border-dashed border-edge bg-bg p-8 text-center text-xs text-muted">
+                Usá &quot;Obtener mi ubicación (GPS)&quot; para desplegar tu gimnasio en el mapa interactivo.
+              </p>
+            )}
           </div>
-          <p className="mt-2 font-mono text-xs text-neon">{gym.qr_code}</p>
-          <button
-            onClick={() => window.print()}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-edge bg-elevated py-2.5 text-sm font-medium text-ink"
-          >
-            <Save className="h-4 w-4" /> Imprimir QR
-          </button>
+
+          {/* QR Code Card */}
+          {gym && (
+            <div className="rounded-2xl border border-edge bg-card p-5 text-center space-y-3">
+              <p className="text-base font-bold text-ink">Código QR de Ingreso</p>
+              <p className="text-xs text-muted">
+                Imprimilo o mostralo en tu recepción para que alumnos y profesores registren su check-in.
+              </p>
+              <div className="mx-auto w-fit rounded-2xl bg-white p-4 shadow-xl">
+                <QRCodeSVG
+                  value={`https://spotterx-five.vercel.app/checkin/${gym.qr_code}`}
+                  size={200}
+                  fgColor="#05070a"
+                />
+              </div>
+              <p className="font-mono text-xs font-semibold text-neon">{gym.qr_code}</p>
+              <button
+                onClick={() => window.print()}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-edge bg-elevated py-2.5 text-sm font-medium text-ink transition hover:border-neon/40 hover:text-neon"
+              >
+                <Save className="h-4 w-4" /> Imprimir Pase QR
+              </button>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </main>
   );
 }

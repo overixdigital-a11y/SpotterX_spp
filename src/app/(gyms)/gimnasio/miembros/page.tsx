@@ -219,152 +219,199 @@ export default function GymMembersPage() {
   };
 
   return (
-    <main className="mx-auto max-w-md px-4 pt-5">
-      <h1 className="text-xl font-bold text-ink">Miembros</h1>
-      <p className="mt-1 text-sm text-muted">Creá las cuentas de tus alumnos y profesores.</p>
-
-      <div className="mt-5 rounded-2xl border border-edge bg-card p-4">
-        <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
-          <UserPlus className="h-4 w-4 text-neon" /> Alta de miembro
+    <main className="mx-auto max-w-5xl px-4 pt-2 md:pt-4">
+      <div className="border-b border-edge/60 pb-4">
+        <h1 className="text-2xl font-bold text-ink">Gestión de Miembros</h1>
+        <p className="mt-0.5 text-sm text-muted">
+          Creá cuentas para tus alumnos y profesores, configurá sus planes y controla sus accesos.
         </p>
-
-        <div className="mt-3 space-y-2">
-          <select
-            value={form.role}
-            onChange={(e) => setForm({ ...form, role: e.target.value })}
-            className="w-full rounded-lg border border-edge bg-elevated px-3 py-2 text-sm text-ink focus:border-neon focus:outline-none"
-          >
-            <option value="alumno">Alumno</option>
-            <option value="profesor">Profesor</option>
-          </select>
-
-          {form.role === "alumno" && (
-            <>
-              <select
-                value={form.plan_id}
-                onChange={(e) => {
-                  setForm({ ...form, plan_id: e.target.value });
-                  const pl = plans.find((p) => p.id === e.target.value);
-                  if (pl?.promo_type) setPromoCount(PROMO_COUNT[pl.promo_type] ?? 2);
-                }}
-                className="w-full rounded-lg border border-edge bg-elevated px-3 py-2 text-sm text-ink focus:border-neon focus:outline-none"
-              >
-                <option value="">Elegí un plan…</option>
-                {plans.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} · ${p.price} ({p.duration_months} mes{p.duration_months > 1 ? "es" : ""})
-                  </option>
-                ))}
-              </select>
-
-              {selectedPlan?.promo_type && (
-                <div className="rounded-xl border border-ember/30 bg-ember/10 p-3">
-                  <p className="flex items-center gap-1.5 text-xs font-semibold text-ember">
-                    <Gift className="h-3.5 w-3.5" />
-                    Promo {selectedPlan.promo_type}: el primero paga, {selectedPlan.promo_type === "2x1" ? "el segundo" : "el resto"} entra gratis el primer mes
-                  </p>
-                </div>
-              )}
-            </>
-          )}
-
-          {people.map((person, i) => (
-            <div key={i} className="space-y-2 rounded-xl border border-edge bg-elevated p-2">
-              {i > 0 && (
-                <p className="text-[10px] font-bold uppercase tracking-wide text-ember">
-                  🎁 Extra de promo (gratis ese mes)
-                </p>
-              )}
-              <input
-                value={person.full_name}
-                onChange={(e) => setPeople((prev) => prev.map((p, j) => (j === i ? { ...p, full_name: e.target.value } : p)))}
-                placeholder="Nombre completo"
-                className="w-full rounded-lg border border-edge bg-card px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-              />
-              <input
-                value={person.email}
-                onChange={(e) => setPeople((prev) => prev.map((p, j) => (j === i ? { ...p, email: e.target.value } : p)))}
-                placeholder="Email"
-                type="email"
-                className="w-full rounded-lg border border-edge bg-card px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-              />
-              <input
-                value={person.username}
-                onChange={(e) => setPeople((prev) => prev.map((p, j) => (j === i ? { ...p, username: e.target.value.replace(/\s/g, "") } : p)))}
-                placeholder="@usuario"
-                className="w-full rounded-lg border border-edge bg-card px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-              />
-            </div>
-          ))}
-
-          <button
-            onClick={createAll}
-            disabled={creating || people.length === 0 || !people[0].email || !requeried(people[0])}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-neon py-2.5 text-sm font-semibold text-bg shadow-neon disabled:opacity-60"
-          >
-            {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-            {creating ? "Creando cuentas…" : `Crear ${people.length} cuenta${people.length > 1 ? "s" : ""}`}
-          </button>
-        </div>
-
-        {results.length > 0 && (
-          <div className="mt-3 rounded-xl border border-ember/40 bg-ember/10 p-3">
-            <p className="flex items-center gap-1.5 text-xs font-semibold text-ember">
-              <KeyRound className="h-3.5 w-3.5" /> Cuentas creadas
-            </p>
-            <div className="mt-2 space-y-1.5 text-sm text-ink">
-              {results.map((r, i) => (
-                <div key={i} className="rounded-lg bg-card p-2">
-                  <p className="text-xs text-muted">{i === 0 ? "💰 Paga" : "🎁 Promo"}</p>
-                  <p className="font-medium">{r.email}</p>
-                  <p className="font-mono text-neon">{r.provisional_password}</p>
-                </div>
-              ))}
-            </div>
-            <button
-              onClick={copyAll}
-              className="mt-2 flex items-center gap-1.5 rounded-lg border border-edge bg-card px-3 py-1.5 text-xs font-medium text-ink"
-            >
-              {copied ? <Check className="h-3.5 w-3.5 text-neon" /> : <Copy className="h-3.5 w-3.5" />}
-              {copied ? "Copiado" : "Copiar credenciales"}
-            </button>
-          </div>
-        )}
       </div>
 
-      <div className="mt-6">
-        <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
-          <Users className="h-4 w-4 text-neon" /> Lista de miembros
-        </p>
-        {members.length === 0 ? (
-          <p className="mt-3 text-xs text-muted">Todavía no hay miembros.</p>
-        ) : (
-          <div className="mt-3 space-y-2">
-            {members.map((m) => (
-              <div key={m.user_id} className="flex items-center justify-between rounded-xl border border-edge bg-card p-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-ink">{m.full_name ?? m.username ?? m.email}</p>
-                  <p className="truncate text-xs text-muted">
-                    @{m.username} · {m.email}
-                  </p>
-                  {m.pay_status === "pendiente" && (
-                    <p className="mt-0.5 text-[10px] text-muted">{m.plan_name ?? "Plan"} · vence {m.expires_on ?? "—"}</p>
-                  )}
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-1">
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                      m.role === "profesor" ? "bg-ember/20 text-ember" : "bg-neon/20 text-neon"
-                    }`}
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Formulario Alta de Miembros */}
+        <div className="lg:col-span-1 space-y-4 rounded-2xl border border-edge bg-card p-5 h-fit">
+          <p className="flex items-center gap-2 text-base font-bold text-ink">
+            <UserPlus className="h-5 w-5 text-neon" /> Alta de Miembro
+          </p>
+
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-muted">Rol de Usuario</label>
+              <select
+                value={form.role}
+                onChange={(e) => setForm({ ...form, role: e.target.value })}
+                className="w-full rounded-xl border border-edge bg-bg px-3.5 py-2.5 text-sm text-ink focus:border-neon focus:outline-none"
+              >
+                <option value="alumno">Alumno</option>
+                <option value="profesor">Profesor / Staff</option>
+              </select>
+            </div>
+
+            {form.role === "alumno" && (
+              <>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-muted">Plan de Membresía</label>
+                  <select
+                    value={form.plan_id}
+                    onChange={(e) => {
+                      setForm({ ...form, plan_id: e.target.value });
+                      const pl = plans.find((p) => p.id === e.target.value);
+                      if (pl?.promo_type) setPromoCount(PROMO_COUNT[pl.promo_type] ?? 2);
+                    }}
+                    className="w-full rounded-xl border border-edge bg-bg px-3.5 py-2.5 text-sm text-ink focus:border-neon focus:outline-none"
                   >
-                    {m.role === "profesor" ? "Profesor" : "Alumno"}
-                  </span>
-                  {m.role === "alumno" && badgePay(m.pay_status)}
+                    <option value="">Elegí un plan…</option>
+                    {plans.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} · ${p.price} ({p.duration_months} mes{p.duration_months > 1 ? "es" : ""})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {selectedPlan?.promo_type && (
+                  <div className="rounded-xl border border-ember/30 bg-ember/10 p-3 space-y-1">
+                    <p className="flex items-center gap-1.5 text-xs font-semibold text-ember">
+                      <Gift className="h-4 w-4" />
+                      Promo {selectedPlan.promo_type} activa
+                    </p>
+                    <p className="text-[11px] text-ember/80">
+                      El primer miembro abona el plan y los demás entran gratis el primer mes.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {people.map((person, i) => (
+              <div key={i} className="space-y-2 rounded-xl border border-edge bg-bg p-3">
+                {i > 0 && (
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-ember">
+                    🎁 Beneficiario Extra de Promo
+                  </p>
+                )}
+                <div>
+                  <input
+                    value={person.full_name}
+                    onChange={(e) => setPeople((prev) => prev.map((p, j) => (j === i ? { ...p, full_name: e.target.value } : p)))}
+                    placeholder="Nombre y apellido"
+                    className="w-full rounded-lg border border-edge bg-card px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <input
+                    value={person.email}
+                    onChange={(e) => setPeople((prev) => prev.map((p, j) => (j === i ? { ...p, email: e.target.value } : p)))}
+                    placeholder="correo@ejemplo.com"
+                    type="email"
+                    className="w-full rounded-lg border border-edge bg-card px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <input
+                    value={person.username}
+                    onChange={(e) => setPeople((prev) => prev.map((p, j) => (j === i ? { ...p, username: e.target.value.replace(/\s/g, "") } : p)))}
+                    placeholder="@usuario"
+                    className="w-full rounded-lg border border-edge bg-card px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                  />
                 </div>
               </div>
             ))}
+
+            <button
+              onClick={createAll}
+              disabled={creating || people.length === 0 || !people[0].email || !requeried(people[0])}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-neon py-3 font-semibold text-bg shadow-neon transition hover:opacity-90 disabled:opacity-60"
+            >
+              {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+              {creating ? "Creando cuentas…" : `Crear ${people.length} cuenta${people.length > 1 ? "s" : ""}`}
+            </button>
           </div>
-        )}
+
+          {results.length > 0 && (
+            <div className="mt-4 rounded-xl border border-ember/40 bg-ember/10 p-3 space-y-2">
+              <p className="flex items-center gap-1.5 text-xs font-bold text-ember">
+                <KeyRound className="h-4 w-4" /> Credenciales Generadas
+              </p>
+              <div className="space-y-1.5 text-sm text-ink">
+                {results.map((r, i) => (
+                  <div key={i} className="rounded-lg bg-card p-2 text-xs border border-edge">
+                    <p className="text-[10px] text-muted">{i === 0 ? "💰 Titular Pagado" : "🎁 Invitado Promo"}</p>
+                    <p className="font-semibold">{r.email}</p>
+                    <p className="font-mono text-neon">Clave: {r.provisional_password}</p>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={copyAll}
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-edge bg-card py-2 text-xs font-medium text-ink transition hover:border-neon/40 hover:text-neon"
+              >
+                {copied ? <Check className="h-4 w-4 text-neon" /> : <Copy className="h-4 w-4" />}
+                {copied ? "¡Copias al portapapeles!" : "Copiar credenciales"}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Tabla / Lista de Miembros */}
+        <div className="lg:col-span-2 space-y-4 rounded-2xl border border-edge bg-card p-5">
+          <div className="flex items-center justify-between">
+            <p className="flex items-center gap-2 text-base font-bold text-ink">
+              <Users className="h-5 w-5 text-neon" /> Miembros Registrados
+            </p>
+            <span className="rounded-full bg-elevated px-3 py-1 text-xs font-bold text-neon border border-neon/20">
+              Total: {members.length}
+            </span>
+          </div>
+
+          {members.length === 0 ? (
+            <div className="py-12 text-center text-xs text-muted">
+              Todavía no registraste miembros en tu gimnasio.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-ink">
+                <thead className="border-b border-edge bg-elevated/40 text-[11px] font-bold uppercase tracking-wider text-muted">
+                  <tr>
+                    <th className="px-3 py-3">Usuario / Email</th>
+                    <th className="px-3 py-3">Rol</th>
+                    <th className="px-3 py-3">Plan</th>
+                    <th className="px-3 py-3">Estado Pago</th>
+                    <th className="px-3 py-3 text-right">Vencimiento</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-edge/60">
+                  {members.map((m) => (
+                    <tr key={m.user_id} className="hover:bg-elevated/30 transition">
+                      <td className="px-3 py-3">
+                        <p className="font-semibold text-ink">{m.full_name ?? m.username ?? m.email}</p>
+                        <p className="text-xs text-muted">@{m.username || "sin_username"} · {m.email}</p>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <span
+                          className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
+                            m.role === "profesor" ? "bg-ember/20 text-ember border border-ember/30" : "bg-neon/20 text-neon border border-neon/30"
+                          }`}
+                        >
+                          {m.role === "profesor" ? "Profesor" : "Alumno"}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-xs text-muted whitespace-nowrap">
+                        {m.plan_name ?? "General"}
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        {m.role === "alumno" ? badgePay(m.pay_status) : <span className="text-xs text-muted">—</span>}
+                      </td>
+                      <td className="px-3 py-3 text-right text-xs font-mono text-muted whitespace-nowrap">
+                        {m.expires_on ? new Date(m.expires_on).toLocaleDateString("es-AR") : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </main>
   );

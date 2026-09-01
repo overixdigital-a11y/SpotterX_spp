@@ -92,68 +92,97 @@ export default function GymAccessPage() {
   const capacity = gym.capacity ?? null;
 
   return (
-    <main className="mx-auto max-w-md px-4 pt-5">
-      <h1 className="text-xl font-bold text-ink">Accesos</h1>
-      <p className="mt-1 text-sm text-muted">Actividad de tu gimnasio.</p>
+    <main className="mx-auto max-w-5xl px-4 pt-2 md:pt-4">
+      <div className="border-b border-edge/60 pb-4">
+        <h1 className="flex items-center gap-2 text-2xl font-bold text-ink">
+          <Activity className="h-6 w-6 text-neon" /> Control de Accesos y Aforo
+        </h1>
+        <p className="mt-0.5 text-sm text-muted">
+          Monitoreá las entradas, salidas y presencia de miembros en tiempo real.
+        </p>
+      </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-2">
-        <div className="rounded-2xl border border-edge bg-card p-4">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-muted">
-            <Users className="h-3.5 w-3.5 text-neon" /> Ahora dentro
+      {/* KPI Cards Grid */}
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="rounded-2xl border border-edge bg-card p-5 space-y-1">
+          <p className="flex items-center gap-2 text-xs font-bold text-muted uppercase tracking-wider">
+            <Users className="h-4 w-4 text-neon" /> Ocupación Actual
           </p>
-          <p className="mt-1 text-3xl font-extrabold text-ink">
+          <p className="text-3xl font-black text-ink">
             {presence}
-            {capacity != null && <span className="text-base font-medium text-muted">/{capacity}</span>}
+            {capacity != null && <span className="text-base font-normal text-muted"> / {capacity} aforo</span>}
           </p>
         </div>
-        <div className="rounded-2xl border border-edge bg-card p-4">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-muted">
-            <Activity className="h-3.5 w-3.5 text-ember" /> Hoy
+
+        <div className="rounded-2xl border border-edge bg-card p-5 space-y-1">
+          <p className="flex items-center gap-2 text-xs font-bold text-muted uppercase tracking-wider">
+            <Activity className="h-4 w-4 text-ember" /> Asistencia Hoy
           </p>
-          <p className="mt-1 text-3xl font-extrabold text-ink">{attendanceToday}</p>
+          <p className="text-3xl font-black text-neon">{attendanceToday} <span className="text-xs font-normal text-muted">check-ins</span></p>
+        </div>
+
+        <div className="rounded-2xl border border-edge bg-card p-5 space-y-1 sm:col-span-2 lg:col-span-1">
+          <p className="text-xs font-bold text-muted uppercase tracking-wider">Estado de Capacidad</p>
+          <p className="text-lg font-bold text-ink">
+            {capacity ? (
+              presence >= capacity ? (
+                <span className="text-ember">🔴 Aforo completo ({Math.round((presence / capacity) * 100)}%)</span>
+              ) : (
+                <span className="text-neon">🟢 {capacity - presence} lugares disponibles</span>
+              )
+            ) : (
+              <span className="text-neon">🟢 Aforo ilimitado</span>
+            )}
+          </p>
         </div>
       </div>
 
-      <div className="mt-6">
-        <p className="text-sm font-semibold text-ink">Historial</p>
+      {/* Historial de Accesos */}
+      <div className="mt-6 space-y-4 rounded-2xl border border-edge bg-card p-5">
+        <div className="flex items-center justify-between">
+          <p className="text-base font-bold text-ink">Registro de Accesos Recientes</p>
+          <span className="text-xs font-semibold text-neon">Últimos {logs.length} registros</span>
+        </div>
+
         {logs.length === 0 ? (
-          <p className="mt-2 text-xs text-muted">Todavía no hay accesos registrados.</p>
+          <p className="py-12 text-center text-xs text-muted">Todavía no hay accesos registrados el día de hoy.</p>
         ) : (
-          <div className="mt-3 space-y-1.5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[600px] overflow-y-auto pr-1">
             {logs.map((l) => (
               <div
                 key={l.id}
-                className="flex items-center justify-between rounded-xl border border-edge bg-card p-2.5"
+                className="flex items-center justify-between rounded-xl border border-edge bg-bg p-3.5 transition hover:border-neon/30"
               >
-                <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex items-center gap-3 min-w-0">
                   <span
-                    className={`rounded-full p-1.5 ${
-                      l.type === "ingreso" ? "bg-neon/20 text-neon" : "bg-ember/20 text-ember"
+                    className={`rounded-xl p-2 ${
+                      l.type === "ingreso" ? "bg-neon/20 text-neon border border-neon/30" : "bg-ember/20 text-ember border border-ember/30"
                     }`}
                   >
                     {l.type === "ingreso" ? (
-                      <DoorOpen className="h-3.5 w-3.5" />
+                      <DoorOpen className="h-4 w-4" />
                     ) : (
-                      <DoorClosed className="h-3.5 w-3.5" />
+                      <DoorClosed className="h-4 w-4" />
                     )}
                   </span>
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-ink">
+                    <p className="truncate text-sm font-semibold text-ink">
                       {l.profiles?.[0]?.full_name ?? l.profiles?.[0]?.username ?? "Usuario"}
                     </p>
-                    <p className="text-[11px] text-muted">
+                    <p className="text-xs font-mono text-muted">
                       {new Date(l.created_at).toLocaleString("es-AR", {
                         day: "2-digit",
                         month: "2-digit",
                         hour: "2-digit",
                         minute: "2-digit",
+                        second: "2-digit",
                       })}
                     </p>
                   </div>
                 </div>
                 <span
-                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                    l.type === "ingreso" ? "bg-neon/20 text-neon" : "bg-ember/20 text-ember"
+                  className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                    l.type === "ingreso" ? "bg-neon/20 text-neon border border-neon/30" : "bg-ember/20 text-ember border border-ember/30"
                   }`}
                 >
                   {l.type === "ingreso" ? "Entrada" : "Salida"}

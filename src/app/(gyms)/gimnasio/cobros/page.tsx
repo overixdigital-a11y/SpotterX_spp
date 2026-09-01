@@ -86,11 +86,12 @@ export default function GymCobrosPage() {
     const supabase = createClient();
     const { data: plan } = await supabase
       .from("gym_plans")
-      .select("duration_months")
+      .select("duration_months, price")
       .eq("gym_id", gym.id)
       .eq("name", m.plan_name)
       .maybeSingle();
     const months = plan?.duration_months ?? 1;
+    const price = typeof plan?.price === "number" ? plan.price : null;
 
     const base = m.expires_on && new Date(m.expires_on) > new Date() ? new Date(m.expires_on) : new Date();
     base.setMonth(base.getMonth() + months);
@@ -100,14 +101,14 @@ export default function GymCobrosPage() {
       gym_id: gym.id,
       membership_id: m.id,
       user_id: m.user_id,
-      amount: 0,
+      amount: price ?? 0,
       method: "manual",
       note: `Cuota ${m.plan_name}`,
     });
 
     await supabase
       .from("gym_memberships")
-      .update({ pay_status: "pagado", expires_on: newExpiry })
+      .update({ pay_status: "pagado", expires_on: newExpiry, price })
       .eq("id", m.id);
 
     setMemberships((prev) => prev.map((x) => (x.id === m.id ? { ...x, pay_status: "pagado", expires_on: newExpiry } : x)));

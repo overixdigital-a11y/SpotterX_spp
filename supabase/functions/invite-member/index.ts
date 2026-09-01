@@ -34,7 +34,7 @@ Deno.serve(async (req: Request) => {
 
     // 2) Leer body
     const body = await req.json();
-    const { gym_id, role, full_name, username, email, plan_name, pay_status, expires_on } = body ?? {};
+    const { gym_id, role, full_name, username, email, plan_name, pay_status, expires_on, price } = body ?? {};
     if (!gym_id || !role || !full_name || !username || !email) {
       return json({ error: "Faltan campos: gym_id, role, full_name, username, email" }, 400);
     }
@@ -87,6 +87,7 @@ Deno.serve(async (req: Request) => {
         status: "activa",
         pay_status: pay_status ?? "pendiente",
         expires_on: expires_on ?? null,
+        price: typeof price === "number" && price >= 0 ? price : null,
       });
     }
 

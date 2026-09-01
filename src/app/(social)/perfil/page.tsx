@@ -1,7 +1,8 @@
 "use client";
 
 import { useAuthState } from "@/lib/auth-context";
-import { MapPin, Zap } from "lucide-react";
+import Link from "next/link";
+import { MapPin, Zap, ChevronRight, Dumbbell } from "lucide-react";
 
 export default function PerfilPage() {
   const { profile } = useAuthState();
@@ -27,6 +28,21 @@ export default function PerfilPage() {
           )}
         </div>
       </div>
+
+      {profile?.role === "alumno" && (
+        <Link
+          href="/mi-gimnasio"
+          className="mx-4 mt-4 flex items-center justify-between rounded-2xl border border-neon/30 bg-neon/10 p-3.5"
+        >
+          <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <span className="rounded-full bg-neon/20 p-1.5 text-neon">
+              <Dumbbell className="h-4 w-4" />
+            </span>
+            Mi gimnasio
+          </p>
+          <ChevronRight className="h-4 w-4 text-neon" />
+        </Link>
+      )}
 
       {profile?.role === "profesor" && (
         <div className="mx-4 mt-4 rounded-xl border border-ember/30 bg-ember/10 p-3 text-center">

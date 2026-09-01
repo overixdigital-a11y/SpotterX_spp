@@ -115,6 +115,12 @@ Tablas planificadas (schema en evolución):
 - Nav del gym: agregado tab **Cobros**.
 - **Pendiente/futuro**: pasarela MercadoPago/Stripe por gym (se dejó `gym_payments.method` preparado con `manual`/`mercadopago`/`stripe`).
 
+### Pulido alumnos + kiosk gym (hecho)
+- **`/mi-gimnasio`** (alumno, sección propia separada de la barra social; acceso desde Perfil solo rol alumno): card "pasaporte" con gym + dirección + plan + **precio** + vencimiento + estado de cuota (✅ al día / 🎁 promo / ⏳ debe / 🔴 vencida). Botón **"Dar el presente"** abre la cámara con `@yudiel/react-qr-scanner` (dependencia `@yudiel/react-qr-scanner`) para escanear el QR (pantalla/cartel) → redirige a `/checkin/<qr>` con la sesión ya iniciada (sin re-login).
+- **Kiosk `/gimnasio/pantalla`** (overlay full-screen para monitor, acceso desde pestaña QR con "Abrir en pantalla"): QR gigante + **realtime** en `gym_access_logs` (`postgres_changes`, publicación `supabase_realtime` agregó `gym_access_logs` y `notifications`) → al escanear un alumno muestra **ficha ~8s** con foto de perfil del feed (`profiles.avatar_url`, o iniciales neón) + hora, y lista "Ingresos de hoy".
+- **Aviso al gym**: trigger `notify_gym_checkin` (migración 00005) inserta notificación `type='checkin'` (columna `gym_id` nueva + tipo habilitado) al dueño por cada ingreso. **Campanita** en el header del GymShell con contador de no leídas + desplegable "Quién entró".
+- **Precio guardado en membresía**: migración 00005 agrega `gym_memberships.price`; se setea al alta (`invite-member` recibe `price`) y al "Marcar pagó" (Cobros registra el monto real y lo persiste). El alumno siempre ve la cifra aunque el plan se borre/edite.
+
 ### Fase 6 — Marketplace Fit
 - Venta de productos de fitness, tipo **MercadoLibre** → comisiones
 
@@ -142,5 +148,6 @@ Tablas planificadas (schema en evolución):
 - ✅ Fase 3 — Gestión de alumnos del profe (+ schema 00002_training)
 - ✅ Fase 4 — Control de Acceso del gym (panel, memberships, QR check-in, accesos/aforo, edge function invite-member, schema 00003, mapa Leaflet)
 - ✅ Fase 5 — Cobro de Cuota manual (+ pulido de planes con promos, schema 00004)
+- ✅ Pulido alumnos + kiosk gym: `/mi-gimnasio` + escáner + kiosk realtime + campanita de ingresos (schema 00005, `@yudiel/react-qr-scanner`)
 - ⏸️ Fase 6 — Marketplace Fit
 - 🔜 Empaquetar como app móvil (Play Store / App Store via Capacitor) al final del roadmap

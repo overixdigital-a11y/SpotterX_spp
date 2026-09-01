@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { Loader2, Printer } from "lucide-react";
+import Link from "next/link";
+import { Loader2, Printer, MonitorPlay } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 
@@ -75,6 +76,13 @@ export default function GymQrPage() {
       >
         <Printer className="h-4 w-4" /> Imprimir QR
       </button>
+
+      <Link
+        href="/gimnasio/pantalla"
+        className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-neon/40 bg-neon/10 py-3 font-semibold text-neon"
+      >
+        <MonitorPlay className="h-4 w-4" /> Abrir en pantalla (kiosk)
+      </Link>
     </main>
   );
 }

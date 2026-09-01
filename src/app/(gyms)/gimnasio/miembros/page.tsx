@@ -167,6 +167,7 @@ export default function GymMembersPage() {
           plan_name: selectedPlan.name,
           pay_status: isExtras ? "promo" : "pagado",
           expires_on: calcExpiry(selectedPlan.duration_months),
+          price: selectedPlan.price,
         }),
       });
       const data = await res.json();

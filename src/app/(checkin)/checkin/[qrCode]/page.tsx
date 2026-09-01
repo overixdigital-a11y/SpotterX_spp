@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { Loader2, LogIn, DoorOpen, DoorClosed, Clock3, MapPin, Ban } from "lucide-react";
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
@@ -30,7 +31,8 @@ interface MemberInfo {
   expires_on: string | null;
 }
 
-export default function CheckinPage({ params }: { params: { qrCode: string } }) {
+export default function CheckinPage() {
+  const { qrCode } = useParams<{ qrCode: string }>();
   const { userId, profile, loading: authLoading } = useAuthState();
   const [gym, setGym] = useState<Gym | null>(null);
   const [member, setMember] = useState<MemberInfo | null>(null);
@@ -46,7 +48,7 @@ export default function CheckinPage({ params }: { params: { qrCode: string } }) 
       const { data } = await supabase
         .from("gyms")
         .select("id, name, address, city, latitude, longitude, qr_code")
-        .eq("qr_code", params.qrCode)
+        .eq("qr_code", qrCode)
         .maybeSingle();
       if (!active) return;
       if (!data) {
@@ -86,7 +88,7 @@ export default function CheckinPage({ params }: { params: { qrCode: string } }) 
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.qrCode, userId]);
+  }, [qrCode, userId]);
 
   const register = async (type: "ingreso" | "egreso") => {
     if (!gym) return;
@@ -151,7 +153,7 @@ export default function CheckinPage({ params }: { params: { qrCode: string } }) 
             <div className="mt-5">
               <p className="text-sm text-muted">Iniciá sesión para registrarte en este gimnasio.</p>
               <Link
-                href={`/login?next=${encodeURIComponent(`/checkin/${params.qrCode}`)}`}
+                href={`/login?next=${encodeURIComponent(`/checkin/${qrCode}`)}`}
                 className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-neon py-3 font-semibold text-bg shadow-neon"
               >
                 <LogIn className="h-4 w-4" /> Ingresar

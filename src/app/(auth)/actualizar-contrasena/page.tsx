@@ -17,13 +17,40 @@ export default function ActualizarContrasenaPage() {
 
   useEffect(() => {
     const supabase = createClient();
+    let active = true;
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!active) return;
+      if ((event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") && session) {
+        setValidLink(true);
+        setChecking(false);
+      }
+    });
+
     (async () => {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      setValidLink(!!session);
-      setChecking(false);
+      if (!active) return;
+      if (session) {
+        setValidLink(true);
+        setChecking(false);
+        return;
+      }
+      // Si no hay sesión de arranque, esperamos el intercambio del token.
+      // Timeout: si en 10s no llegó, el link es inválido o ya se consumió.
+      setTimeout(() => {
+        if (!active) return;
+        setChecking(false);
+      }, 10000);
     })();
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const onSubmit = async (e: React.FormEvent) => {

@@ -44,7 +44,7 @@ export default function DiscoverPage() {
   }, [q]);
 
   return (
-    <main className="mx-auto max-w-md px-4 pt-4">
+    <div className="w-full">
       <div className="flex items-center gap-2 rounded-xl border border-edge bg-card px-3 py-2.5">
         <Search className="h-4 w-4 text-muted" />
         <input
@@ -104,6 +104,6 @@ export default function DiscoverPage() {
           </p>
         </>
       )}
-    </main>
+    </div>
   );
 }

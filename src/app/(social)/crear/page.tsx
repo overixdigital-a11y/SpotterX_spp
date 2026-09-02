@@ -76,7 +76,7 @@ export default function CrearPage() {
   const isVideo = file?.type.startsWith("video");
 
   return (
-    <main className="mx-auto max-w-md px-4 pt-4">
+    <div className="w-full">
       <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-edge bg-card p-8 text-center">
         <input type="file" accept="video/*,image/*" className="hidden" onChange={onFile} />
         {file ? (
@@ -146,6 +146,6 @@ export default function CrearPage() {
           <Type className="h-4 w-4 text-neon" /> Texto
         </button>
       </div>
-    </main>
+    </div>
   );
 }

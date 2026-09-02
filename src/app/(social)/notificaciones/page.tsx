@@ -89,7 +89,7 @@ export default function NotificacionesPage() {
   }
 
   return (
-    <main className="mx-auto max-w-md px-4 pt-2">
+    <div className="w-full">
       {notifs.length === 0 ? (
         <div className="py-16 text-center">
           <p className="text-muted">Todavía no tenés notificaciones.</p>
@@ -112,6 +112,6 @@ export default function NotificacionesPage() {
           );
         })
       )}
-    </main>
+    </div>
   );
 }

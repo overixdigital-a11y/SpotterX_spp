@@ -112,7 +112,7 @@ export default function MiGimnasioPage() {
   }
 
   return (
-    <main className="mx-auto max-w-md px-4 pt-5">
+    <div className="w-full">
       <h1 className="flex items-center gap-1.5 text-xl font-bold text-ink">
         <Dumbbell className="h-5 w-5 text-neon" /> Mi gimnasio
       </h1>
@@ -202,6 +202,6 @@ export default function MiGimnasioPage() {
           </div>
         </>
       )}
-    </main>
+    </div>
   );
 }

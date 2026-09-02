@@ -11,7 +11,7 @@ export default function PerfilPage() {
     (profile?.full_name || profile?.username || "U").slice(0, 2).toUpperCase();
 
   return (
-    <main className="mx-auto max-w-md">
+    <div className="w-full">
       <div className="flex items-center gap-4 px-4 pt-4">
         <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-neon bg-neon/20 text-xl font-bold text-neon shadow-neon">
           {initial}
@@ -73,6 +73,6 @@ export default function PerfilPage() {
           </div>
         ))}
       </div>
-    </main>
+    </div>
   );
 }

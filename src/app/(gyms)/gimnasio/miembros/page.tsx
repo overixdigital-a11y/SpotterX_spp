@@ -265,7 +265,7 @@ export default function GymMembersPage() {
             </div>
 
             {form.role === "alumno" && (
-              <>
+              <div key="plan-select-block" className="space-y-3">
                 <div>
                   <label className="mb-1 block text-xs font-semibold text-muted">Plan de Membresía</label>
                   <select
@@ -287,7 +287,7 @@ export default function GymMembersPage() {
                 </div>
 
                 {selectedPlan?.promo_type && (
-                  <div className="rounded-xl border border-ember/30 bg-ember/10 p-3 space-y-1">
+                  <div key="promo-banner" className="rounded-xl border border-ember/30 bg-ember/10 p-3 space-y-1">
                     <p className="flex items-center gap-1.5 text-xs font-semibold text-ember">
                       <Gift className="h-4 w-4" />
                       Promo {selectedPlan.promo_type} activa
@@ -297,43 +297,45 @@ export default function GymMembersPage() {
                     </p>
                   </div>
                 )}
-              </>
+              </div>
             )}
 
-            {people.map((person, i) => (
-              <div key={i} className="space-y-2 rounded-xl border border-edge bg-bg p-3">
-                {i > 0 && (
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-ember">
-                    🎁 Beneficiario Extra de Promo
-                  </p>
-                )}
-                <div>
-                  <input
-                    value={person.full_name}
-                    onChange={(e) => setPeople((prev) => prev.map((p, j) => (j === i ? { ...p, full_name: e.target.value } : p)))}
-                    placeholder="Nombre y apellido"
-                    className="w-full rounded-lg border border-edge bg-card px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-                  />
+            <div key="people-inputs-list" className="space-y-3">
+              {people.map((person, i) => (
+                <div key={`person-field-${i}`} className="space-y-2 rounded-xl border border-edge bg-bg p-3">
+                  {i > 0 && (
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-ember">
+                      🎁 Beneficiario Extra de Promo
+                    </p>
+                  )}
+                  <div>
+                    <input
+                      value={person.full_name}
+                      onChange={(e) => setPeople((prev) => prev.map((p, j) => (j === i ? { ...p, full_name: e.target.value } : p)))}
+                      placeholder="Nombre y apellido"
+                      className="w-full rounded-lg border border-edge bg-card px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      value={person.email}
+                      onChange={(e) => setPeople((prev) => prev.map((p, j) => (j === i ? { ...p, email: e.target.value } : p)))}
+                      placeholder="correo@ejemplo.com"
+                      type="email"
+                      className="w-full rounded-lg border border-edge bg-card px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      value={person.username}
+                      onChange={(e) => setPeople((prev) => prev.map((p, j) => (j === i ? { ...p, username: e.target.value.replace(/\s/g, "") } : p)))}
+                      placeholder="@usuario"
+                      className="w-full rounded-lg border border-edge bg-card px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <input
-                    value={person.email}
-                    onChange={(e) => setPeople((prev) => prev.map((p, j) => (j === i ? { ...p, email: e.target.value } : p)))}
-                    placeholder="correo@ejemplo.com"
-                    type="email"
-                    className="w-full rounded-lg border border-edge bg-card px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <input
-                    value={person.username}
-                    onChange={(e) => setPeople((prev) => prev.map((p, j) => (j === i ? { ...p, username: e.target.value.replace(/\s/g, "") } : p)))}
-                    placeholder="@usuario"
-                    className="w-full rounded-lg border border-edge bg-card px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-                  />
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
 
             <button
               onClick={createAll}
@@ -341,18 +343,18 @@ export default function GymMembersPage() {
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-neon py-3 font-semibold text-bg shadow-neon transition hover:opacity-90 disabled:opacity-60"
             >
               {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-              {creating ? "Creando cuentas…" : `Crear ${people.length} cuenta${people.length > 1 ? "s" : ""}`}
+              {creating ? "Procesando…" : `Registrar ${people.length} cuenta${people.length > 1 ? "s" : ""}`}
             </button>
           </div>
 
           {results.length > 0 && (
-            <div className="mt-4 rounded-xl border border-neon/40 bg-neon/10 p-3 space-y-2">
+            <div key="results-summary-card" className="mt-4 rounded-xl border border-neon/40 bg-neon/10 p-3 space-y-2">
               <p className="flex items-center gap-1.5 text-xs font-bold text-neon">
                 <KeyRound className="h-4 w-4" /> Resultado del Registro
               </p>
               <div className="space-y-1.5 text-sm text-ink">
                 {results.map((r, i) => (
-                  <div key={i} className="rounded-lg bg-card p-2.5 text-xs border border-edge space-y-1">
+                  <div key={`result-item-${i}`} className="rounded-lg bg-card p-2.5 text-xs border border-edge space-y-1">
                     <div className="flex items-center justify-between">
                       <p className="font-semibold text-ink">{r.email}</p>
                       {r.existing ? (
@@ -367,7 +369,7 @@ export default function GymMembersPage() {
                     </div>
                     {r.existing ? (
                       <p className="text-[11px] text-muted">
-                        El usuario ya estaba registrado en SpotterX y fue vinculado a tu gimnasio.
+                        {r.message || "El usuario ya estaba registrado en SpotterX y fue vinculado a tu gimnasio."}
                       </p>
                     ) : (
                       <p className="font-mono text-neon text-xs">
@@ -418,8 +420,8 @@ export default function GymMembersPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-edge/60">
-                  {members.map((m) => (
-                    <tr key={m.user_id} className="hover:bg-elevated/30 transition">
+                  {members.map((m, idx) => (
+                    <tr key={`${m.user_id}-${m.role}-${idx}`} className="hover:bg-elevated/30 transition">
                       <td className="px-3 py-3">
                         <p className="font-semibold text-ink">{m.full_name ?? m.username ?? m.email}</p>
                         <p className="text-xs text-muted">@{m.username || "sin_username"} · {m.email}</p>

@@ -44,7 +44,7 @@ function NotificationBell() {
     const load = async () => {
       const { data } = await supabase
         .from("notifications")
-        .select("id, created_at, read, actor:actor_id!notifications_actor_id_fkey(full_name, username)")
+        .select("id, created_at, read, actor:actor_id(full_name, username)")
         .eq("user_id", userId)
         .eq("type", "checkin")
         .order("created_at", { ascending: false })
@@ -53,8 +53,9 @@ function NotificationBell() {
     };
     load();
 
+    const channelId = `gym-notifs-${userId}-${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
-      .channel(`gym-notifs-${userId}`)
+      .channel(channelId)
       .on(
         "postgres_changes" as const,
         { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` },

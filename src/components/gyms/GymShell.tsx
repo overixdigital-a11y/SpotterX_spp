@@ -54,9 +54,9 @@ function NotificationBell() {
     load();
 
     const channel = supabase
-      .channel("gym-notifs")
+      .channel(`gym-notifs-${userId}`)
       .on(
-        "postgres_changes",
+        "postgres_changes" as const,
         { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` },
         (payload) => {
           const row = payload.new as { type: string; actor_id: string };
@@ -68,7 +68,7 @@ function NotificationBell() {
 
     return () => {
       active = false;
-      channel.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, [userId]);
 

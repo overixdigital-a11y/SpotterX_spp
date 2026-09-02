@@ -5,7 +5,7 @@ import { UserPlus, Loader2, KeyRound, Copy, Check, Users, Gift } from "lucide-re
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 
-const FUNC_URL = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/invite-member`;
+const FUNC_URL = "/api/invite-member";
 
 interface Gym {
   id: string;

@@ -35,12 +35,16 @@ Deno.serve(async (req: Request) => {
     // 2) Leer body
     const body = await req.json();
     const { gym_id, role, full_name, username, email, plan_name, pay_status, expires_on, price } = body ?? {};
-    if (!gym_id || !role || !full_name || !username || !email) {
-      return json({ error: "Faltan campos: gym_id, role, full_name, username, email" }, 400);
+    if (!gym_id || !role || !email) {
+      return json({ error: "Faltan campos obligatorios: gym_id, role, email" }, 400);
     }
     if (role !== "alumno" && role !== "profesor") {
       return json({ error: "role debe ser alumno o profesor" }, 400);
     }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const cleanUsername = username ? String(username).trim().toLowerCase() : cleanEmail.split("@")[0];
+    const cleanFullName = full_name ? String(full_name).trim() : cleanUsername;
 
     // 3) Verificar que el caller es owner del gym
     const { data: gym, error: gymErr } = await supabase
@@ -49,40 +53,97 @@ Deno.serve(async (req: Request) => {
       return json({ error: "No sos el dueño de este gimnasio" }, 403);
     }
 
-    // 4) Contraseña provisional
+    // 4) Verificar si el usuario YA existe en la plataforma (por email o username)
+    const { data: existingProfile } = await supabase
+      .from("profiles")
+      .select("id, email, username, full_name, role")
+      .or(`email.eq.${cleanEmail},username.eq.${cleanUsername}`)
+      .maybeSingle();
+
+    if (existingProfile) {
+      // 🟢 CASO A: El usuario YA está registrado en la plataforma
+      const userId = existingProfile.id;
+
+      if (role === "profesor") {
+        await supabase.from("gym_staff").upsert(
+          { gym_id, user_id: userId, role: "profesor_invitado", authorized: true },
+          { onConflict: "gym_id,user_id" }
+        );
+      } else {
+        // Alumno: actualizar o crear membresía
+        const { data: existingMembership } = await supabase
+          .from("gym_memberships")
+          .select("id")
+          .eq("gym_id", gym_id)
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        if (existingMembership) {
+          await supabase.from("gym_memberships").update({
+            plan_name: plan_name ?? "Plan inicial",
+            status: "activa",
+            pay_status: pay_status ?? "pendiente",
+            expires_on: expires_on ?? null,
+            price: typeof price === "number" && price >= 0 ? price : null,
+          }).eq("id", existingMembership.id);
+        } else {
+          await supabase.from("gym_memberships").insert({
+            gym_id,
+            user_id: userId,
+            plan_name: plan_name ?? "Plan inicial",
+            status: "activa",
+            pay_status: pay_status ?? "pendiente",
+            expires_on: expires_on ?? null,
+            price: typeof price === "number" && price >= 0 ? price : null,
+          });
+        }
+      }
+
+      return json({
+        ok: true,
+        existing: true,
+        user_id: userId,
+        email: existingProfile.email ?? cleanEmail,
+        username: existingProfile.username ?? cleanUsername,
+        full_name: existingProfile.full_name ?? cleanFullName,
+        message: `El usuario @${existingProfile.username || cleanUsername} ya estaba registrado en SpotterX y se vinculó correctamente a tu gimnasio.`,
+      });
+    }
+
+    // 🔴 CASO B: El usuario NO existe aún en SpotterX (se crea la cuenta)
     const password = `Spotter${randomCode(6)}!`;
 
-    // 5) Crear el usuario
     const { data: created, error: createErr } = await supabase.auth.admin.createUser({
-      email,
+      email: cleanEmail,
       password,
       email_confirm: true,
-      user_metadata: { username, full_name, role },
+      user_metadata: { username: cleanUsername, full_name: cleanFullName, role },
     });
     if (createErr) return json({ error: createErr.message }, 400);
 
-    // 6) Asegurar perfil (por si el trigger no corrio con admin)
-    const { error: profErr } = await supabase
+    const newUserId = created.user!.id;
+
+    // Asegurar perfil
+    await supabase
       .from("profiles")
       .upsert({
-        id: created.user!.id,
-        email,
-        username,
-        full_name,
+        id: newUserId,
+        email: cleanEmail,
+        username: cleanUsername,
+        full_name: cleanFullName,
         role,
       }, { onConflict: "id" });
-    if (profErr) return json({ error: profErr.message }, 500);
 
-    // 7) Relacion staff/gym o membresia
+    // Vincular al gimnasio
     if (role === "profesor") {
       await supabase.from("gym_staff").upsert(
-        { gym_id, user_id: created.user!.id, role: "profesor_invitado", authorized: true },
+        { gym_id, user_id: newUserId, role: "profesor_invitado", authorized: true },
         { onConflict: "gym_id,user_id" }
       );
     } else {
       await supabase.from("gym_memberships").insert({
         gym_id,
-        user_id: created.user!.id,
+        user_id: newUserId,
         plan_name: plan_name ?? "Plan inicial",
         status: "activa",
         pay_status: pay_status ?? "pendiente",
@@ -93,9 +154,13 @@ Deno.serve(async (req: Request) => {
 
     return json({
       ok: true,
-      user_id: created.user!.id,
+      existing: false,
+      user_id: newUserId,
       provisional_password: password,
-      email,
+      email: cleanEmail,
+      username: cleanUsername,
+      full_name: cleanFullName,
+      message: `Se creó la cuenta nueva para ${cleanEmail} con clave provisoria.`,
     });
   } catch (e) {
     return json({ error: String(e?.message || e) }, 500);

@@ -58,7 +58,7 @@ export default function GymMembersPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [results, setResults] = useState<{ email: string; provisional_password: string }[]>([]);
+  const [results, setResults] = useState<{ email: string; provisional_password?: string; existing?: boolean; message?: string }[]>([]);
   const [copied, setCopied] = useState(false);
 
   const [form, setForm] = useState({
@@ -66,6 +66,35 @@ export default function GymMembersPage() {
     plan_id: "",
   });
   const [people, setPeople] = useState([{ email: "", full_name: "", username: "" }]);
+
+  const loadMembers = async (gymId: string) => {
+    const supabase = createClient();
+    const { data: staff } = await supabase
+      .from("gym_staff")
+      .select("user_id, role, profiles:profiles!gym_staff_user_id_fkey(full_name, email, username)")
+      .eq("gym_id", gymId);
+
+    const { data: memberships } = await supabase
+      .from("gym_memberships")
+      .select("user_id, plan_name, status, pay_status, expires_on, profiles:profiles!gym_memberships_user_id_fkey(full_name, email, username)")
+      .eq("gym_id", gymId)
+      .order("created_at", { ascending: false });
+
+    const mapMembers = (rows: MemberRow[] | null, type: string): Member[] =>
+      (rows ?? []).map((r) => ({
+        user_id: r.user_id,
+        role: type,
+        full_name: r.profiles?.[0]?.full_name ?? null,
+        email: r.profiles?.[0]?.email ?? null,
+        username: r.profiles?.[0]?.username ?? null,
+        plan_name: r.plan_name ?? null,
+        status: r.status ?? null,
+        pay_status: r.pay_status ?? "pendiente",
+        expires_on: r.expires_on ?? null,
+      }));
+
+    setMembers([...mapMembers(staff, "profesor"), ...mapMembers(memberships, "alumno")]);
+  };
 
   useEffect(() => {
     let active = true;
@@ -90,32 +119,7 @@ export default function GymMembersPage() {
         .order("created_at", { ascending: true });
       if (active) setPlans((plansData ?? []) as Plan[]);
 
-      const { data: staff } = await supabase
-        .from("gym_staff")
-        .select("user_id, role, profiles:profiles!gym_staff_user_id_fkey(full_name, email, username)")
-        .eq("gym_id", gymData.id);
-
-      const { data: memberships } = await supabase
-        .from("gym_memberships")
-        .select("user_id, plan_name, status, pay_status, expires_on, profiles:profiles!gym_memberships_user_id_fkey(full_name, email, username)")
-        .eq("gym_id", gymData.id)
-        .order("created_at", { ascending: false });
-
-      const mapMembers = (rows: MemberRow[] | null, type: string): Member[] =>
-        (rows ?? []).map((r) => ({
-          user_id: r.user_id,
-          role: type,
-          full_name: r.profiles?.[0]?.full_name ?? null,
-          email: r.profiles?.[0]?.email ?? null,
-          username: r.profiles?.[0]?.username ?? null,
-          plan_name: r.plan_name ?? null,
-          status: r.status ?? null,
-          pay_status: r.pay_status ?? "pendiente",
-          expires_on: r.expires_on ?? null,
-        }));
-
-      const all = [...mapMembers(staff, "profesor"), ...mapMembers(memberships, "alumno")];
-      if (active) setMembers(all);
+      await loadMembers(gymData.id);
       if (active) setLoading(false);
     })();
     return () => {
@@ -137,18 +141,18 @@ export default function GymMembersPage() {
   const createAll = async () => {
     if (!gym) return;
     const email = (i: number) => people[i]?.email?.trim();
-    if (!email(0) || !people[0]?.full_name?.trim() || !people[0]?.username?.trim()) return;
-    if (!selectedPlan) return;
+    if (!email(0)) return;
+    setCreating(true);
+    setResults([]);
+
+    const supabase = createClient();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const token = session?.access_token;
+
     for (let i = 0; i < people.length; i++) {
       if (!people[i]?.email?.trim()) continue;
-      setCreating(true);
-      setResults([]);
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const token = session?.access_token;
-
       const isExtras = i > 0;
       const member = people[i];
       const res = await fetch(FUNC_URL, {
@@ -160,24 +164,34 @@ export default function GymMembersPage() {
         },
         body: JSON.stringify({
           gym_id: gym.id,
-          role: "alumno",
+          role: form.role,
           full_name: member.full_name.trim(),
           username: member.username.trim(),
           email: member.email.trim(),
-          plan_name: selectedPlan.name,
+          plan_name: form.role === "alumno" ? (selectedPlan?.name ?? "General") : null,
           pay_status: isExtras ? "promo" : "pagado",
-          expires_on: calcExpiry(selectedPlan.duration_months),
-          price: selectedPlan.price,
+          expires_on: selectedPlan ? calcExpiry(selectedPlan.duration_months) : null,
+          price: selectedPlan?.price ?? null,
         }),
       });
       const data = await res.json();
       if (!res.ok) {
-        alert(data?.error ?? "No se pudo crear el miembro");
+        alert(data?.error ?? "No se pudo procesar el miembro");
         break;
       } else {
-        setResults((prev) => [...prev, { email: data.email, provisional_password: data.provisional_password }]);
+        setResults((prev) => [
+          ...prev,
+          {
+            email: data.email,
+            provisional_password: data.provisional_password,
+            existing: data.existing,
+            message: data.message,
+          },
+        ]);
       }
     }
+
+    await loadMembers(gym.id);
     setCreating(false);
     setPeople([{ email: "", full_name: "", username: "" }]);
     setForm({ role: "alumno", plan_id: "" });
@@ -190,7 +204,10 @@ export default function GymMembersPage() {
   };
 
   const copyAll = () => {
-    const text = results.map((r) => `${r.email} / ${r.provisional_password}`).join("\n");
+    const text = results
+      .filter((r) => !r.existing && r.provisional_password)
+      .map((r) => `${r.email} / ${r.provisional_password}`)
+      .join("\n");
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
@@ -329,26 +346,46 @@ export default function GymMembersPage() {
           </div>
 
           {results.length > 0 && (
-            <div className="mt-4 rounded-xl border border-ember/40 bg-ember/10 p-3 space-y-2">
-              <p className="flex items-center gap-1.5 text-xs font-bold text-ember">
-                <KeyRound className="h-4 w-4" /> Credenciales Generadas
+            <div className="mt-4 rounded-xl border border-neon/40 bg-neon/10 p-3 space-y-2">
+              <p className="flex items-center gap-1.5 text-xs font-bold text-neon">
+                <KeyRound className="h-4 w-4" /> Resultado del Registro
               </p>
               <div className="space-y-1.5 text-sm text-ink">
                 {results.map((r, i) => (
-                  <div key={i} className="rounded-lg bg-card p-2 text-xs border border-edge">
-                    <p className="text-[10px] text-muted">{i === 0 ? "💰 Titular Pagado" : "🎁 Invitado Promo"}</p>
-                    <p className="font-semibold">{r.email}</p>
-                    <p className="font-mono text-neon">Clave: {r.provisional_password}</p>
+                  <div key={i} className="rounded-lg bg-card p-2.5 text-xs border border-edge space-y-1">
+                    <div className="flex items-center justify-between">
+                      <p className="font-semibold text-ink">{r.email}</p>
+                      {r.existing ? (
+                        <span className="rounded-full bg-neon/20 px-2 py-0.5 text-[9px] font-bold text-neon border border-neon/30">
+                          🟢 Usuario existente
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-ember/20 px-2 py-0.5 text-[9px] font-bold text-ember border border-ember/30">
+                          🔑 Cuenta nueva
+                        </span>
+                      )}
+                    </div>
+                    {r.existing ? (
+                      <p className="text-[11px] text-muted">
+                        El usuario ya estaba registrado en SpotterX y fue vinculado a tu gimnasio.
+                      </p>
+                    ) : (
+                      <p className="font-mono text-neon text-xs">
+                        Clave provisoria: <span className="font-bold">{r.provisional_password}</span>
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
-              <button
-                onClick={copyAll}
-                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-edge bg-card py-2 text-xs font-medium text-ink transition hover:border-neon/40 hover:text-neon"
-              >
-                {copied ? <Check className="h-4 w-4 text-neon" /> : <Copy className="h-4 w-4" />}
-                {copied ? "¡Copias al portapapeles!" : "Copiar credenciales"}
-              </button>
+              {results.some((r) => !r.existing) && (
+                <button
+                  onClick={copyAll}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-edge bg-card py-2 text-xs font-medium text-ink transition hover:border-neon/40 hover:text-neon"
+                >
+                  {copied ? <Check className="h-4 w-4 text-neon" /> : <Copy className="h-4 w-4" />}
+                  {copied ? "¡Copias al portapapeles!" : "Copiar credenciales nuevas"}
+                </button>
+              )}
             </div>
           )}
         </div>

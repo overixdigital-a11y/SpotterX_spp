@@ -98,7 +98,7 @@ Tablas planificadas (schema en evolución):
 - Panel `/gimnasio`: crear/editar gym, dirección, ciudad, capacidad, **geolocalización GPS** + mapa **Leaflet** (sin API key), QR generado con `qrcode.react`
 - Miembros `/gimnasio/miembros`: **creación masiva** vía **Edge Function `invite-member`** (crea cuenta con contraseña provisional + rol + membresía/staff) + lista de miembros
 - Planes `/gimnasio/planes`: CRUD de `gym_plans`
-- Check-in `/checkin/[qrCode]`: ruta pública, QR codifica URL `https://spotterx-five.vercel.app/checkin/<CODIGO>`, registra ingreso/egreso (alumno) y entrada/salida (profe, horas); si no está logueado redirige a `/login?next=...`
+- Check-in `/checkin/[qrCode]`: ruta pública, QR codifica URL `https://spotterx-five.vercel.app/checkin/<CODIGO>`. **Check-in automático** (sin botones): alumno → auto-ingreso con guard de doble escaneo y auto-egreso ≥ 3h; staff → form de hora de salida + nuevo ingreso. Si no está logueado redirige a `/login?next=...`. Muestra estado "¡Presente!" o "Ya estás ingresado".
 - Accesos `/gimnasio/accesos`: aforo en vivo (vista `gym_presence`), asistencia del día (función `gym_attendance_today`), historial
 - Migración `supabase/migrations/00003_gyms.sql` (corrida)
 - Dependencias nuevas: `qrcode.react`, `leaflet`, `react-leaflet`, `@types/leaflet`
@@ -117,7 +117,7 @@ Tablas planificadas (schema en evolución):
 
 ### Pulido alumnos + kiosk gym (hecho)
 - **`/mi-gimnasio`** (alumno, sección propia separada de la barra social; acceso desde Perfil solo rol alumno): card "pasaporte" con gym + dirección + plan + **precio** + vencimiento + estado de cuota (✅ al día / 🎁 promo / ⏳ debe / 🔴 vencida). Botón **"Dar el presente"** abre la cámara con `@yudiel/react-qr-scanner` (dependencia `@yudiel/react-qr-scanner`) para escanear el QR (pantalla/cartel) → redirige a `/checkin/<qr>` con la sesión ya iniciada (sin re-login).
-- **Kiosk `/gimnasio/pantalla`** (overlay full-screen para monitor, acceso desde pestaña QR con "Abrir en pantalla"): QR gigante + **realtime** en `gym_access_logs` (`postgres_changes`, publicación `supabase_realtime` agregó `gym_access_logs` y `notifications`) → al escanear un alumno muestra **ficha ~8s** con foto de perfil del feed (`profiles.avatar_url`, o iniciales neón) + hora, y lista "Ingresos de hoy".
+- **Kiosk `/gimnasio/pantalla`** (overlay full-screen para monitor, acceso desde pestaña QR con "Abrir en pantalla"): QR gigante + **realtime** en `gym_access_logs` → al escanear un alumno o profesor muestra **ficha ~8s** con foto de perfil + hora, con badge verde "Ingresó" o naranja "Salió". Dos secciones: **"Alumnos en el gym"** (lista de alumnos adentro con avatar + hora de ingreso) y **"Profesores trabajando"** (lista de staff adentro, borde naranja). La lista se actualiza en tiempo real con cada escaneo.
 - **Aviso al gym**: trigger `notify_gym_checkin` (migración 00005) inserta notificación `type='checkin'` (columna `gym_id` nueva + tipo habilitado) al dueño por cada ingreso. **Campanita** en el header del GymShell con contador de no leídas + desplegable "Quién entró".
 - **Precio guardado en membresía**: migración 00005 agrega `gym_memberships.price`; se setea al alta (`invite-member` recibe `price`) y al "Marcar pagó" (Cobros registra el monto real y lo persiste). El alumno siempre ve la cifra aunque el plan se borre/edite.
 
@@ -126,6 +126,13 @@ Tablas planificadas (schema en evolución):
 - **`/actualizar-contrasena`** (auth): se abre con el token del correo (`type=recovery`), valida que haya sesión, pide clave nueva + confirmación, `updateUser({ password })` → redirige a `/login`.
 - Link **"¿Olvidaste tu contraseña?"** en `/login`.
 - ⚠️ Requiere registrar la URL de redirección en Supabase **Auth → URL Configuration**: `https://spotterx-five.vercel.app/actualizar-contrasena` (y `http://localhost:3000/actualizar-contrasena` para pruebas locales).
+
+### Auto-checkout de presencia (hecho)
+- **Alumno**: escaneo automático de ingreso (sin botones). Si el último ingreso fue hace **≥ 3 horas** (o no tiene ingreso abierto), se auto-cierra la sesión anterior y se registra un nuevo ingreso → "¡Presente!". Si fue hace **< 3 horas**, muestra "Ya estás ingresado" (sin acción). Sin notificación al alumno.
+- **Profesor/staff**: al escanear con sesión abierta, muestra **form con time picker** ("¿Cuándo saliste?") para que el profesor ingrese manualmente la hora de salida de la sesión anterior. Al confirmar → registra egreso con hora ingresada + nuevo ingreso automático. Si no tiene sesión abierta → auto-ingreso directo.
+- **pg_cron** (`00006_auto_checkout.sql`): job cada **15 minutos** que cierra automáticamente sesiones de alumni > 3 horas (sin notificación). Excluye staff explícitamente. El egreso se timestampa con `created_at + 3 hours` (no `NOW()`) para que el aforo sea más preciso.
+- **Kiosk**: ahora muestra **dos listas separadas** — "Alumnos en el gym" y "Profesores trabajando" — con presencia actual (más ingresos que egresos). La flash card muestra tanto ingresos (verde) como egresos (naranja).
+- **Migración `00006_auto_checkout.sql`**: requiere `pg_cron` y `pg_net` extensions (ya disponibles en Supabase).
 
 ### Fase 6 — Marketplace Fit
 - Venta de productos de fitness, tipo **MercadoLibre** → comisiones
@@ -139,7 +146,7 @@ Tablas planificadas (schema en evolución):
 - **Vercel**: proyecto `pump13/spotterx` → producción `https://spotterx-five.vercel.app` (deploy `https://spotterx-aejk06equ-pump13.vercel.app`). Env vars de Supabase configuradas en production/preview/development. Redploy: `vercel --prod --yes` (requiere login o `VERCEL_TOKEN`).
 - **Supabase** (proyecto `dzalgziofiwcljgnphap`): URL `https://dzalgziofiwcljgnphap.supabase.co`. `.env.local` usa la **anon key clásica** (la publishable no lista Storage). Edge function deployada: `invite-member`.
 - **Edge Function `invite-member`**: crea cuentas (rol alumno/profesor) con la **service role key** guardada como **secreto** `SPOTTERX_SERVICE_ROLE` en Supabase (nunca en frontend). Deploy/secretos con `supabase functions deploy invite-member` y `supabase secrets set` (CLI + access token `sbp_...`). **ATENCIÓN**: la service role key se expuso en el chat → regenerarla luego del deploy si se quiere máxima seguridad. Para crear `auth.users` desde la app solo se puede vía esta edge function (el frontend usa anon key).
-- **Migraciones**: no se pueden ejecutar desde la app; el usuario las corre manualmente en **SQL Editor** de Supabase. Sessions previas muestran completadas 00001, 00002, 00003.
+- **Migraciones**: no se pueden ejecutar desde la app; el usuario las corre manualmente en **SQL Editor** de Supabase. Sessions previas muestran completadas 00001, 00002, 00003, 00004, 00005, 00006.
 
 ## Reglas / recordatorios
 - NO tocar `fitpro`. Este proyecto es independiente.

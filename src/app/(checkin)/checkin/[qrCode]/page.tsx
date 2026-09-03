@@ -56,6 +56,7 @@ export default function CheckinPage() {
   const [staffSession, setStaffSession] = useState<{ openAt: string } | null>(null);
   const [staffExitTime, setStaffExitTime] = useState(nowHHMM());
   const [staffBusy, setStaffBusy] = useState(false);
+  const [dbg, setDbg] = useState<string | null>(null);
   const didAuto = useRef(false);
 
   useEffect(() => {
@@ -104,6 +105,11 @@ export default function CheckinPage() {
         const notExpired = !expires || expires >= new Date(new Date().toDateString());
         const paidOk = m?.pay_status === "pagado" || m?.pay_status === "promo";
         const enabled = !!m && m.status === "activa" && paidOk && notExpired;
+
+        if (active)
+          setDbg(
+            `gym_id=${g.id}\nqr=${qrCode}\nuser_id=${userId}\nmem=${JSON.stringify(m ?? null)}\nmemErr=${memRes.error?.message ?? "none"}`
+          );
 
         setMember({
           isMember: !!m,
@@ -344,6 +350,12 @@ export default function CheckinPage() {
           <div className="mt-4">
             <GymMap latitude={gym.latitude} longitude={gym.longitude} name={gym.name} />
           </div>
+        )}
+
+        {dbg && !member?.isMember && (
+          <pre className="mt-4 overflow-x-auto whitespace-pre-wrap rounded-xl border border-ember/30 bg-card p-3 text-[10px] text-ember">
+            {dbg}
+          </pre>
         )}
       </div>
     </div>

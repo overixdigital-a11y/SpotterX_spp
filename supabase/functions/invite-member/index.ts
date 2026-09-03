@@ -52,49 +52,73 @@ Deno.serve(async (req: Request) => {
     // 4) Contraseña provisional
     const password = `Spotter${randomCode(6)}!`;
 
-    // 5) Crear el usuario
-    const { data: created, error: createErr } = await supabase.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { username, full_name, role },
-    });
-    if (createErr) return json({ error: createErr.message }, 400);
+    // 5) Ver si el usuario ya existe (por email)
+    let existingUserId: string | null = null;
+    const { data: list, error: listErr } = await supabase.auth.admin.listUsers();
+    if (!listErr) {
+      const found = (list.users ?? []).find((u) => u.email?.toLowerCase() === email.toLowerCase());
+      if (found) existingUserId = found.id;
+    }
 
-    // 6) Asegurar perfil (por si el trigger no corrio con admin)
-    const { error: profErr } = await supabase
-      .from("profiles")
-      .upsert({
-        id: created.user!.id,
+    let newUserId: string;
+    let created;
+    let provisional = password;
+
+    if (existingUserId) {
+      // Caso 1: ya existe -> NO creamos cuenta, solo lo vinculamos al gym
+      newUserId = existingUserId;
+      provisional = "";
+    } else {
+      // 5b) Crear el usuario
+      const res = await supabase.auth.admin.createUser({
         email,
-        username,
-        full_name,
-        role,
-      }, { onConflict: "id" });
-    if (profErr) return json({ error: profErr.message }, 500);
+        password,
+        email_confirm: true,
+        user_metadata: { username, full_name, role },
+      });
+      if (res.error) return json({ error: res.error.message }, 400);
+      created = res.data;
+      newUserId = created.user!.id;
+
+      // 6) Asegurar perfil (por si el trigger no corrio con admin)
+      const { error: profErr } = await supabase
+        .from("profiles")
+        .upsert({
+          id: newUserId,
+          email,
+          username,
+          full_name,
+          role,
+        }, { onConflict: "id" });
+      if (profErr) return json({ error: profErr.message }, 500);
+    }
 
     // 7) Relacion staff/gym o membresia
     if (role === "profesor") {
       await supabase.from("gym_staff").upsert(
-        { gym_id, user_id: created.user!.id, role: "profesor_invitado", authorized: true },
+        { gym_id, user_id: newUserId, role: "profesor_invitado", authorized: true },
         { onConflict: "gym_id,user_id" }
       );
     } else {
-      await supabase.from("gym_memberships").insert({
-        gym_id,
-        user_id: created.user!.id,
-        plan_name: plan_name ?? "Plan inicial",
-        status: "activa",
-        pay_status: pay_status ?? "pendiente",
-        expires_on: expires_on ?? null,
-        price: typeof price === "number" && price >= 0 ? price : null,
-      });
+      await supabase.from("gym_memberships").upsert(
+        {
+          gym_id,
+          user_id: newUserId,
+          plan_name: plan_name ?? "Plan inicial",
+          status: "activa",
+          pay_status: pay_status ?? "pendiente",
+          expires_on: expires_on ?? null,
+          price: typeof price === "number" && price >= 0 ? price : null,
+        },
+        { onConflict: "gym_id,user_id" }
+      );
     }
 
     return json({
       ok: true,
-      user_id: created.user!.id,
-      provisional_password: password,
+      user_id: newUserId,
+      provisional_password: provisional,
+      existed: !!existingUserId,
       email,
     });
   } catch (e) {

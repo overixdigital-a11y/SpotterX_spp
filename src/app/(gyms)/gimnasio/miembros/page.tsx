@@ -58,7 +58,7 @@ export default function GymMembersPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [results, setResults] = useState<{ email: string; provisional_password: string }[]>([]);
+  const [results, setResults] = useState<{ email: string; provisional_password: string; existed?: boolean }[]>([]);
   const [copied, setCopied] = useState(false);
 
   const [form, setForm] = useState({
@@ -175,7 +175,10 @@ export default function GymMembersPage() {
         alert(data?.error ?? "No se pudo crear el miembro");
         break;
       } else {
-        setResults((prev) => [...prev, { email: data.email, provisional_password: data.provisional_password }]);
+        setResults((prev) => [
+          ...prev,
+          { email: data.email, provisional_password: data.provisional_password, existed: !!data.existed },
+        ]);
       }
     }
     setCreating(false);
@@ -190,7 +193,11 @@ export default function GymMembersPage() {
   };
 
   const copyAll = () => {
-    const text = results.map((r) => `${r.email} / ${r.provisional_password}`).join("\n");
+    const text = results
+      .filter((r) => !r.existed)
+      .map((r) => `${r.email} / ${r.provisional_password}`)
+      .join("\n");
+    if (!text) return;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
@@ -315,15 +322,22 @@ export default function GymMembersPage() {
             <div className="mt-2 space-y-1.5 text-sm text-ink">
               {results.map((r, i) => (
                 <div key={i} className="rounded-lg bg-card p-2">
-                  <p className="text-xs text-muted">{i === 0 ? "💰 Paga" : "🎁 Promo"}</p>
+                  <p className="text-xs text-muted">
+                    {r.existed ? "Vincular cuenta existente" : i === 0 ? "💰 Paga" : "🎁 Promo"}
+                  </p>
                   <p className="font-medium">{r.email}</p>
-                  <p className="font-mono text-neon">{r.provisional_password}</p>
+                  {r.existed ? (
+                    <p className="text-xs text-neon">✓ Vinculada como miembro del gimnasio</p>
+                  ) : (
+                    <p className="font-mono text-neon">{r.provisional_password}</p>
+                  )}
                 </div>
               ))}
             </div>
             <button
               onClick={copyAll}
-              className="mt-2 flex items-center gap-1.5 rounded-lg border border-edge bg-card px-3 py-1.5 text-xs font-medium text-ink"
+              disabled={results.some((r) => r.existed) && results.every((r) => r.existed)}
+              className="mt-2 flex items-center gap-1.5 rounded-lg border border-edge bg-card px-3 py-1.5 text-xs font-medium text-ink disabled:opacity-50"
             >
               {copied ? <Check className="h-3.5 w-3.5 text-neon" /> : <Copy className="h-3.5 w-3.5" />}
               {copied ? "Copiado" : "Copiar credenciales"}

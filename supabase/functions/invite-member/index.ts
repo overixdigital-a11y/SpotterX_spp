@@ -95,12 +95,13 @@ Deno.serve(async (req: Request) => {
 
     // 7) Relacion staff/gym o membresia
     if (role === "profesor") {
-      await supabase.from("gym_staff").upsert(
+      const { error: staffErr } = await supabase.from("gym_staff").upsert(
         { gym_id, user_id: newUserId, role: "profesor_invitado", authorized: true },
         { onConflict: "gym_id,user_id" }
       );
+      if (staffErr) return json({ error: staffErr.message }, 500);
     } else {
-      await supabase.from("gym_memberships").upsert(
+      const { error: memErr } = await supabase.from("gym_memberships").upsert(
         {
           gym_id,
           user_id: newUserId,
@@ -112,6 +113,7 @@ Deno.serve(async (req: Request) => {
         },
         { onConflict: "gym_id,user_id" }
       );
+      if (memErr) return json({ error: memErr.message }, 500);
     }
 
     return json({

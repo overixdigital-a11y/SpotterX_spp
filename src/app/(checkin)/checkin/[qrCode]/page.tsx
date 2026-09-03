@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Loader2, LogIn, CheckCircle2, LogOut, Clock3, MapPin, Ban, ArrowLeft } from "lucide-react";
+import { Loader2, LogIn, CheckCircle2, LogOut, Clock3, MapPin, Ban, ArrowLeft, Save } from "lucide-react";
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
@@ -33,10 +33,17 @@ interface MemberInfo {
 
 type AutoResult = "in" | "out" | "already" | null;
 
+const AUTO_TIMEOUT_MS = 3 * 60 * 60 * 1000;
+
 const fmtTime = (iso?: string) =>
   iso
     ? new Date(iso).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })
     : "";
+
+const nowHHMM = () => {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+};
 
 export default function CheckinPage() {
   const { qrCode } = useParams<{ qrCode: string }>();
@@ -46,6 +53,9 @@ export default function CheckinPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [auto, setAuto] = useState<{ result: AutoResult; time?: string }>({ result: null });
+  const [staffSession, setStaffSession] = useState<{ openAt: string } | null>(null);
+  const [staffExitTime, setStaffExitTime] = useState(nowHHMM());
+  const [staffBusy, setStaffBusy] = useState(false);
   const didAuto = useRef(false);
 
   useEffect(() => {
@@ -108,19 +118,29 @@ export default function CheckinPage() {
         const last = (lastRes.data ?? null) as { type: string; created_at: string } | null;
 
         if (isStaff) {
-          const desired = last?.type === "ingreso" ? "egreso" : "ingreso";
-          const { error } = await supabase
-            .from("gym_access_logs")
-            .insert({ gym_id: g.id, user_id: userId, type: desired });
-          if (!active) return;
-          if (!error)
-            setAuto({
-              result: desired === "ingreso" ? "in" : "out",
-              time: new Date().toISOString(),
-            });
+          if (last?.type === "ingreso") {
+            setStaffSession({ openAt: last.created_at });
+            setStaffExitTime(nowHHMM());
+          } else {
+            const { error } = await supabase
+              .from("gym_access_logs")
+              .insert({ gym_id: g.id, user_id: userId, type: "ingreso" });
+            if (!active) return;
+            if (!error) setAuto({ result: "in", time: new Date().toISOString() });
+          }
         } else if (enabled) {
           if (last?.type === "ingreso") {
-            setAuto({ result: "already", time: last.created_at });
+            const elapsed = Date.now() - new Date(last.created_at).getTime();
+            if (elapsed >= AUTO_TIMEOUT_MS) {
+              await supabase.from("gym_access_logs").insert({ gym_id: g.id, user_id: userId, type: "egreso" });
+              const { error } = await supabase
+                .from("gym_access_logs")
+                .insert({ gym_id: g.id, user_id: userId, type: "ingreso" });
+              if (!active) return;
+              if (!error) setAuto({ result: "in", time: new Date().toISOString() });
+            } else {
+              setAuto({ result: "already", time: last.created_at });
+            }
           } else {
             const { error } = await supabase
               .from("gym_access_logs")
@@ -138,6 +158,25 @@ export default function CheckinPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qrCode, userId]);
+
+  const submitStaffExit = async () => {
+    if (!gym || !userId || !staffSession) return;
+    setStaffBusy(true);
+    const supabase = createClient();
+    const openDate = new Date(staffSession.openAt);
+    const [h, m] = staffExitTime.split(":").map(Number);
+    openDate.setHours(h, m, 0, 0);
+    const exitIso = openDate.toISOString();
+    await supabase.from("gym_access_logs").insert({ gym_id: gym.id, user_id: userId, type: "egreso", created_at: exitIso });
+    const { error } = await supabase
+      .from("gym_access_logs")
+      .insert({ gym_id: gym.id, user_id: userId, type: "ingreso" });
+    if (!error) {
+      setStaffSession(null);
+      setAuto({ result: "in", time: new Date().toISOString() });
+    }
+    setStaffBusy(false);
+  };
 
   if (loading || authLoading) {
     return (
@@ -217,7 +256,29 @@ export default function CheckinPage() {
                 )}
               </div>
 
-              {auto.result ? (
+              {staffSession ? (
+                <div className="mt-4 rounded-2xl border border-ember/40 bg-ember/10 p-5">
+                  <div className="flex items-center gap-2 text-ember">
+                    <Clock3 className="h-5 w-5" />
+                    <p className="text-sm font-semibold">Sesión abierta desde las {fmtTime(staffSession.openAt)}</p>
+                  </div>
+                  <p className="mt-2 text-xs text-muted">¿Cuándo saliste de esa sesión?</p>
+                  <input
+                    type="time"
+                    value={staffExitTime}
+                    onChange={(e) => setStaffExitTime(e.target.value)}
+                    className="mt-2 w-full rounded-xl border border-edge bg-elevated px-3 py-2.5 text-sm text-ink focus:border-neon focus:outline-none"
+                  />
+                  <button
+                    onClick={submitStaffExit}
+                    disabled={staffBusy}
+                    className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-neon py-3 font-semibold text-bg shadow-neon disabled:opacity-60"
+                  >
+                    {staffBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Registrar salida y nuevo ingreso
+                  </button>
+                </div>
+              ) : auto.result ? (
                 <div
                   className={`mt-4 rounded-2xl border p-5 text-center ${
                     auto.result === "in"
@@ -267,7 +328,7 @@ export default function CheckinPage() {
                 </div>
               )}
 
-              {auto.result && (
+              {auto.result && !staffSession && (
                 <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-[11px] text-muted">
                   <Clock3 className="h-3 w-3" />
                   {member?.isStaff

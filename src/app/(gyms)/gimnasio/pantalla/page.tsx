@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
-import { Loader2, DoorOpen, X, ArrowLeft } from "lucide-react";
+import { Loader2, DoorOpen, DoorClosed, X, ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 
@@ -24,6 +24,7 @@ interface Entry {
   id: string;
   user_id: string;
   created_at: string;
+  type: string;
   person: Person | null;
 }
 
@@ -31,7 +32,15 @@ interface EntryRow {
   id: string;
   user_id: string;
   created_at: string;
+  type: string;
   profiles: Person[] | null;
+}
+
+interface PresenceUser {
+  user_id: string;
+  last_in: string;
+  person: Person | null;
+  isStaff: boolean;
 }
 
 const QR_URL = (code: string) => `https://spotterx-five.vercel.app/checkin/${code}`;
@@ -68,7 +77,7 @@ export default function GymPantallaPage() {
   const [gym, setGym] = useState<Gym | null>(null);
   const [loading, setLoading] = useState(true);
   const [flash, setFlash] = useState<Entry | null>(null);
-  const [today, setToday] = useState<Entry[]>([]);
+  const [presence, setPresence] = useState<PresenceUser[]>([]);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -90,24 +99,50 @@ export default function GymPantallaPage() {
       setGym(g as Gym);
       setLoading(false);
 
+      const { data: staffRows } = await supabase
+        .from("gym_staff")
+        .select("user_id")
+        .eq("gym_id", g.id);
+      const sIds = new Set((staffRows ?? []).map((r) => r.user_id));
+
+      const todayStr = new Date().toISOString().slice(0, 10);
       const { data: logs } = await supabase
         .from("gym_access_logs")
-        .select("id, user_id, created_at, profiles:gym_access_logs_user_id_fkey(full_name, username, avatar_url)")
+        .select("id, user_id, created_at, type, profiles:gym_access_logs_user_id_fkey(full_name, username, avatar_url)")
         .eq("gym_id", g.id)
-        .eq("type", "ingreso")
-        .gte("created_at", new Date().toISOString().slice(0, 10))
+        .gte("created_at", todayStr)
         .order("created_at", { ascending: false })
-        .limit(12);
+        .limit(100);
 
       if (!active) return;
-      setToday(
-        ((logs ?? []) as EntryRow[]).map((l) => ({
-          id: l.id,
-          user_id: l.user_id,
-          created_at: l.created_at,
-          person: l.profiles?.[0] ?? null,
+
+      const rows = (logs ?? []) as EntryRow[];
+      const logsToday = rows.map((l) => ({
+        user_id: l.user_id,
+        type: l.type,
+        created_at: l.created_at,
+        person: l.profiles?.[0] ?? null,
+      }));
+
+      const userState: Record<string, { count: number; lastIn: string; person: Person | null }> = {};
+      for (const l of logsToday) {
+        if (!userState[l.user_id]) userState[l.user_id] = { count: 0, lastIn: l.created_at, person: l.person };
+        userState[l.user_id].count += l.type === "ingreso" ? 1 : -1;
+        if (l.type === "ingreso") userState[l.user_id].lastIn = l.created_at;
+        if (l.person) userState[l.user_id].person = l.person;
+      }
+
+      const inside: PresenceUser[] = Object.entries(userState)
+        .filter(([, s]) => s.count > 0)
+        .map(([uid, s]) => ({
+          user_id: uid,
+          last_in: s.lastIn,
+          person: s.person,
+          isStaff: sIds.has(uid),
         }))
-      );
+        .sort((a, b) => new Date(b.last_in).getTime() - new Date(a.last_in).getTime());
+
+      if (active) setPresence(inside);
 
       const channel = supabase
         .channel("kiosk-ingresos")
@@ -116,7 +151,6 @@ export default function GymPantallaPage() {
           { event: "INSERT", schema: "public", table: "gym_access_logs", filter: `gym_id=eq.${g.id}` },
           async (payload) => {
             const row = payload.new as { user_id: string; type: string; created_at: string };
-            if (row.type !== "ingreso") return;
             const { data: person } = await supabase
               .from("profiles")
               .select("full_name, username, avatar_url")
@@ -127,10 +161,19 @@ export default function GymPantallaPage() {
               id: `${row.user_id}-${row.created_at}`,
               user_id: row.user_id,
               created_at: row.created_at,
+              type: row.type,
               person: person as Person | null,
             };
             setFlash(entry);
-            setToday((prev) => [entry, ...prev.filter((e) => e.user_id !== row.user_id)].slice(0, 12));
+            setPresence((prev) => {
+              const existing = prev.find((p) => p.user_id === row.user_id);
+              if (row.type === "ingreso") {
+                if (existing) return prev;
+                return [{ user_id: row.user_id, last_in: row.created_at, person: entry.person, isStaff: sIds.has(row.user_id) }, ...prev];
+              } else {
+                return prev.filter((p) => p.user_id !== row.user_id);
+              }
+            });
             if (flashTimer.current) clearTimeout(flashTimer.current);
             flashTimer.current = setTimeout(() => setFlash(null), 8000);
           }
@@ -168,9 +211,11 @@ export default function GymPantallaPage() {
     );
   }
 
+  const alumnos = presence.filter((p) => !p.isStaff);
+  const profesores = presence.filter((p) => p.isStaff);
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-bg">
-      {/* Cabecera */}
       <div className="flex items-center justify-between border-b border-edge px-6 py-4">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-widest text-neon">Pantalla de acceso</p>
@@ -185,7 +230,6 @@ export default function GymPantallaPage() {
       </div>
 
       <div className="flex flex-1 flex-col items-center gap-6 overflow-y-auto p-6 lg:flex-row lg:overflow-hidden lg:p-10">
-        {/* QR gigante */}
         <div className="flex flex-col items-center lg:w-1/2">
           <div className="rounded-3xl bg-white p-6 shadow-neon">
             <QRCodeSVG value={QR_URL(gym.qr_code)} size={280} fgColor="#05070a" />
@@ -196,11 +240,20 @@ export default function GymPantallaPage() {
           </p>
         </div>
 
-        {/* Feed de ingresos */}
-        <div className="flex min-h-0 w-full flex-col lg:w-1/2">
+        <div className="flex min-h-0 w-full flex-col gap-4 lg:w-1/2">
           {flash ? (
-            <div className="flex flex-1 flex-col items-center justify-center rounded-3xl border-2 border-neon bg-card p-8 shadow-neon animate-pulse">
-              <p className="text-xs font-bold uppercase tracking-widest text-neon">¡Bienvenido!</p>
+            <div
+              className={`flex flex-1 flex-col items-center justify-center rounded-3xl border-2 p-8 animate-pulse ${
+                flash.type === "ingreso"
+                  ? "border-neon bg-card shadow-neon"
+                  : "border-ember bg-card"
+              }`}
+            >
+              <p className={`text-xs font-bold uppercase tracking-widest ${
+                flash.type === "ingreso" ? "text-neon" : "text-ember"
+              }`}>
+                {flash.type === "ingreso" ? "¡Bienvenido!" : "Hasta luego"}
+              </p>
               <div className="mx-auto mt-4">
                 <Avatar person={flash.person} big />
               </div>
@@ -208,9 +261,11 @@ export default function GymPantallaPage() {
                 {flash.person?.full_name ?? flash.person?.username ?? "Miembro"}
               </p>
               <p className="mt-1 text-lg text-muted">@{flash.person?.username}</p>
-              <p className="mt-4 flex items-center gap-2 text-sm text-neon">
-                <DoorOpen className="h-5 w-5" />
-                Ingresó a las{" "}
+              <p className={`mt-4 flex items-center gap-2 text-sm ${
+                flash.type === "ingreso" ? "text-neon" : "text-ember"
+              }`}>
+                {flash.type === "ingreso" ? <DoorOpen className="h-5 w-5" /> : <DoorClosed className="h-5 w-5" />}
+                {flash.type === "ingreso" ? "Ingresó a las" : "Salió a las"}{" "}
                 {new Date(flash.created_at).toLocaleTimeString("es-AR", {
                   hour: "2-digit",
                   minute: "2-digit",
@@ -227,27 +282,55 @@ export default function GymPantallaPage() {
             </div>
           )}
 
-          {today.length > 0 && (
-            <div className="mt-4">
-              <p className="text-xs font-semibold uppercase tracking-widest text-muted">Ingresos de hoy · {today.length}</p>
+          {alumnos.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted">
+                Alumnos en el gym · {alumnos.length}
+              </p>
               <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {today.map((e) => (
-                  <div key={e.id} className="flex items-center gap-2 rounded-xl border border-edge bg-card p-2">
-                    <Avatar person={e.person} />
+                {alumnos.map((u) => (
+                  <div key={u.user_id} className="flex items-center gap-2 rounded-xl border border-edge bg-card p-2">
+                    <Avatar person={u.person} />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-ink">
-                        {e.person?.full_name ?? e.person?.username ?? "Miembro"}
+                        {u.person?.full_name ?? u.person?.username ?? "Miembro"}
                       </p>
                       <p className="text-[10px] text-muted">
-                        {new Date(e.created_at).toLocaleTimeString("es-AR", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        {new Date(u.last_in).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
                       </p>
                     </div>
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {profesores.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted">
+                Profesores trabajando · {profesores.length}
+              </p>
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {profesores.map((u) => (
+                  <div key={u.user_id} className="flex items-center gap-2 rounded-xl border border-ember/40 bg-ember/10 p-2">
+                    <Avatar person={u.person} />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-ink">
+                        {u.person?.full_name ?? u.person?.username ?? "Miembro"}
+                      </p>
+                      <p className="text-[10px] text-muted">
+                        {new Date(u.last_in).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {alumnos.length === 0 && profesores.length === 0 && !flash && (
+            <div className="text-center text-sm text-muted">
+              Nadie en el gym ahora mismo.
             </div>
           )}
         </div>

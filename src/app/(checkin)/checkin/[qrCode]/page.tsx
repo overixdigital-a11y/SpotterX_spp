@@ -80,7 +80,7 @@ export default function CheckinPage() {
       setGym(g);
 
       if (userId) {
-        const [staffRes, memRes, lastRes] = await Promise.all([
+        const [staffRes, memRes, lastRes, anyMemRes] = await Promise.all([
           supabase.from("gym_staff").select("id, role").eq("gym_id", g.id).eq("user_id", userId).maybeSingle(),
           supabase
             .from("gym_memberships")
@@ -96,6 +96,10 @@ export default function CheckinPage() {
             .order("created_at", { ascending: false })
             .limit(1)
             .maybeSingle(),
+          supabase
+            .from("gym_memberships")
+            .select("gym_id, plan_name, status, pay_status, expires_on")
+            .eq("user_id", userId),
         ]);
         if (!active) return;
 
@@ -108,7 +112,7 @@ export default function CheckinPage() {
 
         if (active)
           setDbg(
-            `gym_id=${g.id}\nqr=${qrCode}\nuser_id=${userId}\nmem=${JSON.stringify(m ?? null)}\nmemErr=${memRes.error?.message ?? "none"}`
+            `gym_id=${g.id}\nqr=${qrCode}\nuser_id=${userId}\nmem=${JSON.stringify(m ?? null)}\nmemErr=${memRes.error?.message ?? "none"}\nanyMemForUser=${JSON.stringify(anyMemRes.data ?? null)}\nanyErr=${anyMemRes.error?.message ?? "none"}`
           );
 
         setMember({

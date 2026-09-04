@@ -2,7 +2,7 @@
 
 import { useAuthState } from "@/lib/auth-context";
 import Link from "next/link";
-import { MapPin, Zap, ChevronRight, Dumbbell } from "lucide-react";
+import { MapPin, Zap, ChevronRight, Dumbbell, Settings } from "lucide-react";
 
 export default function PerfilPage() {
   const { profile } = useAuthState();
@@ -13,13 +13,31 @@ export default function PerfilPage() {
   return (
     <main className="mx-auto max-w-md">
       <div className="flex items-center gap-4 px-4 pt-4">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-neon bg-neon/20 text-xl font-bold text-neon shadow-neon">
-          {initial}
-        </div>
+        {profile?.avatar_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={profile.avatar_url}
+            alt={profile.username}
+            className="h-20 w-20 rounded-full border-2 border-neon object-cover shadow-neon"
+          />
+        ) : (
+          <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-neon bg-neon/20 text-xl font-bold text-neon shadow-neon">
+            {initial}
+          </div>
+        )}
         <div>
-          <h1 className="text-xl font-bold text-ink">
-            {profile?.full_name || profile?.username}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold text-ink">
+              {profile?.full_name || profile?.username}
+            </h1>
+            <Link
+              href="/perfil/editar"
+              className="rounded-lg p-1.5 text-neon transition hover:bg-neon/10"
+              aria-label="Editar perfil"
+            >
+              <Settings className="h-4 w-4" />
+            </Link>
+          </div>
           <p className="text-sm text-muted">@{profile?.username}</p>
           {profile?.location && (
             <p className="mt-1 flex items-center gap-1 text-xs text-neon">
@@ -28,6 +46,10 @@ export default function PerfilPage() {
           )}
         </div>
       </div>
+
+      {profile?.bio && (
+        <p className="px-4 pt-3 text-sm text-muted">{profile.bio}</p>
+      )}
 
       {profile?.role === "alumno" && (
         <Link

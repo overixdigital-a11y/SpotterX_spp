@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { Dumbbell, Loader2, MapPin, QrCode, X, Ban, CheckCircle2, Gift, Clock3 } from "lucide-react";
+import { Dumbbell, Loader2, MapPin, QrCode, X, Ban, CheckCircle2, Gift, Clock3, History } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 
@@ -36,6 +36,7 @@ export default function MiGimnasioPage() {
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [history, setHistory] = useState<{ type: string; created_at: string }[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -53,6 +54,19 @@ export default function MiGimnasioPage() {
         .limit(1)
         .maybeSingle();
       if (active) setMembership((data as Membership) ?? null);
+
+      const gymId = (data as Membership | null)?.gym_id;
+      if (active && gymId) {
+        const { data: logs } = await supabase
+          .from("gym_access_logs")
+          .select("type, created_at")
+          .eq("gym_id", gymId)
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(15);
+        if (active) setHistory((logs ?? []) as { type: string; created_at: string }[]);
+      }
+
       if (active) setLoading(false);
     })();
     return () => {
@@ -200,6 +214,40 @@ export default function MiGimnasioPage() {
             )}
             {scanError && <p className="mt-2 text-center text-xs font-medium text-ember">{scanError}</p>}
           </div>
+
+          {history.length > 0 && (
+            <div className="mt-5 rounded-2xl border border-edge bg-card p-4">
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+                <History className="h-4 w-4 text-neon" /> Últimos accesos
+              </p>
+              <div className="mt-3 space-y-2">
+                {history.map((h, i) => (
+                  <div key={i} className="flex items-center justify-between rounded-xl border border-edge px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`h-2 w-2 rounded-full ${
+                          h.type === "ingreso" ? "bg-neon" : "bg-ember"
+                        }`}
+                      />
+                      <span className="text-xs font-medium capitalize text-ink">
+                        {h.type === "ingreso" ? "Ingreso" : "Egreso"}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-muted">
+                      {new Date(h.created_at).toLocaleDateString("es-AR", {
+                        day: "2-digit",
+                        month: "short",
+                      })}{" "}
+                      {new Date(h.created_at).toLocaleTimeString("es-AR", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
     </main>

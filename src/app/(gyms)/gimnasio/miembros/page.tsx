@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { UserPlus, Loader2, KeyRound, Copy, Check, Users, Gift } from "lucide-react";
+import { UserPlus, Loader2, KeyRound, Copy, Check, Users, Gift, XCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 
@@ -203,6 +203,26 @@ export default function GymMembersPage() {
     setTimeout(() => setCopied(false), 1500);
   };
 
+  const cancelMembership = async (m: Member) => {
+    if (!gym) return;
+    if (!window.confirm(`¿Dar de baja a ${m.full_name ?? m.username ?? m.email}?`)) return;
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("gym_memberships")
+      .update({ status: "inactiva" })
+      .eq("gym_id", gym.id)
+      .eq("user_id", m.user_id);
+    if (error) {
+      alert("Error al cancelar: " + error.message);
+      return;
+    }
+    setMembers((prev) =>
+      prev.map((mem) =>
+        mem.user_id === m.user_id ? { ...mem, status: "inactiva" } : mem
+      )
+    );
+  };
+
   if (loading) {
     return (
       <main className="flex justify-center py-20">
@@ -374,6 +394,19 @@ export default function GymMembersPage() {
                     {m.role === "profesor" ? "Profesor" : "Alumno"}
                   </span>
                   {m.role === "alumno" && badgePay(m.pay_status)}
+                  {m.role === "alumno" && m.status === "activa" && (
+                    <button
+                      onClick={() => cancelMembership(m)}
+                      className="flex items-center gap-1 rounded-lg border border-ember/30 py-1 px-2 text-[10px] font-semibold text-ember transition hover:bg-ember/10"
+                    >
+                      <XCircle className="h-3 w-3" /> Cancelar
+                    </button>
+                  )}
+                  {m.role === "alumno" && m.status === "inactiva" && (
+                    <span className="rounded-full bg-muted/10 px-2 py-0.5 text-[10px] font-semibold text-muted">
+                      Cancelada
+                    </span>
+                  )}
                 </div>
               </div>
             ))}

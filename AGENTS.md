@@ -141,6 +141,18 @@ Tablas planificadas (schema en evolución):
 - **Segundo bug (loop)**: el checkin redirigía al login **antes** de que `AuthProvider` resolviera la sesión (`authLoading` aún true) → loop login↔checkin que parecía "no deja entrar / cierra la sesión". Fix: el efecto **espera `authLoading=false`** antes de decidir (añadir `authLoading` a las deps y un early `if (authLoading) return`).
 - **Lección**: no asumir que una sesión existe al montar `/checkin`; esperar a que la sesión esté resuelta y, si es `null`, redirigir al login con `?next=` (el login ya respeta `next` vía `signIn`).
 
+### Editar perfil (hecho)
+- **`/perfil/editar`**: formulario para cambiar avatar (sube a bucket `media` en `avatars/<userId>/`), nombre completo, ubicación y bio. Usa el patrón de subida de `crear/page.tsx` (extensión + `supabase.storage.from("media").upload()` + `getPublicUrl`). La preview del avatar es即时。
+- **`/perfil` (propio)**: ahora muestra el avatar con imagen si `avatar_url` existe (sino iniciales), la bio, y un icono ⚙️ que lleva a `/perfil/editar`.
+- **Nota**: el bucket `media` fue creado manualmente en Supabase Dashboard. Los avatares se guardan en subcarpeta `avatars/<userId>/` dentro de ese bucket.
+
+### Cancelar membresía desde el gym (hecho)
+- **`/gimnasio/miembros`**: cada miembro alumno con `status=activa` tiene un botón **"Cancelar"** (naranja, con icono XCircle). Al tocar, pide confirmación (`window.confirm`), luego ejecuta `UPDATE gym_memberships SET status='inactiva' WHERE gym_id=X AND user_id=Y`. El badge cambia a "Cancelada" (gris). Los alumnos inactivos no pueden escanear el QR (ya existente: checkin requiere `status=activa`).
+- **RLS**: el owner del gym ya puede hacer `UPDATE` en `gym_memberships` por la policy existente.
+
+### Historial de asistencia del alumno (hecho)
+- **`/mi-gimnasio`**: debajo del botón "Dar el presente", sección **"Últimos accesos"** con los últimos 15 registros de `gym_access_logs` (ingresos/egresos) para ese gym. Muestra badge verde (ingreso) o naranja (egreso) con fecha y hora. Se carga al montar la página junto con la membresía.
+
 ### Fase 6 — Marketplace Fit
 - Venta de productos de fitness, tipo **MercadoLibre** → comisiones
 

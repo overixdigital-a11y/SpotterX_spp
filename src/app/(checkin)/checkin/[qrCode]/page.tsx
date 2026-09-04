@@ -57,8 +57,7 @@ export default function CheckinPage() {
   const [staffSession, setStaffSession] = useState<{ openAt: string } | null>(null);
   const [staffExitTime, setStaffExitTime] = useState(nowHHMM());
   const [staffBusy, setStaffBusy] = useState(false);
-  const [dbg, setDbg] = useState<string | null>(null);
-  const didAuto = useRef(false);
+    const didAuto = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -67,27 +66,18 @@ export default function CheckinPage() {
     didAuto.current = true;
     (async () => {
       const supabase = createClient();
-      let g: Gym | null = null;
-      try {
-        const { data } = await supabase
-          .from("gyms")
-          .select("id, name, address, city, latitude, longitude, qr_code")
-          .eq("qr_code", qrCode)
-          .maybeSingle();
-        g = (data as Gym) ?? null;
-      } catch (err) {
-        if (active) {
-          setDbg(`[[gyms query threw]] ${String(err)}\nuserId=${userId ?? "null"}\nprofileRole=${profile?.role}\nqr=${qrCode}`);
-          setLoading(false);
-        }
-        return;
-      }
+      const { data } = await supabase
+        .from("gyms")
+        .select("id, name, address, city, latitude, longitude, qr_code")
+        .eq("qr_code", qrCode)
+        .maybeSingle();
       if (!active) return;
-      if (!g) {
+      if (!data) {
         setNotFound(true);
         setLoading(false);
         return;
       }
+      const g = data as Gym;
       setGym(g);
 
       if (!userId) {
@@ -97,7 +87,7 @@ export default function CheckinPage() {
       }
 
       {
-        const [staffRes, memRes, lastRes, anyMemRes] = await Promise.all([
+        const [staffRes, memRes, lastRes] = await Promise.all([
           supabase.from("gym_staff").select("id, role").eq("gym_id", g.id).eq("user_id", userId).maybeSingle(),
           supabase
             .from("gym_memberships")
@@ -113,10 +103,6 @@ export default function CheckinPage() {
             .order("created_at", { ascending: false })
             .limit(1)
             .maybeSingle(),
-          supabase
-            .from("gym_memberships")
-            .select("gym_id, plan_name, status, pay_status, expires_on")
-            .eq("user_id", userId),
         ]);
         if (!active) return;
 
@@ -126,11 +112,6 @@ export default function CheckinPage() {
         const notExpired = !expires || expires >= new Date(new Date().toDateString());
         const paidOk = m?.pay_status === "pagado" || m?.pay_status === "promo";
         const enabled = !!m && m.status === "activa" && paidOk && notExpired;
-
-        if (active)
-          setDbg(
-            `gym_id=${g.id}\nname=${g.name}\nqr=${qrCode}\nuser_id=${userId}\nprofileRole=${profile?.role}\nmem=${JSON.stringify(m ?? null)}\nmemErr=${memRes.error?.message ?? "none"}\nenabled=${enabled}\nanyMemForUser=${JSON.stringify(anyMemRes.data ?? null)}\nanyErr=${anyMemRes.error?.message ?? "none"}`
-          );
 
         setMember({
           isMember: !!m,
@@ -367,11 +348,7 @@ export default function CheckinPage() {
           </div>
         )}
 
-        {dbg && (
-          <pre className="mt-4 overflow-x-auto whitespace-pre-wrap rounded-xl border border-ember/30 bg-card p-3 text-[10px] text-ember">
-            {dbg}
-          </pre>
-        )}
+
       </div>
     </div>
   );

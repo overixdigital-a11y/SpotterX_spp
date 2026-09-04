@@ -134,6 +134,13 @@ Tablas planificadas (schema en evolución):
 - **Kiosk**: ahora muestra **dos listas separadas** — "Alumnos en el gym" y "Profesores trabajando" — con presencia actual (más ingresos que egresos). La flash card muestra tanto ingresos (verde) como egresos (naranja).
 - **Migración `00006_auto_checkout.sql`**: requiere `pg_cron` y `pg_net` extensions (ya disponibles en Supabase).
 
+### Fix checkin "no sos miembro" (hecho)
+- **Síntoma**: el check-in decía "no sos miembro" para alumnos con membresía activa/pagada.
+- **Causa raíz**: al escanear el QR con la cámara nativa del celular, el link se abre en un navegador **sin sesión** (`userId=null`). El checkin no podía resolver la membresía porque no había usuario autenticado.
+- **Fix**: `/checkin/[qrCode]` ahora **redirige automáticamente** a `/login?next=/checkin/<qr>` cuando no hay sesión. Al loguear, vuelve y registra el presente.
+- **Segundo bug (loop)**: el checkin redirigía al login **antes** de que `AuthProvider` resolviera la sesión (`authLoading` aún true) → loop login↔checkin que parecía "no deja entrar / cierra la sesión". Fix: el efecto **espera `authLoading=false`** antes de decidir (añadir `authLoading` a las deps y un early `if (authLoading) return`).
+- **Lección**: no asumir que una sesión existe al montar `/checkin`; esperar a que la sesión esté resuelta y, si es `null`, redirigir al login con `?next=` (el login ya respeta `next` vía `signIn`).
+
 ### Fase 6 — Marketplace Fit
 - Venta de productos de fitness, tipo **MercadoLibre** → comisiones
 

@@ -62,6 +62,7 @@ export default function CheckinPage() {
 
   useEffect(() => {
     let active = true;
+    if (authLoading) return;
     if (didAuto.current) return;
     didAuto.current = true;
     (async () => {
@@ -183,7 +184,7 @@ export default function CheckinPage() {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [qrCode, userId]);
+  }, [qrCode, userId, authLoading]);
 
   const submitStaffExit = async () => {
     if (!gym || !userId || !staffSession) return;

@@ -65,21 +65,38 @@ export default function CheckinPage() {
     didAuto.current = true;
     (async () => {
       const supabase = createClient();
-      const { data } = await supabase
-        .from("gyms")
-        .select("id, name, address, city, latitude, longitude, qr_code")
-        .eq("qr_code", qrCode)
-        .maybeSingle();
+      let g: Gym | null = null;
+      try {
+        const { data } = await supabase
+          .from("gyms")
+          .select("id, name, address, city, latitude, longitude, qr_code")
+          .eq("qr_code", qrCode)
+          .maybeSingle();
+        g = (data as Gym) ?? null;
+      } catch (err) {
+        if (active) {
+          setDbg(`[[gyms query threw]] ${String(err)}\nuserId=${userId ?? "null"}\nprofileRole=${profile?.role}\nqr=${qrCode}`);
+          setLoading(false);
+        }
+        return;
+      }
       if (!active) return;
-      if (!data) {
+      if (!g) {
         setNotFound(true);
         setLoading(false);
         return;
       }
-      const g = data as Gym;
       setGym(g);
 
-      if (userId) {
+      if (!userId) {
+        if (active) {
+          setDbg(`[[NO SESION]]\nuserId=null (no hay sesión en este navegador)\nqr=${qrCode}\ngym_id=${g.id}\nname=${g.name}`);
+          setLoading(false);
+        }
+        return;
+      }
+
+      {
         const [staffRes, memRes, lastRes, anyMemRes] = await Promise.all([
           supabase.from("gym_staff").select("id, role").eq("gym_id", g.id).eq("user_id", userId).maybeSingle(),
           supabase

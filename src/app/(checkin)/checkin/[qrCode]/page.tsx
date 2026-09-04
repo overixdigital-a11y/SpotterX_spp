@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { Loader2, LogIn, CheckCircle2, LogOut, Clock3, MapPin, Ban, ArrowLeft, Save } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { Loader2, CheckCircle2, LogOut, Clock3, MapPin, Ban, ArrowLeft, Save } from "lucide-react";
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
@@ -47,6 +47,7 @@ const nowHHMM = () => {
 
 export default function CheckinPage() {
   const { qrCode } = useParams<{ qrCode: string }>();
+  const router = useRouter();
   const { userId, profile, loading: authLoading } = useAuthState();
   const [gym, setGym] = useState<Gym | null>(null);
   const [member, setMember] = useState<MemberInfo | null>(null);
@@ -89,10 +90,8 @@ export default function CheckinPage() {
       setGym(g);
 
       if (!userId) {
-        if (active) {
-          setDbg(`[[NO SESION]]\nuserId=null (no hay sesión en este navegador)\nqr=${qrCode}\ngym_id=${g.id}\nname=${g.name}`);
-          setLoading(false);
-        }
+        router.replace(`/login?next=${encodeURIComponent(`/checkin/${qrCode}`)}`);
+        setLoading(false);
         return;
       }
 
@@ -242,14 +241,8 @@ export default function CheckinPage() {
           )}
 
           {!userId ? (
-            <div className="mt-5">
-              <p className="text-sm text-muted">Iniciá sesión para registrarte en este gimnasio.</p>
-              <Link
-                href={`/login?next=${encodeURIComponent(`/checkin/${qrCode}`)}`}
-                className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-neon py-3 font-semibold text-bg shadow-neon"
-              >
-                <LogIn className="h-4 w-4" /> Ingresar
-              </Link>
+            <div className="mt-5 flex items-center gap-2 text-sm text-muted">
+              <Loader2 className="h-4 w-4 animate-spin text-neon" /> Redirigiendo al inicio de sesión…
             </div>
           ) : (
             <div className="mt-5">

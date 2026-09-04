@@ -112,7 +112,7 @@ export default function CheckinPage() {
 
         if (active)
           setDbg(
-            `gym_id=${g.id}\nqr=${qrCode}\nuser_id=${userId}\nmem=${JSON.stringify(m ?? null)}\nmemErr=${memRes.error?.message ?? "none"}\nanyMemForUser=${JSON.stringify(anyMemRes.data ?? null)}\nanyErr=${anyMemRes.error?.message ?? "none"}`
+            `gym_id=${g.id}\nname=${g.name}\nqr=${qrCode}\nuser_id=${userId}\nprofileRole=${profile?.role}\nmem=${JSON.stringify(m ?? null)}\nmemErr=${memRes.error?.message ?? "none"}\nenabled=${enabled}\nanyMemForUser=${JSON.stringify(anyMemRes.data ?? null)}\nanyErr=${anyMemRes.error?.message ?? "none"}`
           );
 
         setMember({
@@ -356,7 +356,7 @@ export default function CheckinPage() {
           </div>
         )}
 
-        {dbg && !member?.isMember && (
+        {dbg && (
           <pre className="mt-4 overflow-x-auto whitespace-pre-wrap rounded-xl border border-ember/30 bg-card p-3 text-[10px] text-ember">
             {dbg}
           </pre>

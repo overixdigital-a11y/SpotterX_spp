@@ -165,6 +165,12 @@ Tablas planificadas (schema en evolución):
 ### Historial de asistencia del alumno (hecho)
 - **`/mi-gimnasio`**: debajo del botón "Dar el presente", sección **"Últimos accesos"** con los últimos 15 registros de `gym_access_logs` (ingresos/egresos) para ese gym. Muestra badge verde (ingreso) o naranja (egreso) con fecha y hora. Se carga al montar la página junto con la membresía.
 
+### Ficha del miembro (frontend deployado; falta migración 00008)
+- **`/gimnasio/miembros/<userId>`** (`src/app/(gyms)/gimnasio/miembros/[userId]/page.tsx`): ficha con cabecera (nombre, @, email, badge Alumno/Profesor del gimnasio), resumen de membresía (plan, vencimiento, estado) y form de **datos extra**: teléfono, dirección, ciudad, obra social, fecha de nacimiento (con edad calculada), DNI/CUIL, contacto de emergencia (nombre + teléfono) y notas/observaciones. Guarda con `upsert` y `onConflict: "gym_id,user_id"`. Aplica a alumnos y profesores.
+- **Lista `/gimnasio/miembros`**: los recuadros ahora son **clicables** (Link → ficha, chevron derecho); los botones Cancelar/Reactivar hacen `preventDefault`/`stopPropagation` para no navegar.
+- ⚠️ **Migración `00008_gym_member_details.sql` NO corrida aún** → el form no puede guardar/cargar hasta que el usuario la ejecute en SQL Editor. Crea `gym_member_details(gym_id, user_id, phone, address, city, obra_social, birth_date, dni, emergency_name, emergency_phone, notes, updated_at)` con PK `(gym_id, user_id)`, RLS owner (full) + propia (select) y trigger de `updated_at`.
+- Nota de lint (regla `react-hooks/purity` del nuevo React compiler): no llamar `Date.now()` ni crear componentes (`Field`) dentro del render; la edad se calcula en los handlers y se guarda en estado.
+
 ### Fase 6 — Marketplace Fit
 - Venta de productos de fitness, tipo **MercadoLibre** → comisiones
 

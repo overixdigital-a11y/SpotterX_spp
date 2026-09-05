@@ -34,22 +34,6 @@ interface Member {
   price?: number | null;
 }
 
-interface MemberRow {
-  user_id: string;
-  role?: string | null;
-  plan_name?: string | null;
-  status?: string | null;
-  pay_status?: string | null;
-  expires_on?: string | null;
-  profiles: ProfileRef[] | null;
-}
-
-interface ProfileRef {
-  full_name: string | null;
-  email: string | null;
-  username: string | null;
-}
-
 const PROMO_COUNT: Record<string, number> = { "2x1": 2, "3x2": 3, "4x3": 4 };
 
 export default function GymMembersPage() {
@@ -96,27 +80,53 @@ export default function GymMembersPage() {
 
       const { data: staff } = await supabase
         .from("gym_staff")
-        .select("user_id, role, profiles:profiles!gym_staff_user_id_fkey(full_name, email, username)")
+        .select("user_id, role")
         .eq("gym_id", gymData.id);
 
       const { data: memberships } = await supabase
         .from("gym_memberships")
-        .select("user_id, plan_name, status, pay_status, expires_on, profiles:profiles!gym_memberships_user_id_fkey(full_name, email, username)")
+        .select("user_id, plan_name, status, pay_status, expires_on")
         .eq("gym_id", gymData.id)
         .order("created_at", { ascending: false });
 
-      const mapMembers = (rows: MemberRow[] | null, type: string): Member[] =>
-        (rows ?? []).map((r) => ({
-          user_id: r.user_id,
-          role: type,
-          full_name: r.profiles?.[0]?.full_name ?? null,
-          email: r.profiles?.[0]?.email ?? null,
-          username: r.profiles?.[0]?.username ?? null,
-          plan_name: r.plan_name ?? null,
-          status: r.status ?? null,
-          pay_status: r.pay_status ?? "pendiente",
-          expires_on: r.expires_on ?? null,
-        }));
+      const userIds = Array.from(
+        new Set([
+          ...(staff ?? []).map((r) => r.user_id),
+          ...(memberships ?? []).map((r) => r.user_id),
+        ])
+      );
+
+      const { data: profileRows } = userIds.length
+        ? await supabase
+            .from("profiles")
+            .select("id, full_name, email, username")
+            .in("id", userIds)
+        : { data: null };
+
+      const profileMap = new Map<string, { full_name: string | null; email: string | null; username: string | null }>();
+      (profileRows ?? []).forEach((p) =>
+        profileMap.set(p.id, {
+          full_name: p.full_name ?? null,
+          email: p.email ?? null,
+          username: p.username ?? null,
+        })
+      );
+
+      const mapMembers = (rows: { user_id: string; plan_name?: string | null; status?: string | null; pay_status?: string | null; expires_on?: string | null }[] | null, type: string): Member[] =>
+        (rows ?? []).map((r) => {
+          const prof = profileMap.get(r.user_id);
+          return {
+            user_id: r.user_id,
+            role: type,
+            full_name: prof?.full_name ?? null,
+            email: prof?.email ?? null,
+            username: prof?.username ?? null,
+            plan_name: r.plan_name ?? null,
+            status: r.status ?? null,
+            pay_status: r.pay_status ?? "pendiente",
+            expires_on: r.expires_on ?? null,
+          };
+        });
 
       const all = [...mapMembers(staff, "profesor"), ...mapMembers(memberships, "alumno")];
       if (active) setMembers(all);

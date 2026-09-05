@@ -31,6 +31,7 @@ interface Member {
   status: string | null;
   pay_status: string | null;
   expires_on: string | null;
+  price?: number | null;
 }
 
 interface MemberRow {
@@ -60,6 +61,9 @@ export default function GymMembersPage() {
   const [creating, setCreating] = useState(false);
   const [results, setResults] = useState<{ email: string; provisional_password: string; existed?: boolean }[]>([]);
   const [copied, setCopied] = useState(false);
+  const [search, setSearch] = useState("");
+  const [reactivating, setReactivating] = useState<Member | null>(null);
+  const [reactivatePlan, setReactivatePlan] = useState("");
 
   const [form, setForm] = useState({
     role: "alumno",
@@ -223,6 +227,37 @@ export default function GymMembersPage() {
     );
   };
 
+  const confirmReactivate = async () => {
+    if (!gym || !reactivating) return;
+    if (!reactivatePlan) {
+      alert("Elegí un plan para reactivar");
+      return;
+    }
+    const plan = plans.find((p) => p.id === reactivatePlan);
+    const supabase = createClient();
+    const d = new Date();
+    d.setMonth(d.getMonth() + (plan?.duration_months ?? 1));
+    const newExpiry = d.toISOString().split("T")[0];
+    const { error } = await supabase
+      .from("gym_memberships")
+      .update({ status: "activa", plan_name: plan?.name ?? null, pay_status: "pagado", expires_on: newExpiry, price: plan?.price ?? null })
+      .eq("gym_id", gym.id)
+      .eq("user_id", reactivating.user_id);
+    if (error) {
+      alert("Error al reactivar: " + error.message);
+      return;
+    }
+    setMembers((prev) =>
+      prev.map((mem) =>
+        mem.user_id === reactivating.user_id
+          ? { ...mem, status: "activa", plan_name: plan?.name ?? null, pay_status: "pagado", expires_on: newExpiry, price: plan?.price ?? null }
+          : mem
+      )
+    );
+    setReactivating(null);
+    setReactivatePlan("");
+  };
+
   if (loading) {
     return (
       <main className="flex justify-center py-20">
@@ -370,49 +405,126 @@ export default function GymMembersPage() {
         <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
           <Users className="h-4 w-4 text-neon" /> Lista de miembros
         </p>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar por nombre, usuario o email…"
+          className="mt-3 w-full rounded-xl border border-edge bg-card px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+        />
         {members.length === 0 ? (
           <p className="mt-3 text-xs text-muted">Todavía no hay miembros.</p>
         ) : (
           <div className="mt-3 space-y-2">
-            {members.map((m) => (
-              <div key={m.user_id} className="flex items-center justify-between rounded-xl border border-edge bg-card p-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-ink">{m.full_name ?? m.username ?? m.email}</p>
-                  <p className="truncate text-xs text-muted">
-                    @{m.username} · {m.email}
-                  </p>
-                  {m.pay_status === "pendiente" && (
-                    <p className="mt-0.5 text-[10px] text-muted">{m.plan_name ?? "Plan"} · vence {m.expires_on ?? "—"}</p>
-                  )}
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-1">
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                      m.role === "profesor" ? "bg-ember/20 text-ember" : "bg-neon/20 text-neon"
-                    }`}
-                  >
-                    {m.role === "profesor" ? "Profesor" : "Alumno"}
-                  </span>
-                  {m.role === "alumno" && badgePay(m.pay_status)}
-                  {m.role === "alumno" && m.status === "activa" && (
-                    <button
-                      onClick={() => cancelMembership(m)}
-                      className="flex items-center gap-1 rounded-lg border border-ember/30 py-1 px-2 text-[10px] font-semibold text-ember transition hover:bg-ember/10"
+            {members
+              .filter((m) => {
+                if (!search.trim()) return true;
+                const q = search.trim().toLowerCase();
+                return (
+                  (m.full_name ?? "").toLowerCase().includes(q) ||
+                  (m.username ?? "").toLowerCase().includes(q) ||
+                  (m.email ?? "").toLowerCase().includes(q)
+                );
+              })
+              .map((m) => (
+                <div key={m.user_id} className="flex items-center justify-between rounded-xl border border-edge bg-card p-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-ink">{m.full_name ?? m.username ?? m.email}</p>
+                    <p className="truncate text-xs text-muted">
+                      @{m.username} · {m.email}
+                    </p>
+                    {(m.status === "inactiva" || m.pay_status === "pendiente") && (
+                      <p className="mt-0.5 text-[10px] text-muted">
+                        {m.plan_name ?? "Plan"} · vence {m.expires_on ?? "—"}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                        m.role === "profesor" ? "bg-ember/20 text-ember" : "bg-neon/20 text-neon"
+                      }`}
                     >
-                      <XCircle className="h-3 w-3" /> Cancelar
-                    </button>
-                  )}
-                  {m.role === "alumno" && m.status === "inactiva" && (
-                    <span className="rounded-full bg-muted/10 px-2 py-0.5 text-[10px] font-semibold text-muted">
-                      Cancelada
+                      {m.role === "profesor" ? "Profesor" : "Alumno"}
                     </span>
-                  )}
+                    {m.role === "alumno" && badgePay(m.pay_status)}
+                    {m.role === "alumno" && m.status === "activa" && (
+                      <button
+                        onClick={() => cancelMembership(m)}
+                        className="flex items-center gap-1 rounded-lg border border-ember/30 py-1 px-2 text-[10px] font-semibold text-ember transition hover:bg-ember/10"
+                      >
+                        <XCircle className="h-3 w-3" /> Cancelar
+                      </button>
+                    )}
+                    {m.role === "alumno" && m.status === "inactiva" && (
+                      <button
+                        onClick={() => {
+                          setReactivating(m);
+                          const prev = plans.find((p) => p.name === m.plan_name);
+                          setReactivatePlan(prev?.id ?? "");
+                        }}
+                        className="rounded-lg border border-neon/40 bg-neon/10 py-1 px-2 text-[10px] font-semibold text-neon transition hover:bg-neon/20"
+                      >
+                        Reactivar
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            {search.trim() &&
+              members.filter((m) =>
+                (m.full_name ?? "").toLowerCase().includes(search.trim().toLowerCase()) ||
+                (m.username ?? "").toLowerCase().includes(search.trim().toLowerCase()) ||
+                (m.email ?? "").toLowerCase().includes(search.trim().toLowerCase())
+              ).length === 0 && (
+                <p className="pt-2 text-center text-xs text-muted">No se encontraron personas con «{search}».</p>
+              )}
           </div>
         )}
       </div>
+
+      {reactivating && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-edge bg-elevated p-5">
+            <p className="text-sm font-bold text-ink">Reactivar a {reactivating.full_name ?? reactivating.username ?? reactivating.email}</p>
+            <p className="mt-1 text-xs text-muted">Elegí el plan para la nueva membresía. Se setea al día y con vencimiento según el plan.</p>
+            <div className="mt-4 space-y-2">
+              {plans.length === 0 ? (
+                <p className="text-xs text-muted">No hay planes. Creá uno en la pestaña Planes.</p>
+              ) : (
+                plans.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => setReactivatePlan(p.id)}
+                    className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left transition ${
+                      reactivatePlan === p.id ? "border-neon bg-neon/10" : "border-edge bg-card"
+                    }`}
+                  >
+                    <span className="text-sm font-semibold text-ink">{p.name}</span>
+                    <span className="text-xs text-muted">
+                      {p.duration_months} mes(es) · ${Number(p.price).toLocaleString("es-AR")}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => setReactivating(null)}
+                className="flex-1 rounded-xl border border-edge py-2.5 text-sm font-medium text-muted"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmReactivate}
+                disabled={!reactivatePlan}
+                className="flex-1 rounded-xl bg-neon py-2.5 text-sm font-semibold text-bg disabled:opacity-50"
+              >
+                Reactivar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

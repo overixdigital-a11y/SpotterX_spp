@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { UserPlus, Loader2, KeyRound, Copy, Check, Users, Gift, XCircle } from "lucide-react";
+import Link from "next/link";
+import { UserPlus, Loader2, KeyRound, Copy, Check, Users, Gift, XCircle, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 
@@ -436,8 +437,12 @@ export default function GymMembersPage() {
                 );
               })
               .map((m) => (
-                <div key={m.user_id} className="flex items-center justify-between rounded-xl border border-edge bg-card p-3">
-                  <div className="min-w-0">
+                <Link
+                  key={m.user_id}
+                  href={`/gimnasio/miembros/${m.user_id}`}
+                  className="flex items-center justify-between gap-2 rounded-xl border border-edge bg-card p-3 transition hover:border-neon/40"
+                >
+                  <div className="min-w-0">  
                     <p className="truncate text-sm font-semibold text-ink">{m.full_name ?? m.username ?? m.email}</p>
                     <p className="truncate text-xs text-muted">
                       @{m.username} · {m.email}
@@ -459,7 +464,11 @@ export default function GymMembersPage() {
                     {m.role === "alumno" && badgePay(m.pay_status)}
                     {m.role === "alumno" && m.status === "activa" && (
                       <button
-                        onClick={() => cancelMembership(m)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          cancelMembership(m);
+                        }}
                         className="flex items-center gap-1 rounded-lg border border-ember/30 py-1 px-2 text-[10px] font-semibold text-ember transition hover:bg-ember/10"
                       >
                         <XCircle className="h-3 w-3" /> Cancelar
@@ -467,7 +476,9 @@ export default function GymMembersPage() {
                     )}
                     {m.role === "alumno" && m.status === "inactiva" && (
                       <button
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
                           setReactivating(m);
                           const prev = plans.find((p) => p.name === m.plan_name);
                           setReactivatePlan(prev?.id ?? "");
@@ -478,7 +489,8 @@ export default function GymMembersPage() {
                       </button>
                     )}
                   </div>
-                </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-neon/60" />
+                </Link>
               ))}
             {search.trim() &&
               members.filter((m) =>

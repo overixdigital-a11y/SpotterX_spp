@@ -156,6 +156,12 @@ Tablas planificadas (schema en evolución):
 - Al tocar "Reactivar" se abre un **modal** que lista los planes del gym; el dueño elige un plan y se reactiva la membresía: `status='activa'`, `pay_status='pagado'`, `expires_on` = hoy + duración del plan, `price` = precio del plan, `plan_name` actualizado.
 - Permite rastrear ex-alumnos (personas que ya fueron parte del gym) con su último vencimiento y darlos de alta de nuevo.
 
+### Fix: lista de miembros vacía (embed a profiles roto)
+- **Síntoma**: en `/gimnasio/miembros` los recuadros de clientes mostraban solo `@` sin nombre/email/username.
+- **Causa**: el embed de PostgREST `profiles:profiles!gym_memberships_user_id_fkey(full_name,email,username)` devolvía `null` en runtime autenticado aunque con service role sí traía los datos y la policy `Profiles: lectura pública` (`using(true)`) debería permitirlo. Mismo patrón que el bug del "Gimnasio" en `/mi-gimnasio`.
+- **Fix (robusto)**: **no confiar en el embedding a `profiles`**. Ahora `/gimnasio/miembros` hace una **consulta separada** a `profiles` (`select id, full_name, email, username ... in (ids)`) y construye un `Map<userId, profile>` para unir en el frontend.
+- **Lección**: los embeds de PostgREST por nombre de FK (`!<tabla>_<columna>_fkey`) pueden fallar en runtime. Para join de datos de perfil, preferir consulta separada a `profiles` y unir por `id` en el cliente.
+
 ### Historial de asistencia del alumno (hecho)
 - **`/mi-gimnasio`**: debajo del botón "Dar el presente", sección **"Últimos accesos"** con los últimos 15 registros de `gym_access_logs` (ingresos/egresos) para ese gym. Muestra badge verde (ingreso) o naranja (egreso) con fecha y hora. Se carga al montar la página junto con la membresía.
 

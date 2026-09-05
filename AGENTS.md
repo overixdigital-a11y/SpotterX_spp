@@ -150,6 +150,12 @@ Tablas planificadas (schema en evolución):
 - **`/gimnasio/miembros`**: cada miembro alumno con `status=activa` tiene un botón **"Cancelar"** (naranja, con icono XCircle). Al tocar, pide confirmación (`window.confirm`), luego ejecuta `UPDATE gym_memberships SET status='inactiva' WHERE gym_id=X AND user_id=Y`. El badge cambia a "Cancelada" (gris). Los alumnos inactivos no pueden escanear el QR (ya existente: checkin requiere `status=activa`).
 - **RLS**: el owner del gym ya puede hacer `UPDATE` en `gym_memberships` por la policy existente.
 
+### Buscador + reactivar membresía (hecho)
+- **`/gimnasio/miembros`** ahora tiene un **buscador** (input que filtra en vivo por nombre, usuario o email) sobre la lista de miembros.
+- Los miembros **inactivos/cancelados** muestran la línea del plan + su última fecha de **vencimiento** (`expires_on`) y un botón **"Reactivar"** (verde).
+- Al tocar "Reactivar" se abre un **modal** que lista los planes del gym; el dueño elige un plan y se reactiva la membresía: `status='activa'`, `pay_status='pagado'`, `expires_on` = hoy + duración del plan, `price` = precio del plan, `plan_name` actualizado.
+- Permite rastrear ex-alumnos (personas que ya fueron parte del gym) con su último vencimiento y darlos de alta de nuevo.
+
 ### Historial de asistencia del alumno (hecho)
 - **`/mi-gimnasio`**: debajo del botón "Dar el presente", sección **"Últimos accesos"** con los últimos 15 registros de `gym_access_logs` (ingresos/egresos) para ese gym. Muestra badge verde (ingreso) o naranja (egreso) con fecha y hora. Se carga al montar la página junto con la membresía.
 

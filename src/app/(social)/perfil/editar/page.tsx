@@ -3,16 +3,22 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, Camera, Save } from "lucide-react";
+import { ArrowLeft, Loader2, Camera, Save, AlertTriangle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
+import { useToast } from "@/components/core/ToastProvider";
 
 export default function EditarPerfilPage() {
   const { profile, userId } = useAuthState();
   const router = useRouter();
+  const toast = useToast();
   const [fullName, setFullName] = useState(profile?.full_name ?? "");
+  const [username, setUsername] = useState(profile?.username ?? "");
   const [bio, setBio] = useState(profile?.bio ?? "");
   const [location, setLocation] = useState(profile?.location ?? "");
+  const [website, setWebsite] = useState(profile?.website ?? "");
+  const [phone, setPhone] = useState(profile?.phone ?? "");
+  const [birthDate, setBirthDate] = useState(profile?.birth_date ?? "");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(
     profile?.avatar_url ?? null
@@ -28,14 +34,20 @@ export default function EditarPerfilPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setAvatarFile(file);
+    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
     setAvatarPreview(URL.createObjectURL(file));
   };
 
   const onSave = async () => {
     if (!userId) return;
+    if (!username.trim()) {
+      setError("El usuario no puede estar vacío");
+      return;
+    }
     setSaving(true);
     setError(null);
     const supabase = createClient();
+    const normalizedUsername = username.trim().toLowerCase().replace(/[^a-z0-9_.]/g, "");
     try {
       let avatar_url: string | null = profile?.avatar_url ?? null;
       if (avatarFile) {
@@ -48,20 +60,50 @@ export default function EditarPerfilPage() {
         const { data: pub } = supabase.storage.from("media").getPublicUrl(path);
         avatar_url = pub.publicUrl;
       }
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          full_name: fullName.trim() || null,
-          bio: bio.trim() || null,
-          location: location.trim() || null,
-          avatar_url,
-        })
-        .eq("id", userId);
-      if (error) throw error;
+
+      if (normalizedUsername !== profile?.username) {
+        const { data: taken } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("username", normalizedUsername)
+          .neq("id", userId)
+          .maybeSingle();
+        if (taken) {
+          setError(`El usuario @${normalizedUsername} ya está en uso. Probá otro.`);
+          setSaving(false);
+          return;
+        }
+      }
+
+      const base = {
+        full_name: fullName.trim() || null,
+        bio: bio.trim() || null,
+        location: location.trim() || null,
+        avatar_url,
+      };
+      const extended = {
+        username: normalizedUsername,
+        phone: phone.trim() || null,
+        birth_date: birthDate || null,
+        website: website.trim() || null,
+      };
+
+      const { error: err1 } = await supabase.from("profiles").update(base).eq("id", userId);
+      if (err1) throw err1;
+
+      const { error: err2 } = await supabase.from("profiles").update(extended).eq("id", userId);
+      if (err2) {
+        // Degradación: la migración 00010 todavía no corrió (columnas ausentes)
+        const msg = (err2 as { message?: string }).message ?? "";
+        if (!/column|does not exist|could not find/i.test(msg)) throw err2;
+        toast("Datos básicos guardados. Corré la migración 00010 para habilitar los campos extra.", "info");
+      }
+
       router.refresh();
       router.push("/perfil");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al guardar el perfil");
+      if (avatarPreview && avatarPreview.startsWith("blob:")) URL.revokeObjectURL(avatarPreview);
     } finally {
       setSaving(false);
     }
@@ -100,17 +142,68 @@ export default function EditarPerfilPage() {
             className="hidden"
           />
         </label>
-        <p className="mt-2 text-xs text-muted">Tocá la foto para cambiarla</p>
       </div>
 
       <div className="mt-6 space-y-4 px-4">
+        {profile?.email && (
+          <div>
+            <label className="text-xs font-medium text-muted">Email</label>
+            <p className="mt-1 w-full rounded-xl border border-edge bg-card px-3.5 py-2.5 text-sm text-muted">
+              {profile.email}
+            </p>
+          </div>
+        )}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs font-medium text-muted">Nombre</label>
+            <input
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-edge bg-card px-3.5 py-2.5 text-sm text-ink focus:border-neon focus:outline-none"
+              placeholder="Tu nombre"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted">Usuario</label>
+            <div className="mt-1 flex items-center rounded-xl border border-edge bg-card">
+              <span className="pl-3 text-sm text-muted">@</span>
+              <input
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full bg-transparent px-2 py-2.5 text-sm text-ink focus:outline-none"
+                placeholder="usuario"
+              />
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs font-medium text-muted">Teléfono</label>
+            <input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              type="tel"
+              className="mt-1 w-full rounded-xl border border-edge bg-card px-3.5 py-2.5 text-sm text-ink focus:border-neon focus:outline-none"
+              placeholder="+54 9 11 0000 0000"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted">Nacimiento</label>
+            <input
+              value={birthDate}
+              onChange={(e) => setBirthDate(e.target.value)}
+              type="date"
+              className="mt-1 w-full rounded-xl border border-edge bg-card px-3 py-2.5 text-sm text-ink focus:border-neon focus:outline-none [color-scheme:dark]"
+            />
+          </div>
+        </div>
         <div>
-          <label className="text-xs font-medium text-muted">Nombre</label>
+          <label className="text-xs font-medium text-muted">Website</label>
           <input
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
+            value={website}
+            onChange={(e) => setWebsite(e.target.value)}
             className="mt-1 w-full rounded-xl border border-edge bg-card px-3.5 py-2.5 text-sm text-ink focus:border-neon focus:outline-none"
-            placeholder="Tu nombre"
+            placeholder="https://tusitio.com"
           />
         </div>
         <div>
@@ -129,11 +222,15 @@ export default function EditarPerfilPage() {
             onChange={(e) => setBio(e.target.value)}
             rows={3}
             className="mt-1 w-full resize-none rounded-xl border border-edge bg-card px-3.5 py-2.5 text-sm text-ink focus:border-neon focus:outline-none"
-            placeholder="Contá algo sobre vos…"
+            placeholder="Contá algo sobre vos… (mencioná con @usuario)"
           />
         </div>
 
-        {error && <p className="text-sm text-ember">{error}</p>}
+        {error && (
+          <p className="flex items-start gap-2 rounded-xl border border-ember/30 bg-ember/10 px-3 py-2.5 text-sm text-ember">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> {error}
+          </p>
+        )}
 
         <button
           onClick={onSave}

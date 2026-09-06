@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Home, Compass, Plus, Bell, User } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { useAuthState } from "@/lib/auth-context";
 
 const items = [
   { href: "/home", label: "Inicio", icon: Home },
@@ -14,6 +17,42 @@ const items = [
 
 export function BottomNav() {
   const pathname = usePathname();
+  const { userId } = useAuthState();
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    if (!userId) return;
+    const supabase = createClient();
+
+    const load = async () => {
+      const { count } = await supabase
+        .from("notifications")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("read", false);
+      setUnread(count ?? 0);
+    };
+
+    load();
+
+    const channel = supabase
+      .channel("nav-notifs")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${userId}`,
+        },
+        () => load()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
 
   return (
     <nav className="fixed inset-x-0 bottom-4 z-40 px-4">
@@ -21,6 +60,7 @@ export function BottomNav() {
         {items.map((item) => {
           const active = pathname.startsWith(item.href);
           const Icon = item.icon;
+          const isNotif = item.href === "/notificaciones";
           return (
             <Link
               key={item.href}
@@ -28,12 +68,17 @@ export function BottomNav() {
               className={
                 item.highlight
                   ? "flex h-11 w-11 items-center justify-center rounded-full bg-neon text-bg shadow-neon"
-                  : `flex h-11 w-11 flex-col items-center justify-center gap-0.5 rounded-full transition ${
+                  : `relative flex h-11 w-11 flex-col items-center justify-center gap-0.5 rounded-full transition ${
                       active ? "text-neon" : "text-muted"
                     }`
               }
             >
               <Icon className="h-5 w-5" strokeWidth={active ? 2.5 : 2} />
+              {isNotif && unread > 0 && (
+                <span className="absolute right-1 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-ember px-1 text-[9px] font-bold text-bg">
+                  {unread > 9 ? "9+" : unread}
+                </span>
+              )}
             </Link>
           );
         })}

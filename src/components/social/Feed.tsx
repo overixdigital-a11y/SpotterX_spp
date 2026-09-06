@@ -1,105 +1,213 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { PostCard, type PostData } from "./PostCard";
-import { Loader2 } from "lucide-react";
+import { hydratePosts, type PostRow } from "@/lib/posts";
+import { EmptyState } from "@/components/core/EmptyState";
+import { Skeleton } from "@/components/core/Skeleton";
+import { useAuthState } from "@/lib/auth-context";
+import { Sparkles, Users, Loader2 } from "lucide-react";
+
+const PAGE = 12;
+
+const categories = [
+  "#CrossFit",
+  "#Running",
+  "#Powerlifting",
+  "#Calistenia",
+  "#Yoga",
+  "#Boxeo",
+  "#Nutrición",
+  "#Cardio",
+];
+
+type Tab = "all" | "following";
 
 export function Feed() {
+  const { userId } = useAuthState();
+  const [tab, setTab] = useState<Tab>("all");
+  const [category, setCategory] = useState<string | null>(null);
   const [posts, setPosts] = useState<PostData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const cursorRef = useRef<string | null>(null);
+
+  const fetchPage = async (replace: boolean) => {
+    const supabase = createClient();
+
+    let followingIds: string[] = [];
+    if (tab === "following" && userId) {
+      const { data } = await supabase
+        .from("follows")
+        .select("following_id")
+        .eq("follower_id", userId);
+      followingIds = (data ?? []).map((f) => f.following_id as string);
+      if (followingIds.length === 0) {
+        if (replace) setPosts([]);
+        setHasMore(false);
+        return;
+      }
+    }
+
+    let query = supabase
+      .from("posts")
+      .select("*, author:user_id(username, full_name, avatar_url)")
+      .order("created_at", { ascending: false })
+      .limit(PAGE);
+
+    if (category) query = query.eq("category", category);
+    if (tab === "following") query = query.in("user_id", followingIds);
+    if (replace && cursorRef.current) query = query.lt("created_at", cursorRef.current);
+
+    const { data, error } = await query;
+    if (error || !data) {
+      if (replace) setHasMore(false);
+      return;
+    }
+
+    const hydrated = await hydratePosts(data as unknown as PostRow[], userId);
+    if (hydrated.length < PAGE) setHasMore(false);
+    else setHasMore(true);
+    if (data.length > 0) cursorRef.current = data[data.length - 1].created_at;
+
+    setPosts((prev) => (replace ? hydrated : [...prev, ...hydrated]));
+  };
+
+  const loadFirst = async () => {
+    setLoading(true);
+    cursorRef.current = null;
+    await fetchPage(true);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      loadFirst();
+    }, 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, category, userId]);
 
   useEffect(() => {
     const supabase = createClient();
-    let active = true;
-
-    const load = async () => {
-      const { data: postRows, error } = await supabase
-        .from("posts")
-        .select("*, profiles:user_id(username, full_name, avatar_url)")
-        .order("created_at", { ascending: false })
-        .limit(30);
-
-      if (error || !postRows || !active) {
-        if (active) setLoading(false);
-        return;
-      }
-
-      const ids = postRows.map((p) => p.id);
-
-      const [{ data: pulses }, { data: comments }] = await Promise.all([
-        supabase
-          .from("post_pulses")
-          .select("post_id", { count: "exact", head: true })
-          .in("post_id", ids),
-        supabase
-          .from("post_comments")
-          .select("post_id", { count: "exact", head: true })
-          .in("post_id", ids),
-      ]);
-
-      if (!active) return;
-
-      setPosts(
-        postRows.map((p) => ({
-          id: p.id,
-          author: p.profiles?.full_name || p.profiles?.username || "Usuario",
-          handle: `@${p.profiles?.username || "usuario"}`,
-          avatar: (p.profiles?.username || "U").slice(0, 2).toUpperCase(),
-          caption: p.caption || "",
-          media_url: p.media_url,
-          media_type: p.media_type,
-          category: p.category,
-          pulses: pulses?.length ?? 0,
-          comments: comments?.length ?? 0,
-          remixes: 0,
-        }))
-      );
-      setLoading(false);
-    };
-
-    load();
-
-    // Realtime: nueva publicación
     const channel = supabase
-      .channel("feed")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "posts" },
-        () => load()
-      )
+      .channel("feed-live")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "posts" }, () => {
+        if (!category && tab === "all") loadFirst();
+      })
       .subscribe();
-
     return () => {
-      active = false;
       supabase.removeChannel(channel);
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, category]);
 
-  if (loading) {
-    return (
-      <div className="flex justify-center py-16">
-        <Loader2 className="h-6 w-6 animate-spin text-neon" />
-      </div>
-    );
-  }
+  const loadMore = async () => {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    await fetchPage(false);
+    setLoadingMore(false);
+  };
 
-  if (posts.length === 0) {
-    return (
-      <div className="px-6 py-16 text-center">
-        <p className="text-muted">Todavía no hay publicaciones.</p>
-        <p className="text-sm text-muted/60">
-          Creá el primer post con el botón +.
-        </p>
-      </div>
-    );
-  }
+  const removePost = (id: string) => {
+    setPosts((prev) => prev.filter((p) => p.id !== id));
+  };
 
   return (
     <div>
-      {posts.map((p) => (
-        <PostCard key={p.id} post={p} />
-      ))}
+      {/* Tabs */}
+      <div className="sticky top-0 z-10 flex gap-1 border-b border-edge bg-bg/90 px-4 pt-2 pb-2 backdrop-blur">
+        {(
+          [
+            { id: "all", label: "Para vos" },
+            { id: "following", label: "Siguiendo" },
+          ] as const
+        ).map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+              tab === t.id ? "bg-neon text-bg shadow-neon" : "text-muted hover:text-ink"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Categorías */}
+      <div className="flex gap-2 overflow-x-auto px-4 py-2 no-scrollbar">
+        {categories.map((c) => (
+          <button
+            key={c}
+            onClick={() => setCategory((prev) => (prev === c ? null : c))}
+            className={`shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition ${
+              category === c
+                ? "border-neon text-neon shadow-neon"
+                : "border-edge bg-card text-muted"
+            }`}
+          >
+            {c}
+          </button>
+        ))}
+      </div>
+
+      {/* Contenido */}
+      {loading ? (
+        <div className="px-4">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="mb-3 overflow-hidden rounded-2xl border border-edge bg-card">
+              <Skeleton className="aspect-[4/5] w-full rounded-none" />
+              <div className="flex items-center gap-2 p-3">
+                <Skeleton className="h-9 w-9 rounded-full" />
+                <div className="space-y-1.5">
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-3 w-32" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : posts.length === 0 ? (
+        category ? (
+          <EmptyState icon={Sparkles} title={`Sin publicaciones en ${category}`} />
+        ) : tab === "following" ? (
+          <EmptyState
+            icon={Users}
+            title="Todavía no seguís a nadie"
+            subtitle="Descubrí personas y gimnasios en la sección Descubrir."
+          />
+        ) : (
+          <EmptyState
+            icon={Sparkles}
+            title="Todavía no hay publicaciones"
+            subtitle="Creá el primer post con el botón +."
+          />
+        )
+      ) : (
+        <>
+          {posts.map((p) => (
+            <PostCard key={p.id} post={p} onDeleted={removePost} />
+          ))}
+          {hasMore && (
+            <div className="px-4 pb-4">
+              <button
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-edge bg-card py-3 text-sm font-semibold text-neon transition active:scale-[0.98] disabled:opacity-60"
+              >
+                {loadingMore ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <span>Cargar más</span>
+                )}
+              </button>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

@@ -15,6 +15,9 @@ import {
   IdCard,
   Siren,
   StickyNote,
+  Download,
+  DoorOpen,
+  DoorClosed,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
@@ -43,6 +46,42 @@ interface Details {
   emergency_name: string | null;
   emergency_phone: string | null;
   notes: string | null;
+}
+
+interface MemberLog {
+  id: string;
+  type: string;
+  created_at: string;
+}
+
+interface MemberPay {
+  id: string;
+  amount: number | null;
+  method: string | null;
+  note: string | null;
+  paid_at: string;
+}
+
+function exportMemberCsv(
+  name: string,
+  logs: MemberLog[],
+  pays: MemberPay[]
+) {
+  const rows: (string | number)[][] = [
+    ...logs.map((l) => ["Acceso", l.type === "ingreso" ? "Entrada" : "Salida", l.created_at, ""]),
+    ...pays.map((p) => ["Pago", p.note ?? "Cuota", p.paid_at, p.amount ?? ""]),
+  ];
+  const lines = [
+    "registro;detalle;fecha;monto",
+    ...rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(";")),
+  ];
+  const blob = new Blob(["\uFEFF" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${(name || "miembro").replace(/[^\w.-]+/g, "_")}-historial.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function Field({
@@ -110,6 +149,8 @@ export default function MemberDetailPage() {
     notes: "",
   });
   const [age, setAge] = useState<number | null>(null);
+  const [logs, setLogs] = useState<MemberLog[]>([]);
+  const [pays, setPays] = useState<MemberPay[]>([]);
 
   const ageFrom = (birth: string) =>
     birth
@@ -135,7 +176,7 @@ export default function MemberDetailPage() {
       }
       setGymId(gymData.id);
 
-      const [profRes, memRes, staffRes, detRes] = await Promise.all([
+      const [profRes, memRes, staffRes, detRes, logRes, payRes] = await Promise.all([
         supabase.from("profiles").select("id, full_name, email, username").eq("id", userIdParam).maybeSingle(),
         supabase
           .from("gym_memberships")
@@ -155,6 +196,20 @@ export default function MemberDetailPage() {
           .eq("gym_id", gymData.id)
           .eq("user_id", userIdParam)
           .maybeSingle(),
+        supabase
+          .from("gym_access_logs")
+          .select("id, type, created_at")
+          .eq("gym_id", gymData.id)
+          .eq("user_id", userIdParam)
+          .order("created_at", { ascending: false })
+          .limit(15),
+        supabase
+          .from("gym_payments")
+          .select("id, amount, method, note, paid_at")
+          .eq("gym_id", gymData.id)
+          .eq("user_id", userIdParam)
+          .order("paid_at", { ascending: false })
+          .limit(15),
       ]);
       if (!active) return;
 
@@ -176,6 +231,11 @@ export default function MemberDetailPage() {
           notes: d.notes ?? "",
         });
         setAge(ageFrom(d.birth_date ?? ""));
+      }
+
+      if (active) {
+        setLogs((logRes.data ?? []) as MemberLog[]);
+        setPays((payRes.data ?? []) as MemberPay[]);
       }
 
       setLoading(false);
@@ -284,6 +344,69 @@ export default function MemberDetailPage() {
               {membership.status === "activa" && payOk ? "Activa" : "Inactiva / pendiente"}
             </span>
           </div>
+        </div>
+      )}
+
+      {(logs.length > 0 || pays.length > 0) && (
+        <div className="mx-4 mt-4 rounded-xl border border-edge bg-card p-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-ink">Historial (accesos y pagos)</p>
+            <button
+              onClick={() => exportMemberCsv(displayName, logs, pays)}
+              className="flex items-center gap-1 text-xs font-medium text-neon"
+            >
+              <Download className="h-3.5 w-3.5" /> Exportar CSV
+            </button>
+          </div>
+          {logs.length > 0 && (
+            <div className="mt-3">
+              <p className="text-xs font-semibold text-muted">Últimos accesos</p>
+              <div className="mt-2 space-y-1.5">
+                {logs.map((l) => (
+                  <div key={l.id} className="flex items-center justify-between rounded-lg border border-edge bg-elevated p-2">
+                    <span className="flex items-center gap-2 text-sm text-ink">
+                      {l.type === "ingreso" ? (
+                        <DoorOpen className="h-3.5 w-3.5 text-neon" />
+                      ) : (
+                        <DoorClosed className="h-3.5 w-3.5 text-ember" />
+                      )}
+                      {l.type === "ingreso" ? "Entrada" : "Salida"}
+                    </span>
+                    <span className="text-[11px] text-muted">
+                      {new Date(l.created_at).toLocaleString("es-AR", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {pays.length > 0 && (
+            <div className="mt-3">
+              <p className="text-xs font-semibold text-muted">Pagos registrados</p>
+              <div className="mt-2 space-y-1.5">
+                {pays.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between rounded-lg border border-edge bg-elevated p-2">
+                    <span className="min-w-0 truncate text-sm text-ink">{p.note ?? "Cuota"}</span>
+                    <span className="ml-2 flex shrink-0 items-center gap-2">
+                      <span className="text-[11px] text-muted">
+                        {new Date(p.paid_at).toLocaleString("es-AR", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "2-digit",
+                        })}
+                      </span>
+                      <span className="text-sm font-bold text-neon">${p.amount ?? 0}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -16,6 +16,7 @@ interface Gym {
   name: string | null;
   address: string | null;
   city: string | null;
+  capacity: number | null;
   latitude: number | null;
   longitude: number | null;
   qr_code: string;
@@ -31,7 +32,7 @@ interface MemberInfo {
   expires_on: string | null;
 }
 
-type AutoResult = "in" | "out" | "already" | null;
+type AutoResult = "in" | "out" | "already" | "full" | null;
 
 const AUTO_TIMEOUT_MS = 3 * 60 * 60 * 1000;
 
@@ -68,7 +69,7 @@ export default function CheckinPage() {
       const supabase = createClient();
       const { data } = await supabase
         .from("gyms")
-        .select("id, name, address, city, latitude, longitude, qr_code")
+        .select("id, name, address, city, capacity, latitude, longitude, qr_code")
         .eq("qr_code", qrCode)
         .maybeSingle();
       if (!active) return;
@@ -125,6 +126,18 @@ export default function CheckinPage() {
 
         const last = (lastRes.data ?? null) as { type: string; created_at: string } | null;
 
+        const capped = g.capacity != null && g.capacity > 0;
+        let full = false;
+        if (!isStaff && capped) {
+          const cap = g.capacity as number;
+          const presRes = await supabase
+            .from("gym_presence")
+            .select("user_id")
+            .eq("gym_id", g.id)
+            .neq("user_id", userId);
+          full = (presRes.data ?? []).length >= cap;
+        }
+
         if (isStaff) {
           if (last?.type === "ingreso") {
             setStaffSession({ openAt: last.created_at });
@@ -137,7 +150,9 @@ export default function CheckinPage() {
             if (!error) setAuto({ result: "in", time: new Date().toISOString() });
           }
         } else if (enabled) {
-          if (last?.type === "ingreso") {
+          if (full) {
+            setAuto({ result: "full" });
+          } else if (last?.type === "ingreso") {
             const elapsed = Date.now() - new Date(last.created_at).getTime();
             if (elapsed >= AUTO_TIMEOUT_MS) {
               await supabase.from("gym_access_logs").insert({ gym_id: g.id, user_id: userId, type: "egreso" });
@@ -308,6 +323,14 @@ export default function CheckinPage() {
                         Ya estás egresado de {gym.name ?? "el gimnasio"} · {fmtTime(auto.time)}
                       </p>
                     </>
+                  ) : auto.result === "full" ? (
+                    <>
+                      <Ban className="mx-auto h-9 w-9 text-ember" />
+                      <p className="mt-2 text-2xl font-extrabold text-ink">Aforo completo</p>
+                      <p className="mt-1 text-sm text-muted">
+                        {gym.name ?? "El gimnasio"} llegó a su capacidad máxima. Esperá a que alguien salga.
+                      </p>
+                    </>
                   ) : (
                     <>
                       <Clock3 className="mx-auto h-9 w-9 text-ember" />
@@ -330,7 +353,7 @@ export default function CheckinPage() {
                 </div>
               )}
 
-              {auto.result && !staffSession && (
+              {auto.result && auto.result !== "full" && !staffSession && (
                 <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-[11px] text-muted">
                   <Clock3 className="h-3 w-3" />
                   {member?.isStaff

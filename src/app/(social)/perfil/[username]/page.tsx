@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { MapPin, UserPlus, Check, MessageCircle, Loader2, Globe, BadgeCheck } from "lucide-react";
+import { MapPin, UserPlus, Check, MessageCircle, Loader2, Globe, BadgeCheck, Dumbbell } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { Avatar } from "@/components/core/Avatar";
@@ -47,6 +47,7 @@ export default function PublicProfilePage() {
   const [stats, setStats] = useState<ProfileStats | null>(null);
   const [posts, setPosts] = useState<PostData[]>([]);
   const [workplaces, setWorkplaces] = useState<Workplace[]>([]);
+  const [ownedGym, setOwnedGym] = useState<Workplace | null>(null);
   const [following, setFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [list, setList] = useState<"followers" | "following" | null>(null);
@@ -111,8 +112,16 @@ export default function PublicProfilePage() {
           (w, i, arr) => arr.findIndex((x) => x.id === w.id) === i
         );
         if (active) setWorkplaces(combined);
+      } else if (prof.role === "gym") {
+        const { data: own } = await supabase
+          .from("gyms")
+          .select("id, name, address, city, latitude, longitude")
+          .eq("owner_id", prof.id)
+          .maybeSingle();
+        if (active) setOwnedGym((own as Workplace | null) ?? null);
       } else {
         if (active) setWorkplaces([]);
+        if (active) setOwnedGym(null);
       }
 
       if (active) setLoading(false);
@@ -272,6 +281,30 @@ export default function PublicProfilePage() {
                 longitude={mapWorkplace.longitude!}
                 name={mapWorkplace.name}
               />
+            </div>
+          )}
+        </section>
+      )}
+
+      {ownedGym && (
+        <section className="mx-4 mt-4 rounded-2xl border border-neon/30 bg-card p-3.5">
+          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-neon">
+            <Dumbbell className="h-3.5 w-3.5" /> Este gimnasio usa SpotterX
+          </p>
+          <div className="mt-2 flex items-center gap-2.5">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neon/15 text-neon">
+              <MapPin className="h-4 w-4" />
+            </span>
+            <div className="min-w-0 leading-tight">
+              <p className="truncate text-sm font-semibold text-ink">{ownedGym.name || "Gimnasio"}</p>
+              <p className="truncate text-xs text-muted">
+                {[ownedGym.city, ownedGym.address].filter(Boolean).join(" · ") || "Ubicación no especificada"}
+              </p>
+            </div>
+          </div>
+          {ownedGym.latitude && ownedGym.longitude && (
+            <div className="mt-3">
+              <GymMap latitude={ownedGym.latitude} longitude={ownedGym.longitude} name={ownedGym.name} />
             </div>
           )}
         </section>

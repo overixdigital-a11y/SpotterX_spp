@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Zap, MessageCircle, UserPlus, Loader2, Mail, DoorOpen, CheckCheck, ShieldAlert } from "lucide-react";
+import { Zap, MessageCircle, UserPlus, Loader2, Mail, DoorOpen, CheckCheck, ShieldAlert, CalendarClock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { timeAgo } from "@/lib/format";
 import { EmptyState } from "@/components/core/EmptyState";
 
-type NotifType = "pulse" | "comment" | "follow" | "message" | "checkin" | string;
+type NotifType = "pulse" | "comment" | "follow" | "message" | "checkin" | "vencimiento" | string;
 
 interface Notif {
   id: string;
@@ -26,6 +26,7 @@ const iconMap: Record<string, { Icon: typeof Zap; tone: string }> = {
   follow: { Icon: UserPlus, tone: "text-ember" },
   message: { Icon: Mail, tone: "text-ember" },
   checkin: { Icon: DoorOpen, tone: "text-neon" },
+  vencimiento: { Icon: CalendarClock, tone: "text-ember" },
 };
 
 const textMap: Record<string, string> = {
@@ -34,6 +35,7 @@ const textMap: Record<string, string> = {
   follow: "empezó a seguirte",
   message: "te envió un mensaje",
   checkin: "registró su ingreso al gimnasio",
+  vencimiento: "te avisa que tu membresía vence pronto",
 };
 
 export default function NotificacionesPage() {
@@ -176,7 +178,11 @@ export default function NotificacionesPage() {
               }
               if (n.gym_id) {
                 return (
-                  <Link key={n.id} href="/gimnasio" className="block">
+                  <Link
+                    key={n.id}
+                    href={n.type === "vencimiento" ? "/mi-gimnasio" : "/gimnasio"}
+                    className="block"
+                  >
                     {inner}
                   </Link>
                 );

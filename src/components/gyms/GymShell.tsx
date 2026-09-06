@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, Users, Receipt, QrCode, Activity, Wallet, Bell } from "lucide-react";
+import { LayoutDashboard, Users, Receipt, QrCode, Activity, Wallet, Bell, Sparkles } from "lucide-react";
 import { AuthProvider, useAuthState } from "@/lib/auth-context";
 import { createClient } from "@/lib/supabase/client";
 
@@ -140,17 +140,19 @@ function Header() {
   );
 }
 
-const nav = [
-  { href: "/gimnasio", label: "Panel", icon: LayoutDashboard },
-  { href: "/gimnasio/miembros", label: "Miembros", icon: Users },
-  { href: "/gimnasio/planes", label: "Planes", icon: Receipt },
-  { href: "/gimnasio/cobros", label: "Cobros", icon: Wallet },
-  { href: "/gimnasio/qr", label: "QR", icon: QrCode },
-  { href: "/gimnasio/accesos", label: "Accesos", icon: Activity },
-];
-
 function GymNav() {
   const pathname = usePathname();
+  const { profile } = useAuthState();
+  const feedHref = profile?.username ? `/perfil/${profile.username}` : "/perfil";
+  const nav = [
+    { href: "/gimnasio", label: "Panel", icon: LayoutDashboard },
+    { href: feedHref, label: "Feed", icon: Sparkles },
+    { href: "/gimnasio/miembros", label: "Miembros", icon: Users },
+    { href: "/gimnasio/planes", label: "Planes", icon: Receipt },
+    { href: "/gimnasio/cobros", label: "Cobros", icon: Wallet },
+    { href: "/gimnasio/qr", label: "QR", icon: QrCode },
+    { href: "/gimnasio/accesos", label: "Accesos", icon: Activity },
+  ];
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-edge bg-card/95 backdrop-blur">
       <div className="mx-auto flex max-w-md items-center justify-around px-1 py-1">

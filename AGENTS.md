@@ -79,6 +79,19 @@ Orden de etapas para pulir/completar la app, módulo por módulo. Cada etapa ter
 - Discover: chips que filtran **posts** por categoría (hoy buscan usuarios), búsqueda de posts + usuarios, "A quién seguir".
 - Decisión: interacciones completas, **sin** Remix real (compartir = link/Web Share).
 
+### ✅ Etapa 1 — Implementado y deployado (11/09/2026); FALTA correr migración 00009
+- Migración **`00009_social_polish.sql`** (NUEVA, **pendiente de correr por el usuario en SQL Editor**): realtime en `posts`/`post_pulses`/`post_comments`/`follows`, RLS faltantes (`notifications` UPDATE/DELETE, `posts`/`post_comments` UPDATE+DELETE del dueño), columna `parent_id` en `post_comments` (respuestas anidadas), tablas `post_saves` + `post_reports` con RLS, storage policies del bucket `media`, índices. La app degrada con gracia: si `post_saves`/`post_reports` no existen, las queries devuelven `data: null` y no crashean.
+- Primitivas core nuevas: `Avatar` (imagen con fallback de iniciales), `Button`, `Skeleton`, `EmptyState`, `BottomSheet`, `ToastProvider`/`useToast` (wrap en `src/app/layout.tsx`), `BottomNav` con **badge de notificaciones no leídas** (realtime).
+- `src/lib/format.ts`: `timeAgo`, `formatNumber`, `formatDateTime` (es-AR), `parseMentions`. `src/lib/posts.ts`: `hydratePosts` compartido (Feed + detalle) para pulsos/saves/comments con joins hechos en cliente.
+- **PostCard completa**: avatar clicable → perfil, nombre + @ + timeAgo + categoria, media 4:5; Pulse (optimista + rollback), comentarios en BottomSheet (lista + respuestas + realtime + borrar + sync de contador), compartir (Web Share / copiar link), Guardar (favoritos), menú ⋮ (editar/borrar propio, reportar). Caption editable con **estado local** (no muta la prop, regla `react-hooks/immutability`).
+- **Feed**: tabs Para vos/Siguiendo, chips de categoría, paginación por cursor + "Cargar más", skeletons/empty states, realtime de posts nuevos.
+- Página `/posts/[id]` (deep link): PostCard + CommentsList inline + back.
+- Notificaciones: auto-marcado de leídas al abrir, "Marcar todas como leídas", badge en la nav (INSERT realtime), links al post/gym, `type='checkin'` soportado.
+- Crear: **preview** del archivo (objectURL, revocada), publicar con/sin archivo, sin botones muertos Reels/Texto.
+- Discover: chips que **filtran posts** por categoría (PostCard enlaza `?cat=`), búsqueda de posts + personas (debounce 250ms), "A quién seguir" con seguir inline.
+- Nota lint (`react-hooks/set-state-in-effect`): envolver los setState iniciales de efectos en `setTimeout(..., 0)` o callback async; no llamar setState sync en el cuerpo del efecto.
+- Commit `9ab06fa`, deployado a **https://spotterx-five.vercel.app** (26s). Para completar la Etapa 1: correr `00009_social_polish.sql`.
+
 ### 🟦 Etapa 2 — Perfil de usuario completo
 - Migración **00010**: `profiles` += `birth_date`, `phone`, `website`, `social_links`, `is_verified`, `privacy`; RPCs de stats (posts, followers, following, pulses recibidos, racha); tablas `post_saves` + `post_reports` (si no se crearon en E1).
 - Stats **reales** en perfil propio y público (fuera el hardcode "12/1.2k/890"), grid real con conteos por tile + lightbox.

@@ -63,6 +63,59 @@ Tablas planificadas (schema en evolución):
 
 ## Roadmap por fases
 
+## 🗺️ Plan maestro "SpotterX vibrante" (aprobado 11/09/2026)
+
+Orden de etapas para pulir/completar la app, módulo por módulo. Cada etapa termina en: **migración nueva (correr en SQL Editor juntos) + build/lint + commit + deploy a producción + actualizar AGENTS.md**.
+
+### 🟦 Etapa 1 — Red social bien hecha (feed)
+- Migración **00009**: publicar `posts`, `post_pulses`, `post_comments`, `follows` en `supabase_realtime`; RLS faltantes (`notifications` UPDATE para marcar leídas, `posts`/`post_comments` UPDATE+DELETE del dueño, **storage policies**); índices de conteos/feed; columna `parent_id` en `post_comments` (respuestas anidadas).
+- Primitivas core (no existen): `Avatar` (usa `avatar_url` con fallback), `Button`, `Modal`/`BottomSheet`, `Skeleton`, `EmptyState`, `Toast`; `src/lib/format.ts` compartido (`timeAgo`, `formatNumber`, fechas `es-AR`).
+- Fix bugs visibles: contadores de pulses/comentarios muestran 0 (feed lee `data.length` con `head:true`); avatares con iniciales pese a `avatar_url` (perfil público y PostCard); timestamps ausentes.
+- **PostCard completa**: avatar clicable → perfil, nombre + @ + timeAgo + badge de categoría, media 4:5; acciones reales: **Pulse** (estado precargado + animación + rollback en error), **Comentarios** (BottomSheet: lista + realtime + respuestas anidadas + eliminar), **Compartir** (Web Share / copiar link), **Guardar** (favoritos), menú **⋮** (editar/borrar propio, reportar).
+- **Feed**: tabs "Para vos" / "Siguiendo" / por categoría, paginación por cursor + "Cargar más", skeletons y empty states.
+- Página detalle `/posts/[id]` (deep link desde notis/guardados).
+- Notificaciones: marcar leídas + badge de no leídas, links al post, unión con `type='checkin'` (hoy rompería a un dueño), agrupación por actor.
+- Crear: preview del archivo, barra de progreso, conectar o quitar botones muertos Reels/Texto.
+- Discover: chips que filtran **posts** por categoría (hoy buscan usuarios), búsqueda de posts + usuarios, "A quién seguir".
+- Decisión: interacciones completas, **sin** Remix real (compartir = link/Web Share).
+
+### 🟦 Etapa 2 — Perfil de usuario completo
+- Migración **00010**: `profiles` += `birth_date`, `phone`, `website`, `social_links`, `is_verified`, `privacy`; RPCs de stats (posts, followers, following, pulses recibidos, racha); tablas `post_saves` + `post_reports` (si no se crearon en E1).
+- Stats **reales** en perfil propio y público (fuera el hardcode "12/1.2k/890"), grid real con conteos por tile + lightbox.
+- Perfil público: avatar con foto arreglado, listas de seguidores/siguiendo, botón mensaje.
+- Perfil del profe **real**: gyms donde trabaja (`gym_staff`) + zona (`trainer_gyms`) con mapa Leaflet (fuera del placeholder "próximamente").
+- Editar perfil extendido: username (validación unique), teléfono, nacimiento, website, enlaces, privacidad.
+- **Configuración de cuenta** (nueva): cambiar email, cambiar contraseña, **borrar cuenta** (edge function con service role), preferencias de notificación, sesiones.
+- `@menciones` parseables en captions y bio → links.
+- Decisión: **todo público** (sin cuentas privadas ni aprobación de seguidores).
+
+### 🟦 Etapa 3 — Gimnasio completo (herramientas del dueño)
+- Decisiones: **cobro manual + estructura lista** (`gym_payments.method` ya soporta mercadopago; sin webhook aún, se agrega al final); **un gym por dueño** (sin multi-sede); avisos **in-app + push a futuro** (sin email/WhatsApp reales).
+- Panel con cards de resumen: miembros activos, en el gym ahora, deudores, ingresos del mes.
+- Miembros: editar datos del miembro, eliminar/desvincular, **historial individual** (accesos + pagos), exportar.
+- **Staff**: gestión de profes (agregar/quitar, roles `admin`/`recepcion`/`profesor`), **horas trabajadas por profe** (ya se registran ingresos/egresos).
+- Cobros: sección **Deudores** con montos, "Marcar pagó" mejorado (monto + nota), **recibos imprimibles**, totales por período, filtros.
+- Aforo con tope (el checkin bloquea si está lleno). Comunicados del dueño a miembros/staff (notif en app). Recordatorios de vencimiento (pg_cron → notificación).
+- Accesos con estadísticas (horario pico, asistencia media) + exportar CSV.
+
+### 🟦 Etapa 4 — Módulo Profesor (gym + personal trainers)
+- Panel conectado al gym: ver gyms (`gym_staff`), horas trabajadas, **alumnos del gym automáticos** (sync `gym_memberships` → `trainer_students source='gym'`; hoy la etiqueta "Del gym" es manual).
+- **Vista ALUMNO** (hoy NO existe): `/mi-entrenamiento` con planes, rutinas y chat de cada profe — pieza clave para que el módulo sirva.
+- Planes **estructurados** (tabla de items: días/ejercicios/series/reps/descanso) + **plantillas** reutilizables.
+- Rutinas con fecha (`due_on` existe pero no se usa) + historial de cumplimiento con gráfico.
+- Chat 1:1 completo: trigger de notificación `type='message'` (hoy nunca se genera), vistos (`read`), adjuntos.
+- Vinculación bidireccional: profe se postula a un gym (el dueño autoriza); alumno busca/contrata profe por zona con mapa (Leaflet, ya en repo).
+- Disponibilidad/horarios del profe.
+
+### 🟦 Etapa 5 — Marketplace fit (estilo MercadoLibre)
+- `market_products` (publicador: gym/profe/usuario, nombre, descripción, precio, fotos bucket `market`, stock, estado), `market_orders` + items (carrito, total, estados, dirección retiro/envío).
+- Reseñas por vendedor/producto.
+- **Comisión de la plataforma** vía `credits`/`wallet` (schema base ya preparado).
+- UI: home grid, detalle, carrito, comprar, Mis publicaciones, Mis pedidos, reseñas.
+
+### 🟦 Etapa 6 — Empaquetado app (bonus, final del roadmap)
+- Capacitor → APK/iOS, escaneo QR nativo, push reales.
+
 ### ✅ Fase 1 — Fundación (prioridad al iniciar este documento)
 1. Scaffolding Next.js + Tailwind + theme (dark, paleta neón)
 2. Setup Supabase proyecto nuevo

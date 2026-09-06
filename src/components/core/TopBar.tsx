@@ -29,9 +29,12 @@ export function TopBar({ onLogout }: { onLogout?: () => void }) {
           <Menu className="h-6 w-6" />
         </button>
 
-        <Link href="/home" className="text-lg font-bold tracking-tight">
-          <span className="text-neon text-glow">Spotter</span>
-          <span className="text-ember">X</span>
+        <Link href="/home" className="flex items-center gap-2">
+          <img src="/logo-icon.png" alt="" className="h-7 w-7 object-contain" />
+          <span className="text-lg font-bold tracking-tight">
+            <span className="text-neon text-glow">Spotter</span>
+            <span className="text-ember">X</span>
+          </span>
         </Link>
 
         <button className="text-muted" aria-label="Cuenta">

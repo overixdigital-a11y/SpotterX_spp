@@ -30,11 +30,8 @@ function LoginForm() {
   return (
     <>
       <div className="text-center">
-        <h1 className="text-3xl font-extrabold tracking-tight">
-          <span className="text-neon text-glow">Spotter</span>
-          <span className="text-ember">X</span>
-        </h1>
-        <p className="mt-1 text-sm text-muted">La comunidad fit</p>
+        <img src="/logofull-transparente.png" alt="SpotterX" className="mx-auto h-24 w-auto" />
+        <p className="mt-2 text-sm text-muted">La comunidad fit</p>
       </div>
 
       <form onSubmit={onSubmit} className="mt-8 space-y-4">

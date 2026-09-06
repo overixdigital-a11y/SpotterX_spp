@@ -16,6 +16,9 @@ export const metadata: Metadata = {
   title: "SpotterX",
   description: "La comunidad fit. Entrená, conectá y crecé.",
   applicationName: "SpotterX",
+  icons: {
+    icon: "/logo-icon.png",
+  },
 };
 
 export const viewport: Viewport = {

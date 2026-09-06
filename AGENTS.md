@@ -92,6 +92,18 @@ Orden de etapas para pulir/completar la app, módulo por módulo. Cada etapa ter
 - Nota lint (`react-hooks/set-state-in-effect`): envolver los setState iniciales de efectos en `setTimeout(..., 0)` o callback async; no llamar setState sync en el cuerpo del efecto.
 - Commit `9ab06fa`, deployado a **https://spotterx-five.vercel.app** (26s). Para completar la Etapa 1: correr `00009_social_polish.sql`.
 
+### ✅ Etapa 2 — Perfil de usuario completo (implementado y deployado 11/09/2026); PENDIENTES usuario: migración 00010 + deploy delete-account
+- Migración **`00010_profiles_extend.sql`** (NUEVA, **pendiente de correr**): columnas `birth_date`, `phone`, `website`, `social_links jsonb`, `is_verified`, `privacy`, `settings jsonb`, `updated_at` (+ trigger `touch_profile`); trigger `notify_message` (notif `type='message'` al recibir chat); índices de followers/chat. La página de editar degrada con gracia si no se corrió (guarda campos base + avisa con toast).
+- **Stats reales**: `src/lib/stats.ts` (`getProfileStats` → posts/followers/following/pulses recibidos con `count: exact, head: true`), fuera el hardcode "12/1.2k/890".
+- **`/perfil` (propio)**: `Avatar` con foto, badge verificado, chip de rol, bio con @menciones, ubicación + website, cards "Mi gimnasio"/"Mi zona", **grid real** de posts con conteos por tile y **lightbox** (`ProfileGrid` → BottomSheet con PostCard), seguidores/siguiendo abren lista (FollowList con seguir/des-seguir), link a Configuración.
+- **`/perfil/[username]` (público)**: avatar con foto, badge verificado, bio con menciones, stats reales, botón **Seguir** (optimista + toast) y **Mensaje** (→ `/chat/[id]`), seguidores/siguiendo (FollowList), grid + lightbox. **Profesor**: sección "Gimnasios donde trabaja" (gym_staff `authorized` + trainer_gyms) con mapa Leaflet si hay coordenadas.
+- **`/perfil/editar` (extendido)**: avatar, nombre, **username** (`@`, normalizado, validación de unicidad), email (read-only), **teléfono**, **nacimiento** (date), **website**, ubicación, bio.
+- **`/perfil/ajustes` (Configuración, nueva)**: cambiar email, cambiar contraseña, **preferencias de notificación** (toggles en `profiles.settings`), cerrar sesión, **borrar cuenta** (edge function `delete-account`).
+- **Chat 1:1** `/chat/[id]`: lista + envío + realtime (INSERT filtrado por sender) + auto-scroll; notificación `message` vía trigger 00010.
+- **Edge function `delete-account`** (`supabase/functions/delete-account/index.ts`): valida token, `auth.admin.deleteUser(id)` con service role. ⚠️ **Pendiente deploy**: `supabase functions deploy delete-account`.
+- Tipado: los embeds de PostgREST 1:1 (`gym:gyms`, `follower:profiles!follows_*_fkey`) se tipan como array → castear con `as unknown as { kol: Type | null }[]`.
+- Commit `cce27e2`, deployado a **https://spotterx-five.vercel.app** (27s). Para completar la Etapa 2: correr `00010_profiles_extend.sql` y deployar la edge function `delete-account`.
+
 ### 🟦 Etapa 2 — Perfil de usuario completo
 - Migración **00010**: `profiles` += `birth_date`, `phone`, `website`, `social_links`, `is_verified`, `privacy`; RPCs de stats (posts, followers, following, pulses recibidos, racha); tablas `post_saves` + `post_reports` (si no se crearon en E1).
 - Stats **reales** en perfil propio y público (fuera el hardcode "12/1.2k/890"), grid real con conteos por tile + lightbox.

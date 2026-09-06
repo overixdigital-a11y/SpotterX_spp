@@ -41,7 +41,7 @@ interface Workplace {
 export default function PublicProfilePage() {
   const params = useParams<{ username: string }>();
   const username = params.username;
-  const { userId, profile: myProfile } = useAuthState();
+  const { userId } = useAuthState();
   const toast = useToast();
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [stats, setStats] = useState<ProfileStats | null>(null);
@@ -49,6 +49,7 @@ export default function PublicProfilePage() {
   const [workplaces, setWorkplaces] = useState<Workplace[]>([]);
   const [ownedGym, setOwnedGym] = useState<Workplace | null>(null);
   const [following, setFollowing] = useState(false);
+  const [ownsGym, setOwnsGym] = useState(false);
   const [loading, setLoading] = useState(true);
   const [list, setList] = useState<"followers" | "following" | null>(null);
 
@@ -91,6 +92,15 @@ export default function PublicProfilePage() {
           .eq("following_id", prof.id)
           .maybeSingle();
         if (active) setFollowing(!!f);
+      }
+
+      if (userId) {
+        const { data: ownGym } = await supabase
+          .from("gyms")
+          .select("id")
+          .eq("owner_id", userId)
+          .maybeSingle();
+        if (active) setOwnsGym(!!ownGym);
       }
 
       if (prof.role === "profesor") {
@@ -173,7 +183,7 @@ export default function PublicProfilePage() {
 
   const isSelf = userId === profile.id;
   const mapWorkplace = workplaces.find((w) => w.latitude && w.longitude);
-  const showGymPanelBack = myProfile?.role === "gym";
+  const showGymPanelBack = ownsGym;
 
   return (
     <main className="mx-auto max-w-md">

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { MapPin, UserPlus, Check, MessageCircle, Loader2, Globe, BadgeCheck, Dumbbell } from "lucide-react";
+import { MapPin, UserPlus, Check, MessageCircle, Loader2, Globe, BadgeCheck, Dumbbell, LayoutDashboard } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { Avatar } from "@/components/core/Avatar";
@@ -41,7 +41,7 @@ interface Workplace {
 export default function PublicProfilePage() {
   const params = useParams<{ username: string }>();
   const username = params.username;
-  const { userId } = useAuthState();
+  const { userId, profile: myProfile } = useAuthState();
   const toast = useToast();
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [stats, setStats] = useState<ProfileStats | null>(null);
@@ -173,9 +173,18 @@ export default function PublicProfilePage() {
 
   const isSelf = userId === profile.id;
   const mapWorkplace = workplaces.find((w) => w.latitude && w.longitude);
+  const showGymPanelBack = myProfile?.role === "gym";
 
   return (
     <main className="mx-auto max-w-md">
+      {showGymPanelBack && (
+        <Link
+          href="/gimnasio"
+          className="sticky top-16 z-20 mx-4 mt-3 flex items-center justify-center gap-2 rounded-2xl border border-neon/40 bg-card/90 px-4 py-2.5 text-sm font-semibold text-neon shadow-neon backdrop-blur"
+        >
+          <LayoutDashboard className="h-4 w-4" /> Panel del gimnasio
+        </Link>
+      )}
       <div className="flex items-center gap-4 px-4 pt-4">
         <Avatar
           src={profile.avatar_url}

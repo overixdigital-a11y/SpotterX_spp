@@ -9,6 +9,8 @@ import {
   Settings,
   Globe,
   BadgeCheck,
+  LayoutDashboard,
+  ClipboardList,
   Loader2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -32,6 +34,7 @@ export default function PerfilPage() {
   const [stats, setStats] = useState<ProfileStats | null>(null);
   const [posts, setPosts] = useState<PostData[]>([]);
   const [list, setList] = useState<"followers" | "following" | null>(null);
+  const [ownsGym, setOwnsGym] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -51,6 +54,9 @@ export default function PerfilPage() {
       setStats(statsRes);
       const hydrated = await hydratePosts((postsRes.data as unknown as PostRow[]) ?? [], userId);
       if (active) setPosts(hydrated);
+
+      const { data: ownGym } = await supabase.from("gyms").select("id").eq("owner_id", userId).maybeSingle();
+      if (active) setOwnsGym(!!ownGym);
     })();
     return () => {
       active = false;
@@ -149,6 +155,21 @@ export default function PerfilPage() {
         </Link>
       )}
 
+      {profile?.role === "alumno" && (
+        <Link
+          href="/mi-entrenamiento"
+          className="mx-4 mt-4 flex items-center justify-between rounded-2xl border border-ember/30 bg-ember/10 p-3.5"
+        >
+          <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <span className="rounded-full bg-ember/20 p-1.5 text-ember">
+              <ClipboardList className="h-4 w-4" />
+            </span>
+            Mi entrenamiento
+          </p>
+          <ChevronRight className="h-4 w-4 text-ember" />
+        </Link>
+      )}
+
       {profile?.role === "profesor" && (
         <Link
           href="/entrenamiento/zona"
@@ -161,6 +182,21 @@ export default function PerfilPage() {
             Mi zona (gimnasios donde trabajo)
           </p>
           <ChevronRight className="h-4 w-4 text-ember" />
+        </Link>
+      )}
+
+      {ownsGym && (
+        <Link
+          href="/gimnasio"
+          className="mx-4 mt-4 flex items-center justify-between rounded-2xl border border-neon/30 bg-neon/10 p-3.5"
+        >
+          <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <span className="rounded-full bg-neon/20 p-1.5 text-neon">
+              <LayoutDashboard className="h-4 w-4" />
+            </span>
+            Panel del gimnasio
+          </p>
+          <ChevronRight className="h-4 w-4 text-neon" />
         </Link>
       )}
 

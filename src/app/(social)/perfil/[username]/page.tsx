@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { MapPin, UserPlus, Check, MessageCircle, Loader2, Globe, BadgeCheck, Dumbbell, LayoutDashboard } from "lucide-react";
+import { MapPin, UserPlus, Check, MessageCircle, Loader2, Globe, BadgeCheck, Dumbbell } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { Avatar } from "@/components/core/Avatar";
@@ -49,7 +49,6 @@ export default function PublicProfilePage() {
   const [workplaces, setWorkplaces] = useState<Workplace[]>([]);
   const [ownedGym, setOwnedGym] = useState<Workplace | null>(null);
   const [following, setFollowing] = useState(false);
-  const [ownsGym, setOwnsGym] = useState(false);
   const [loading, setLoading] = useState(true);
   const [list, setList] = useState<"followers" | "following" | null>(null);
 
@@ -92,15 +91,6 @@ export default function PublicProfilePage() {
           .eq("following_id", prof.id)
           .maybeSingle();
         if (active) setFollowing(!!f);
-      }
-
-      if (userId) {
-        const { data: ownGym } = await supabase
-          .from("gyms")
-          .select("id")
-          .eq("owner_id", userId)
-          .maybeSingle();
-        if (active) setOwnsGym(!!ownGym);
       }
 
       if (prof.role === "profesor") {
@@ -183,18 +173,9 @@ export default function PublicProfilePage() {
 
   const isSelf = userId === profile.id;
   const mapWorkplace = workplaces.find((w) => w.latitude && w.longitude);
-  const showGymPanelBack = ownsGym;
 
   return (
     <main className="mx-auto max-w-md">
-      {showGymPanelBack && (
-        <Link
-          href="/gimnasio"
-          className="sticky top-16 z-20 mx-4 mt-3 flex items-center justify-center gap-2 rounded-2xl border border-neon/40 bg-card/90 px-4 py-2.5 text-sm font-semibold text-neon shadow-neon backdrop-blur"
-        >
-          <LayoutDashboard className="h-4 w-4" /> Panel del gimnasio
-        </Link>
-      )}
       <div className="flex items-center gap-4 px-4 pt-4">
         <Avatar
           src={profile.avatar_url}

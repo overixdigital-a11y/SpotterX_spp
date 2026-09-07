@@ -31,6 +31,22 @@ export function formatDateTime(iso: string | null | undefined): string {
   });
 }
 
+export function todayLocal(): string {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
+export function formatDay(dateStr: string | null | undefined): string {
+  if (!dateStr) return "";
+  return new Date(`${dateStr}T00:00:00`).toLocaleDateString("es-AR", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+}
+
 export function parseMentions(text: string): { raw: string; handle?: string }[] {
   return text.split(/(@[\w.]+)/g).map((part) =>
     part.startsWith("@") ? { raw: part, handle: part.slice(1) } : { raw: part }

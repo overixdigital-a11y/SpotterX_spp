@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { UserPlus, Loader2, KeyRound, Copy, Check, Users, Gift, XCircle, ChevronRight } from "lucide-react";
+import { UserPlus, Loader2, KeyRound, Copy, Check, Users, Gift, XCircle, ChevronRight, Search } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
+import { Avatar } from "@/components/core/Avatar";
+import { useToast } from "@/components/core/ToastProvider";
 
 const FUNC_URL = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/invite-member`;
 
@@ -35,10 +37,20 @@ interface Member {
   price?: number | null;
 }
 
+interface SearchPerson {
+  id: string;
+  username: string;
+  full_name: string | null;
+  email: string | null;
+  avatar_url: string | null;
+  role: string;
+}
+
 const PROMO_COUNT: Record<string, number> = { "2x1": 2, "3x2": 3, "4x3": 4 };
 
 export default function GymMembersPage() {
   const { userId } = useAuthState();
+  const toast = useToast();
   const [gym, setGym] = useState<Gym | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
@@ -49,6 +61,13 @@ export default function GymMembersPage() {
   const [search, setSearch] = useState("");
   const [reactivating, setReactivating] = useState<Member | null>(null);
   const [reactivatePlan, setReactivatePlan] = useState("");
+  const [searchQ, setSearchQ] = useState("");
+  const [searchRes, setSearchRes] = useState<SearchPerson[]>([]);
+  const [memberIds, setMemberIds] = useState<Set<string>>(new Set());
+  const [staffIds, setStaffIds] = useState<Set<string>>(new Set());
+  const [busyAdd, setBusyAdd] = useState<string | null>(null);
+  const [picking, setPicking] = useState<SearchPerson | null>(null);
+  const [alumnoPlan, setAlumnoPlan] = useState("");
 
   const [form, setForm] = useState({
     role: "alumno",
@@ -130,13 +149,41 @@ export default function GymMembersPage() {
         });
 
       const all = [...mapMembers(staff, "profesor"), ...mapMembers(memberships, "alumno")];
-      if (active) setMembers(all);
+      if (active) {
+        setMembers(all);
+        setMemberIds(new Set((memberships ?? []).map((r) => r.user_id)));
+        setStaffIds(new Set((staff ?? []).map((r) => r.user_id)));
+      }
       if (active) setLoading(false);
     })();
     return () => {
       active = false;
     };
   }, [userId]);
+
+  // Búsqueda estilo Instagram: personas de la app por nombre o @usuario
+  useEffect(() => {
+    let active = true;
+    const t = setTimeout(async () => {
+      const q = searchQ.trim();
+      if (!q) {
+        if (active) setSearchRes([]);
+        return;
+      }
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, username, full_name, email, avatar_url, role")
+        .or(`username.ilike.%${q}%,full_name.ilike.%${q}%`)
+        .neq("id", userId)
+        .limit(12);
+      if (active) setSearchRes((data as SearchPerson[] | null) ?? []);
+    }, 250);
+    return () => {
+      active = false;
+      clearTimeout(t);
+    };
+  }, [searchQ, userId]);
 
   const selectedPlan = plans.find((p) => p.id === form.plan_id) ?? null;
 
@@ -153,7 +200,7 @@ export default function GymMembersPage() {
     if (!gym) return;
     const email = (i: number) => people[i]?.email?.trim();
     if (!email(0) || !people[0]?.full_name?.trim() || !people[0]?.username?.trim()) return;
-    if (!selectedPlan) return;
+    if (form.role === "alumno" && !selectedPlan) return;
     for (let i = 0; i < people.length; i++) {
       if (!people[i]?.email?.trim()) continue;
       setCreating(true);
@@ -166,6 +213,7 @@ export default function GymMembersPage() {
 
       const isExtras = i > 0;
       const member = people[i];
+      const plan = form.role === "alumno" ? selectedPlan : null;
       const res = await fetch(FUNC_URL, {
         method: "POST",
         headers: {
@@ -175,14 +223,14 @@ export default function GymMembersPage() {
         },
         body: JSON.stringify({
           gym_id: gym.id,
-          role: "alumno",
+          role: form.role,
           full_name: member.full_name.trim(),
           username: member.username.trim(),
           email: member.email.trim(),
-          plan_name: selectedPlan.name,
-          pay_status: isExtras ? "promo" : "pagado",
-          expires_on: calcExpiry(selectedPlan.duration_months),
-          price: selectedPlan.price,
+          plan_name: plan?.name,
+          pay_status: form.role === "alumno" ? (isExtras ? "promo" : "pagado") : "pendiente",
+          expires_on: plan ? calcExpiry(plan.duration_months) : null,
+          price: plan?.price ?? null,
         }),
       });
       const data = await res.json();
@@ -269,6 +317,87 @@ export default function GymMembersPage() {
     setReactivatePlan("");
   };
 
+  const confirmAlumno = async () => {
+    if (!gym || !picking) return;
+    const plan = plans.find((p) => p.id === alumnoPlan);
+    if (!plan) {
+      toast("Elegí un plan para el alumno", "error");
+      return;
+    }
+    setBusyAdd(picking.id);
+    const supabase = createClient();
+    const d = new Date();
+    d.setMonth(d.getMonth() + (plan.duration_months ?? 1));
+    const expires = d.toISOString().split("T")[0];
+    const { error } = await supabase.from("gym_memberships").upsert(
+      {
+        gym_id: gym.id,
+        user_id: picking.id,
+        plan_name: plan.name,
+        price: plan.price,
+        status: "activa",
+        pay_status: "pagado",
+        expires_on: expires,
+      },
+      { onConflict: "gym_id,user_id" }
+    );
+    setBusyAdd(null);
+    if (error) {
+      toast("No se pudo agregar: " + error.message, "error");
+      return;
+    }
+    setPicking(null);
+    setAlumnoPlan("");
+    setMemberIds((prev) => new Set(prev).add(picking.id));
+    setMembers((prev) => [
+      {
+        user_id: picking.id,
+        role: "alumno",
+        full_name: picking.full_name,
+        email: picking.email,
+        username: picking.username,
+        plan_name: plan.name,
+        status: "activa",
+        pay_status: "pagado",
+        expires_on: expires,
+        price: plan.price,
+      },
+      ...prev,
+    ]);
+    toast(`${picking.full_name ?? picking.username} ahora es alumno del gym`);
+  };
+
+  const addProfesor = async (p: SearchPerson) => {
+    if (!gym) return;
+    setBusyAdd(p.id);
+    const supabase = createClient();
+    const { error } = await supabase.from("gym_staff").upsert(
+      { gym_id: gym.id, user_id: p.id, role: "profesor_invitado", authorized: true },
+      { onConflict: "gym_id,user_id" }
+    );
+    setBusyAdd(null);
+    if (error) {
+      toast("No se pudo agregar: " + error.message, "error");
+      return;
+    }
+    setStaffIds((prev) => new Set(prev).add(p.id));
+    setMembers((prev) => [
+      {
+        user_id: p.id,
+        role: "profesor",
+        full_name: p.full_name,
+        email: p.email,
+        username: p.username,
+        plan_name: null,
+        status: null,
+        pay_status: "pendiente",
+        expires_on: null,
+      },
+      ...prev,
+    ]);
+    toast(`${p.full_name ?? p.username} ahora es profesor del gym`);
+  };
+
   if (loading) {
     return (
       <main className="flex justify-center py-20">
@@ -295,6 +424,90 @@ export default function GymMembersPage() {
     <main className="mx-auto max-w-md px-4 pt-5">
       <h1 className="text-xl font-bold text-ink">Miembros</h1>
       <p className="mt-1 text-sm text-muted">Creá las cuentas de tus alumnos y profesores.</p>
+
+      <div className="mt-5 rounded-2xl border border-edge bg-card p-4">
+        <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+          <Search className="h-4 w-4 text-neon" /> Agregar por búsqueda
+        </p>
+        <p className="mt-0.5 text-xs text-muted">
+          Buscá por nombre o @usuario a alguien que ya esté en la app y agregalo como alumno o profesor.
+        </p>
+
+        <div className="mt-3 flex items-center gap-2 rounded-xl border border-edge bg-elevated px-3 py-2.5">
+          <Search className="h-4 w-4 shrink-0 text-muted" />
+          <input
+            value={searchQ}
+            onChange={(e) => setSearchQ(e.target.value)}
+            placeholder="Buscar personas…"
+            className="w-full bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none"
+          />
+        </div>
+
+        {searchQ.trim() && searchRes.length === 0 && (
+          <p className="pt-3 text-center text-xs text-muted">Sin resultados para «{searchQ.trim()}».</p>
+        )}
+
+        {searchRes.length > 0 && (
+          <div className="mt-2 max-h-80 overflow-y-auto">
+            {searchRes.map((p) => {
+              const isMember = memberIds.has(p.id);
+              const isStaff = staffIds.has(p.id);
+              return (
+                <div key={p.id} className="flex items-center gap-3 border-b border-edge py-2.5 last:border-b-0">
+                  <Avatar src={p.avatar_url} name={p.full_name} username={p.username} size="sm" ring={false} />
+                  <div className="min-w-0 flex-1 leading-tight">
+                    <p className="truncate text-sm font-semibold text-ink">{p.full_name || p.username}</p>
+                    <p className="truncate text-xs text-muted">
+                      @{p.username} · {p.role}
+                      {isMember && <span className="ml-1 text-neon"> · Alumno ✓</span>}
+                      {isStaff && <span className="ml-1 text-ember"> · Profesor ✓</span>}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-1.5">
+                    <button
+                      onClick={() => {
+                        setPicking(p);
+                        setAlumnoPlan("");
+                      }}
+                      disabled={isMember || busyAdd === p.id}
+                      className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition active:scale-95 disabled:opacity-50 ${
+                        isMember ? "border border-neon/30 bg-neon/10 text-neon" : "border border-transparent bg-neon text-bg shadow-neon"
+                      }`}
+                    >
+                      {isMember ? (
+                        "✓ Alumno"
+                      ) : busyAdd === p.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <>
+                          <UserPlus className="h-3.5 w-3.5" /> Alumno
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => addProfesor(p)}
+                      disabled={isStaff || busyAdd === p.id}
+                      className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition active:scale-95 disabled:opacity-50 ${
+                        isStaff ? "border border-ember/30 bg-ember/10 text-ember" : "border border-transparent bg-ember text-bg"
+                      }`}
+                    >
+                      {isStaff ? (
+                        "✓ Profesor"
+                      ) : busyAdd === p.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <>
+                          <UserPlus className="h-3.5 w-3.5" /> Profesor
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       <div className="mt-5 rounded-2xl border border-edge bg-card p-4">
         <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
@@ -389,11 +602,23 @@ export default function GymMembersPage() {
               {results.map((r, i) => (
                 <div key={i} className="rounded-lg bg-card p-2">
                   <p className="text-xs text-muted">
-                    {r.existed ? "Vincular cuenta existente" : i === 0 ? "💰 Paga" : "🎁 Promo"}
+                    {form.role === "profesor"
+                      ? r.existed
+                        ? "Vinculado como profesor"
+                        : "Profesor"
+                      : r.existed
+                        ? "Vincular cuenta existente"
+                        : i === 0
+                          ? "💰 Paga"
+                          : "🎁 Promo"}
                   </p>
                   <p className="font-medium">{r.email}</p>
                   {r.existed ? (
-                    <p className="text-xs text-neon">✓ Vinculada como miembro del gimnasio</p>
+                    <p className="text-xs text-neon">
+                      {form.role === "profesor"
+                        ? "✓ Vinculado como profesor del gimnasio"
+                        : "✓ Vinculada como miembro del gimnasio"}
+                    </p>
                   ) : (
                     <p className="font-mono text-neon">{r.provisional_password}</p>
                   )}
@@ -542,6 +767,51 @@ export default function GymMembersPage() {
                 className="flex-1 rounded-xl bg-neon py-2.5 text-sm font-semibold text-bg disabled:opacity-50"
               >
                 Reactivar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {picking && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-edge bg-elevated p-5">
+            <p className="text-sm font-bold text-ink">Agregar a {picking.full_name ?? picking.username} como alumno</p>
+            <p className="mt-1 text-xs text-muted">Elegí el plan. La membresía sale activa y pagada desde hoy.</p>
+            <div className="mt-4 space-y-2">
+              {plans.length === 0 ? (
+                <p className="text-xs text-muted">No hay planes. Creá uno en la pestaña Planes.</p>
+              ) : (
+                plans.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => setAlumnoPlan(p.id)}
+                    className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left transition ${
+                      alumnoPlan === p.id ? "border-neon bg-neon/10" : "border-edge bg-card"
+                    }`}
+                  >
+                    <span className="text-sm font-semibold text-ink">{p.name}</span>
+                    <span className="text-xs text-muted">
+                      {p.duration_months} mes{p.duration_months > 1 ? "es" : ""} · ${Number(p.price).toLocaleString("es-AR")}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => setPicking(null)}
+                className="flex-1 rounded-xl border border-edge py-2.5 text-sm font-medium text-muted"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmAlumno}
+                disabled={!alumnoPlan || busyAdd === picking.id}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-neon py-2.5 text-sm font-semibold text-bg disabled:opacity-50"
+              >
+                {busyAdd === picking.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                Agregar
               </button>
             </div>
           </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Zap, MessageCircle, UserPlus, Loader2, Mail, DoorOpen, CheckCheck, ShieldAlert, CalendarClock } from "lucide-react";
+import { Zap, MessageCircle, UserPlus, Loader2, Mail, DoorOpen, CheckCheck, ShieldAlert, CalendarClock, Store, UserCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { timeAgo } from "@/lib/format";
@@ -27,6 +27,8 @@ const iconMap: Record<string, { Icon: typeof Zap; tone: string }> = {
   message: { Icon: Mail, tone: "text-ember" },
   checkin: { Icon: DoorOpen, tone: "text-neon" },
   vencimiento: { Icon: CalendarClock, tone: "text-ember" },
+  solicitud_staff: { Icon: Store, tone: "text-ember" },
+  staff_aprobado: { Icon: UserCheck, tone: "text-neon" },
 };
 
 const textMap: Record<string, string> = {
@@ -36,6 +38,8 @@ const textMap: Record<string, string> = {
   message: "te envió un mensaje",
   checkin: "registró su ingreso al gimnasio",
   vencimiento: "te avisa que tu membresía vence pronto",
+  solicitud_staff: "se postuló para trabajar en tu gimnasio",
+  staff_aprobado: "aprobó tu postulación en su gimnasio",
 };
 
 export default function NotificacionesPage() {
@@ -180,7 +184,7 @@ export default function NotificacionesPage() {
                 return (
                   <Link
                     key={n.id}
-                    href={n.type === "vencimiento" ? "/mi-gimnasio" : "/gimnasio"}
+                    href={n.type === "vencimiento" ? "/mi-gimnasio" : n.type === "staff_aprobado" ? "/entrenamiento/zona" : "/gimnasio"}
                     className="block"
                   >
                     {inner}

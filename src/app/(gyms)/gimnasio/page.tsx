@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
-import { Loader2, MapPin, Pencil, Check, Save, Send, Users, Activity, AlertTriangle, Wallet, Clock3 } from "lucide-react";
+import { Loader2, MapPin, Pencil, Check, Save, Send, Users, Activity, AlertTriangle, Wallet, Clock3, X, UserPlus } from "lucide-react";
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
+import { timeAgo } from "@/lib/format";
 
 const GymMap = dynamic(() => import("@/components/gyms/GymMap"), { ssr: false });
 
@@ -40,6 +41,16 @@ interface StaffView {
   authorized: boolean;
   name: string;
   hours: number;
+}
+
+interface RequestRow {
+  id: string;
+  trainer_id: string;
+  created_at: string;
+}
+
+interface RequestView extends RequestRow {
+  name: string;
 }
 
 function startOfToday() {
@@ -83,6 +94,7 @@ export default function GymPanelPage() {
   const [saving, setSaving] = useState(false);
   const [summary, setSummary] = useState<Summary>({ members: 0, presence: 0, debtors: 0, income: 0 });
   const [staff, setStaff] = useState<StaffView[]>([]);
+  const [requests, setRequests] = useState<RequestView[]>([]);
 
   const [form, setForm] = useState({
     name: "",
@@ -189,6 +201,60 @@ export default function GymPanelPage() {
     };
   }, [userId]);
 
+  useEffect(() => {
+    const gymId = gym?.id;
+    if (!gymId) return;
+    let active = true;
+    const supabase = createClient();
+    const loadRequests = async () => {
+      const { data: reqRows } = await supabase
+        .from("trainer_gym_requests")
+        .select("id, trainer_id, created_at")
+        .eq("gym_id", gymId)
+        .eq("status", "pending")
+        .order("created_at", { ascending: true });
+      if (!active) return;
+      if (!reqRows || reqRows.length === 0) {
+        setRequests([]);
+        return;
+      }
+      const tids = [...new Set((reqRows as RequestRow[]).map((r) => r.trainer_id))];
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id, full_name, username")
+        .in("id", tids);
+      const nameMap = new Map(
+        ((profs ?? []) as { id: string; full_name: string | null; username: string | null }[]).map(
+          (p) => [p.id, p.full_name ?? p.username ?? "Profesor"]
+        )
+      );
+      setRequests(
+        (reqRows as RequestRow[]).map((r) => ({
+          ...r,
+          name: nameMap.get(r.trainer_id) ?? "Profesor",
+        }))
+      );
+    };
+    loadRequests();
+    const channel = supabase
+      .channel(`gym-requests-${gymId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "trainer_gym_requests",
+          filter: `gym_id=eq.${gymId}`,
+        },
+        () => loadRequests()
+      )
+      .subscribe();
+    return () => {
+      active = false;
+      channel.unsubscribe();
+    };
+  }, [gym?.id]);
+
   const saveGym = async () => {
     if (!userId) return;
     setSaving(true);
@@ -231,6 +297,26 @@ export default function GymPanelPage() {
       },
       { enableHighAccuracy: true }
     );
+  };
+
+  const approveRequest = async (r: RequestView) => {
+    if (!gym) return;
+    setSaving(true);
+    const supabase = createClient();
+    await supabase
+      .from("gym_staff")
+      .upsert(
+        { gym_id: gym.id, user_id: r.trainer_id, role: "profesor_invitado", authorized: true },
+        { onConflict: "gym_id,user_id" }
+      );
+    await supabase.from("trainer_gym_requests").update({ status: "approved" }).eq("id", r.id);
+    setRequests((prev) => prev.filter((x) => x.id !== r.id));
+    setSaving(false);
+  };
+
+  const rejectRequest = async (r: RequestView) => {
+    await createClient().from("trainer_gym_requests").update({ status: "rejected" }).eq("id", r.id);
+    setRequests((prev) => prev.filter((x) => x.id !== r.id));
   };
 
   if (loading) {
@@ -366,6 +452,48 @@ export default function GymPanelPage() {
           >
             <Send className="h-4 w-4" /> Publicar en el feed
           </Link>
+
+          {requests.length > 0 && (
+            <div className="mt-6">
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+                <UserPlus className="h-4 w-4 text-ember" /> Solicitudes de profesores
+              </p>
+              <p className="mt-0.5 text-xs text-muted">
+                Profesores que se postularon para trabajar en tu gimnasio.
+              </p>
+              <div className="mt-3 space-y-2">
+                {requests.map((r) => (
+                  <div
+                    key={r.id}
+                    className="rounded-xl border border-ember/20 bg-card p-3"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-ink">{r.name}</p>
+                        <p className="text-[11px] text-muted">Se postuló {timeAgo(r.created_at)}</p>
+                      </div>
+                      <div className="flex shrink-0 gap-1.5">
+                        <button
+                          onClick={() => approveRequest(r)}
+                          disabled={saving}
+                          className="flex items-center gap-1 rounded-lg bg-neon px-3 py-1.5 text-xs font-semibold text-bg"
+                        >
+                          <Check className="h-3.5 w-3.5" /> Aprobar
+                        </button>
+                        <button
+                          onClick={() => rejectRequest(r)}
+                          disabled={saving}
+                          className="flex items-center gap-1 rounded-lg border border-ember/40 bg-ember/10 px-3 py-1.5 text-xs font-semibold text-ember"
+                        >
+                          <X className="h-3.5 w-3.5" /> Rechazar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {staff.length > 0 && (
             <div className="mt-6">

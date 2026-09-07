@@ -54,7 +54,9 @@ interface Routine {
 interface Msg {
   id: string;
   sender_id: string;
+  recipient_id: string;
   content: string;
+  read: boolean;
   created_at: string;
 }
 
@@ -63,6 +65,11 @@ const KIND_LABEL: Record<string, string> = {
   alimentacion: "Alimentación",
   general: "General",
 };
+
+function todayDow(): number {
+  const d = new Date();
+  return ((d.getDay() + 6) % 7) + 1;
+}
 
 export default function MiEntrenamientoPage() {
   const { userId } = useAuthState();
@@ -76,6 +83,7 @@ export default function MiEntrenamientoPage() {
   const [msgText, setMsgText] = useState("");
   const [loading, setLoading] = useState(true);
   const [openPlan, setOpenPlan] = useState<string | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     if (!userId) return;
@@ -157,7 +165,13 @@ export default function MiEntrenamientoPage() {
         .or(`sender_id.eq.${trainerId},recipient_id.eq.${trainerId}`)
         .order("created_at", { ascending: true });
       if (!active) return;
-      if (ms) setMessages(ms as Msg[]);
+      if (ms) {
+        const unread = (ms as Msg[]).filter(
+          (m) => m.sender_id === trainerId && m.recipient_id === userId && !m.read
+        ).length;
+        setUnreadCount(unread);
+        setMessages(ms as Msg[]);
+      }
 
       await supabase
         .from("messages")
@@ -247,6 +261,7 @@ export default function MiEntrenamientoPage() {
   const pending = sortedRoutines.filter((r) => !r.done);
   const completed = sortedRoutines.filter((r) => r.done);
   const todayCount = pending.filter((r) => r.due_on && r.due_on === todayLocal()).length;
+  const currentDay = todayDow();
 
   return (
     <main className="mx-auto max-w-md px-4 pt-5 pb-24">
@@ -298,12 +313,20 @@ export default function MiEntrenamientoPage() {
         ).map(([key, label, Icon]) => (
           <button
             key={key}
-            onClick={() => setTab(key)}
+            onClick={() => {
+              setTab(key);
+              if (key === "chat") setUnreadCount(0);
+            }}
             className={`flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm font-semibold transition ${
               tab === key ? "bg-neon text-bg" : "text-muted"
             }`}
           >
             <Icon className="h-4 w-4" /> {label}
+            {key === "chat" && unreadCount > 0 && (
+              <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-ember text-[10px] font-bold text-bg">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -325,6 +348,9 @@ export default function MiEntrenamientoPage() {
               const k = i.day ?? 0;
               groups.set(k, [...(groups.get(k) ?? []), i]);
             });
+            const todayItems = planItems.filter(
+              (i) => i.day === currentDay || i.day === 0
+            );
             return (
               <div key={p.id} className="mb-2 rounded-xl border border-edge bg-card p-3.5">
                 <button
@@ -333,9 +359,16 @@ export default function MiEntrenamientoPage() {
                 >
                   <div>
                     <p className="font-semibold text-ink">{p.title}</p>
-                    <span className="rounded-full border border-neon/40 bg-neon/10 px-2 py-0.5 text-[11px] text-neon">
-                      {KIND_LABEL[p.kind] ?? p.kind}
-                    </span>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      <span className="rounded-full border border-neon/40 bg-neon/10 px-2 py-0.5 text-[11px] text-neon">
+                        {KIND_LABEL[p.kind] ?? p.kind}
+                      </span>
+                      {todayItems.length > 0 && (
+                        <span className="rounded-full border border-ember/40 bg-ember/10 px-2 py-0.5 text-[11px] text-ember">
+                          {todayItems.length} ejercicios hoy
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-muted transition ${expanded ? "rotate-180" : ""}`} />
                 </button>

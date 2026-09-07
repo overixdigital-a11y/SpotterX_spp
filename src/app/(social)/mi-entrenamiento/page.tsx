@@ -129,6 +129,7 @@ export default function MiEntrenamientoPage() {
         .from("trainer_plans")
         .select("*")
         .eq("trainer_id", trainerId)
+        .eq("is_template", false)
         .order("created_at", { ascending: false });
       if (!active) return;
       if (pl) setPlans(pl as Plan[]);

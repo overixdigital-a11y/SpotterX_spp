@@ -13,6 +13,9 @@ import {
   X,
   Clock3,
   ChevronDown,
+  LayoutTemplate,
+  Copy,
+  BookmarkPlus,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
@@ -30,6 +33,7 @@ interface Plan {
   title: string;
   kind: string;
   content: string | null;
+  is_template: boolean | null;
 }
 
 interface PlanItem {
@@ -101,6 +105,9 @@ export default function AlumnoPage() {
     title: "",
     due_on: "",
   });
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [templates, setTemplates] = useState<Plan[]>([]);
+  const [tplItems, setTplItems] = useState<PlanItem[]>([]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -230,6 +237,74 @@ export default function AlumnoPage() {
     setItems((prev) => prev.filter((i) => i.id !== id));
   };
 
+  const openTemplates = async () => {
+    if (!userId) return;
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("trainer_plans")
+      .select("*")
+      .eq("trainer_id", userId)
+      .eq("is_template", true)
+      .order("created_at", { ascending: false });
+    if (data) setTemplates(data as Plan[]);
+    const ids = (data as Plan[] | null)?.map((x) => x.id) ?? [];
+    if (ids.length > 0) {
+      const { data: it } = await supabase
+        .from("trainer_plan_items")
+        .select("*")
+        .in("plan_id", ids);
+      if (it) setTplItems(it as PlanItem[]);
+    } else {
+      setTplItems([]);
+    }
+    setShowTemplates(true);
+  };
+
+  const saveAsTemplate = async (id: string) => {
+    await createClient().from("trainer_plans").update({ is_template: true }).eq("id", id);
+    setPlans((prev) => prev.map((p) => (p.id === id ? { ...p, is_template: true } : p)));
+  };
+
+  const copyTemplate = async (tpl: Plan) => {
+    if (!userId) return;
+    const supabase = createClient();
+    const srcItems = tplItems.filter((i) => i.plan_id === tpl.id);
+    const { data } = await supabase
+      .from("trainer_plans")
+      .insert({
+        trainer_id: userId,
+        student_id: studentId,
+        title: tpl.title,
+        kind: tpl.kind,
+        content: tpl.content,
+      })
+      .select()
+      .maybeSingle();
+    if (!data) return;
+    const newPlan = data as Plan;
+    if (srcItems.length > 0) {
+      await supabase.from("trainer_plan_items").insert(
+        srcItems.map((i) => ({
+          plan_id: newPlan.id,
+          day: i.day,
+          exercise: i.exercise,
+          sets: i.sets,
+          reps: i.reps,
+          rest_seconds: i.rest_seconds,
+          notes: i.notes,
+          position: i.position,
+        }))
+      );
+      const { data: newIts } = await supabase
+        .from("trainer_plan_items")
+        .select("*")
+        .eq("plan_id", newPlan.id);
+      if (newIts) setItems((prev) => [...prev, ...(newIts as PlanItem[])]);
+    }
+    setPlans((prev) => [newPlan, ...prev]);
+    setShowTemplates(false);
+  };
+
   const addRoutine = async () => {
     if (!userId || !routineForm.title.trim()) return;
     const supabase = createClient();
@@ -332,12 +407,20 @@ export default function AlumnoPage() {
 
       {tab === "planes" && (
         <div className="mt-4">
-          <button
-            onClick={() => setPlanForm((v) => ({ ...v, open: !v.open }))}
-            className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-edge bg-card py-3 text-sm font-medium text-neon"
-          >
-            <Plus className="h-4 w-4" /> Nuevo plan
-          </button>
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            <button
+              onClick={() => setPlanForm((v) => ({ ...v, open: !v.open }))}
+              className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-edge bg-card py-3 text-sm font-medium text-neon"
+            >
+              <Plus className="h-4 w-4" /> Nuevo plan
+            </button>
+            <button
+              onClick={openTemplates}
+              className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-ember/50 bg-card py-3 text-sm font-medium text-ember"
+            >
+              <LayoutTemplate className="h-4 w-4" /> Plantillas
+            </button>
+          </div>
 
           {planForm.open && (
             <div className="mb-3 space-y-2 rounded-xl border border-neon/30 bg-card p-3">
@@ -418,14 +501,32 @@ export default function AlumnoPage() {
                     />
                   </div>
                 </button>
-                <div className="flex items-center justify-between pr-8">
-                  {p.content && <p className="mt-2 text-sm text-muted">{p.content}</p>}
-                  <button
-                    onClick={() => deletePlan(p.id)}
-                    className="mt-2 text-muted hover:text-ember"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                <div className="mt-2 flex items-center justify-between pr-1">
+                  <div className="flex flex-wrap items-center gap-2 pr-8">
+                    {p.content ? <p className="text-sm text-muted">{p.content}</p> : null}
+                    {p.is_template && (
+                      <span className="rounded-full border border-ember/40 bg-ember/10 px-2 py-0.5 text-[11px] font-medium text-ember">
+                        Plantilla
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {!p.is_template && (
+                      <button
+                        onClick={() => saveAsTemplate(p.id)}
+                        title="Guardar como plantilla"
+                        className="text-muted transition hover:text-ember"
+                      >
+                        <BookmarkPlus className="h-4 w-4" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => deletePlan(p.id)}
+                      className="text-muted hover:text-ember"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
 
                 {expanded && (
@@ -544,6 +645,54 @@ export default function AlumnoPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {showTemplates && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60"
+          onClick={() => setShowTemplates(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-t-2xl border border-edge bg-card p-4 pb-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="font-semibold text-ink">Tus plantillas</p>
+            <p className="mt-0.5 text-xs text-muted">
+              Guardá un plan tocando el ícono de guardado y reusalo en cualquier alumno.
+            </p>
+            <div className="mt-3 max-h-72 space-y-2 overflow-y-auto">
+              {templates.length === 0 && (
+                <p className="py-6 text-center text-sm text-muted">
+                  Todavía no guardaste plantillas.
+                </p>
+              )}
+              {templates.map((t) => (
+                <div
+                  key={t.id}
+                  className="flex items-center gap-3 rounded-xl border border-edge bg-bg p-3"
+                >
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-ink">{t.title}</p>
+                    <span className="rounded-full border border-neon/40 bg-neon/10 px-2 py-0.5 text-[11px] text-neon">
+                      {KIND_LABEL[t.kind] ?? t.kind}
+                    </span>
+                  </div>
+                  {tplItems.filter((i) => i.plan_id === t.id).length > 0 && (
+                    <span className="text-xs text-muted">
+                      {tplItems.filter((i) => i.plan_id === t.id).length} ej.
+                    </span>
+                  )}
+                  <button
+                    onClick={() => copyTemplate(t)}
+                    className="flex items-center gap-1 rounded-lg bg-ember px-3 py-1.5 text-xs font-semibold text-bg"
+                  >
+                    <Copy className="h-3.5 w-3.5" /> Usar
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 

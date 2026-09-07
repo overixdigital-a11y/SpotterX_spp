@@ -17,7 +17,7 @@ Completar todos los módulos existentes, pulir la experiencia de usuario y prepa
 ### A2. Planes Estructurados
 - [x] Tabla `trainer_plan_items` (ejercicio, series, reps, descanso, día)
 - [x] UI para que el profesor cree planes con estructura real
-- [ ] Plantillas reutilizables de planes
+- [x] Plantillas reutilizables de planes
 - [x] Alumno puede ver plan estructurado (no solo texto)
 
 ### A3. Rutinas con Fecha

@@ -1065,7 +1065,7 @@ export default function AlumnoPage() {
                         {isSeriesDiscipline(routineForm.discipline) ? (
                           <div className="space-y-1">
                             {exerciseSeries(dayIdx, exIdx).map((serie, sIdx) => (
-                              <div key={sIdx} className="grid grid-cols-[1.25rem_3.5rem_3.25rem_2.75rem_auto] items-center gap-1">
+                              <div key={sIdx} className="grid grid-cols-[1.25rem_4.25rem_4rem_3.25rem_auto] items-center gap-1">
                                 <span className="text-[10px] font-semibold text-neon">S{sIdx + 1}</span>
                                 <input
                                   value={String(serie.reps ?? "")}

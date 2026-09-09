@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
+import ExercisePicker from "@/components/training/ExercisePicker";
 import { DISCIPLINES, getDisciplineFields, getSeries, resolveSeries, legacyToSeries, formatSeries, isSeriesDiscipline, type FieldDef, type Series } from "@/lib/disciplines";
 
 interface StudentProfile {
@@ -1041,18 +1042,19 @@ export default function AlumnoPage() {
                     {day.exercises.map((ex, exIdx) => (
                       <div key={exIdx} className="rounded border border-edge/50 bg-card p-2 space-y-1.5">
                         <div className="flex items-center gap-2">
-                          <input
+                          <ExercisePicker
                             value={ex.exercise}
-                            onChange={(e) => setRoutineForm((v) => ({
-                              ...v,
-                              days: v.days.map((d, i) =>
+                            onChange={(v) => setRoutineForm((prev) => ({
+                              ...prev,
+                              days: prev.days.map((d, i) =>
                                 i === dayIdx
-                                  ? { ...d, exercises: d.exercises.map((x, j) => j === exIdx ? { ...x, exercise: e.target.value } : x) }
+                                  ? { ...d, exercises: d.exercises.map((x, j) => j === exIdx ? { ...x, exercise: v } : x) }
                                   : d
                               ),
                             }))}
+                            discipline={routineForm.discipline}
                             placeholder="Ejercicio"
-                            className="flex-1 rounded border border-edge bg-bg px-2 py-1 text-xs text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                            className="flex-1"
                           />
                           {day.exercises.length > 1 && (
                             <button onClick={() => removeExerciseFromDay(dayIdx, exIdx)} className="text-muted hover:text-ember">

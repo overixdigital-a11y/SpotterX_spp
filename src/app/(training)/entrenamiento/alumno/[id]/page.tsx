@@ -22,6 +22,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import ExercisePicker from "@/components/training/ExercisePicker";
+import FoodPicker, { type Food } from "@/components/training/FoodPicker";
 import { MEALS, getDietData } from "@/lib/diets";
 import { DISCIPLINES, getDisciplineFields, getSeries, resolveSeries, legacyToSeries, formatSeries, isSeriesDiscipline, type FieldDef, type Series } from "@/lib/disciplines";
 
@@ -309,6 +310,30 @@ export default function AlumnoPage() {
       protein: "",
       fat: "",
       carbs: "",
+    });
+  };
+
+  const autoFillFood = (f: Food) => {
+    const k = typeof f.kcal === "number" && Number.isFinite(f.kcal) ? f.kcal : null;
+    const p = typeof f.protein_g === "number" && Number.isFinite(f.protein_g) ? f.protein_g : null;
+    const g = typeof f.fat_g === "number" && Number.isFinite(f.fat_g) ? f.fat_g : null;
+    const c = typeof f.carbs_g === "number" && Number.isFinite(f.carbs_g) ? f.carbs_g : null;
+    setItemForm((v) => {
+      const qty = parseFloat(v.qty);
+      const factor = qty > 0 ? qty / 100 : 1;
+      const kcal = k != null ? Math.round(k * factor) : null;
+      const protein = p != null ? Math.round(p * factor * 10) / 10 : null;
+      const fat = g != null ? Math.round(g * factor * 10) / 10 : null;
+      const carbs = c != null ? Math.round(c * factor * 10) / 10 : null;
+      return {
+        ...v,
+        exercise: f.name,
+        unit: v.unit || "g",
+        kcal: kcal != null ? String(kcal) : v.kcal,
+        protein: protein != null ? String(protein) : v.protein,
+        fat: fat != null ? String(fat) : v.fat,
+        carbs: carbs != null ? String(carbs) : v.carbs,
+      };
     });
   };
 
@@ -943,12 +968,13 @@ export default function AlumnoPage() {
                               ))}
                             </select>
                           </div>
-                          <input
-                            value={itemForm.exercise}
-                            onChange={(e) => setItemForm((v) => ({ ...v, exercise: e.target.value }))}
-                            placeholder="Alimento (ej: arroz integral)"
-                            className="w-full rounded-lg border border-edge bg-card px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-                          />
+<FoodPicker
+  value={itemForm.exercise}
+  onChange={(e) => setItemForm((v) => ({ ...v, exercise: e }))}
+  onPick={autoFillFood}
+  placeholder="Alimento (ej: arroz integral)"
+  className="w-full"
+/>
                           <div className="grid grid-cols-2 gap-2">
                             <input
                               value={itemForm.qty}

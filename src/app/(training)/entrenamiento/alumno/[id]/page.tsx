@@ -17,6 +17,7 @@ import {
   BookmarkPlus,
   GripVertical,
   EyeOff,
+  UtensilsCrossed,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
@@ -111,12 +112,6 @@ export default function AlumnoPage() {
   const [msgText, setMsgText] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const [planForm, setPlanForm] = useState<{ open: boolean; title: string; kind: string; content: string }>({
-    open: false,
-    title: "",
-    kind: "entrenamiento",
-    content: "",
-  });
   const [openPlan, setOpenPlan] = useState<string | null>(null);
   const [itemForm, setItemForm] = useState<{
     planId: string | null;
@@ -256,24 +251,25 @@ export default function AlumnoPage() {
     };
   }, [studentId, userId]);
 
-  const createPlan = async () => {
-    if (!userId || !planForm.title.trim()) return;
+  const createDiet = async (goal: string) => {
+    if (!userId) return;
     const supabase = createClient();
-    const isDiet = planForm.kind === "alimentacion";
     const { data } = await supabase
       .from("trainer_plans")
       .insert({
         trainer_id: userId,
         student_id: studentId,
-        title: planForm.title.trim(),
-        kind: planForm.kind,
-        content: planForm.content.trim() || null,
-        assigned_at: isDiet ? null : new Date().toISOString(),
+        title: goal,
+        kind: "alimentacion",
+        content: null,
+        assigned_at: null,
       })
       .select()
       .maybeSingle();
-    if (data) setPlans((prev) => [data as Plan, ...prev]);
-    setPlanForm({ open: false, title: "", kind: "entrenamiento", content: "" });
+    if (data) {
+      setPlans((prev) => [data as Plan, ...prev]);
+      setOpenPlan((data as Plan).id);
+    }
   };
 
   const deletePlan = async (id: string) => {
@@ -742,69 +738,29 @@ export default function AlumnoPage() {
       {/* ─── PLANES ─── */}
       {tab === "planes" && (
         <div className="mt-4">
-          <div className="mb-3 grid grid-cols-2 gap-2">
-            <button
-              onClick={() => setPlanForm((v) => ({ ...v, open: !v.open }))}
-              className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-edge bg-card py-3 text-sm font-medium text-neon"
-            >
-              <Plus className="h-4 w-4" /> Nuevo plan
-            </button>
+          <div className="mb-3">
+            <div className="grid grid-cols-3 gap-2">
+              {["Déficit calórico", "Mantenimiento", "Superávit calórico"].map((g) => (
+                <button
+                  key={g}
+                  onClick={() => createDiet(g)}
+                  className="rounded-xl border border-ember/40 bg-ember/10 py-3 text-xs font-semibold text-ember transition hover:bg-ember/20"
+                >
+                  <UtensilsCrossed className="mx-auto mb-1 h-4 w-4" />
+                  {g}
+                </button>
+              ))}
+            </div>
             <button
               onClick={openTemplates}
-              className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-ember/50 bg-card py-3 text-sm font-medium text-ember"
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-edge bg-card py-2.5 text-sm font-medium text-ember"
             >
               <LayoutTemplate className="h-4 w-4" /> Plantillas
             </button>
           </div>
 
-          {planForm.open && (
-            <div className="mb-3 space-y-2 rounded-xl border border-neon/30 bg-card p-3">
-              <input
-                value={planForm.title}
-                onChange={(e) => setPlanForm((v) => ({ ...v, title: e.target.value }))}
-                placeholder="Título (ej: 4x8 fuerza)"
-                className="w-full rounded-lg border border-edge bg-bg px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-              />
-              <select
-                value={planForm.kind}
-                onChange={(e) => setPlanForm((v) => ({ ...v, kind: e.target.value }))}
-                className="w-full rounded-lg border border-edge bg-bg px-3 py-2 text-sm text-ink focus:border-neon focus:outline-none"
-              >
-                <option value="entrenamiento">Entrenamiento</option>
-                <option value="alimentacion">Alimentación</option>
-                <option value="general">General</option>
-              </select>
-              <textarea
-                value={planForm.content}
-                onChange={(e) => setPlanForm((v) => ({ ...v, content: e.target.value }))}
-                placeholder={
-                  planForm.kind === "alimentacion"
-                    ? "Guía nutricional (ej: Desayuno: avenida + banana + huevos | Almuerzo: pollo + arroz + ensalada | Merienda: yogur + fruta)"
-                    : "Descripción / notas del plan (opcional)"
-                }
-                rows={planForm.kind === "alimentacion" ? 4 : 2}
-                className="w-full resize-none rounded-lg border border-edge bg-bg px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-              />
-              <div className="flex gap-2">
-                <button
-                  onClick={createPlan}
-                  disabled={!planForm.title.trim()}
-                  className="grow rounded-lg bg-neon py-2.5 text-sm font-semibold text-bg shadow-neon disabled:opacity-50"
-                >
-                  Crear plan
-                </button>
-                <button
-                  onClick={() => setPlanForm((v) => ({ ...v, open: false }))}
-                  className="rounded-lg border border-edge px-3 text-muted transition hover:text-ink"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          )}
-
           {plans.length === 0 && (
-            <p className="py-8 text-center text-sm text-muted">Sin planes todavía.</p>
+            <p className="py-8 text-center text-sm text-muted">Sin dietas todavía.</p>
           )}
 
           {plans.map((p) => {

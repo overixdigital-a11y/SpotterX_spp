@@ -23,7 +23,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import ExercisePicker from "@/components/training/ExercisePicker";
 import FoodPicker, { type Food } from "@/components/training/FoodPicker";
-import { MEALS, getDietData } from "@/lib/diets";
+import { MEALS, getDietData, formatQuantity } from "@/lib/diets";
 import { DISCIPLINES, getDisciplineFields, getSeries, resolveSeries, legacyToSeries, formatSeries, isSeriesDiscipline, type FieldDef, type Series } from "@/lib/disciplines";
 
 interface StudentProfile {
@@ -123,8 +123,8 @@ export default function AlumnoPage() {
     rest: string;
     notes: string;
     meal: string;
-    qty: string;
-    unit: string;
+    qtyU: string;
+    qtyG: string;
     kcal: string;
     protein: string;
     fat: string;
@@ -138,13 +138,20 @@ export default function AlumnoPage() {
     rest: "",
     notes: "",
     meal: "",
-    qty: "",
-    unit: "",
+    qtyU: "",
+    qtyG: "",
     kcal: "",
     protein: "",
     fat: "",
     carbs: "",
   });
+  const [selectedFood, setSelectedFood] = useState<{
+    kcal: number;
+    protein_g: number;
+    fat_g: number;
+    carbs_g: number;
+    unit_grams: number | null;
+  } | null>(null);
 
   const [routineFormOpen, setRoutineFormOpen] = useState(false);
   const [routineForm, setRoutineForm] = useState({
@@ -295,6 +302,7 @@ export default function AlumnoPage() {
   };
 
   const openItemForm = (planId: string) => {
+    setSelectedFood(null);
     setItemForm({
       planId,
       day: "",
@@ -304,8 +312,8 @@ export default function AlumnoPage() {
       rest: "",
       notes: "",
       meal: "",
-      qty: "",
-      unit: "",
+      qtyU: "",
+      qtyG: "",
       kcal: "",
       protein: "",
       fat: "",
@@ -314,26 +322,45 @@ export default function AlumnoPage() {
   };
 
   const autoFillFood = (f: Food) => {
-    const k = typeof f.kcal === "number" && Number.isFinite(f.kcal) ? f.kcal : null;
-    const p = typeof f.protein_g === "number" && Number.isFinite(f.protein_g) ? f.protein_g : null;
-    const g = typeof f.fat_g === "number" && Number.isFinite(f.fat_g) ? f.fat_g : null;
-    const c = typeof f.carbs_g === "number" && Number.isFinite(f.carbs_g) ? f.carbs_g : null;
+    setSelectedFood({
+      kcal: typeof f.kcal === "number" && Number.isFinite(f.kcal) ? f.kcal : 0,
+      protein_g: typeof f.protein_g === "number" && Number.isFinite(f.protein_g) ? f.protein_g : 0,
+      fat_g: typeof f.fat_g === "number" && Number.isFinite(f.fat_g) ? f.fat_g : 0,
+      carbs_g: typeof f.carbs_g === "number" && Number.isFinite(f.carbs_g) ? f.carbs_g : 0,
+      unit_grams: typeof f.unit_grams === "number" && Number.isFinite(f.unit_grams) ? f.unit_grams : null,
+    });
+    setItemForm((v) => ({
+      ...v,
+      exercise: f.name,
+      qtyU: "",
+      qtyG: "",
+      kcal: "",
+      protein: "",
+      fat: "",
+      carbs: "",
+    }));
+  };
+
+  const onQtyChange = (mode: "g" | "u") => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
     setItemForm((v) => {
-      const qty = parseFloat(v.qty);
-      const factor = qty > 0 ? qty / 100 : 1;
-      const kcal = k != null ? Math.round(k * factor) : null;
-      const protein = p != null ? Math.round(p * factor * 10) / 10 : null;
-      const fat = g != null ? Math.round(g * factor * 10) / 10 : null;
-      const carbs = c != null ? Math.round(c * factor * 10) / 10 : null;
-      return {
-        ...v,
-        exercise: f.name,
-        unit: v.unit || "g",
-        kcal: kcal != null ? String(kcal) : v.kcal,
-        protein: protein != null ? String(protein) : v.protein,
-        fat: fat != null ? String(fat) : v.fat,
-        carbs: carbs != null ? String(carbs) : v.carbs,
-      };
+      const qty = parseFloat(val);
+      let next = { ...v, qtyG: mode === "g" ? val : "", qtyU: mode === "u" ? val : "" };
+      if (selectedFood && Number.isFinite(qty) && qty > 0) {
+        const grams = mode === "g" ? qty : selectedFood.unit_grams ? qty * selectedFood.unit_grams : 0;
+        if (grams > 0) {
+          const factor = grams / 100;
+          next = {
+            ...next,
+            kcal: String(Math.round((selectedFood.kcal ?? 0) * factor)),
+            protein: String(Math.round((selectedFood.protein_g ?? 0) * factor * 10) / 10),
+            fat: String(Math.round((selectedFood.fat_g ?? 0) * factor * 10) / 10),
+            carbs: String(Math.round((selectedFood.carbs_g ?? 0) * factor * 10) / 10),
+          };
+          return next;
+        }
+      }
+      return { ...next, kcal: "", protein: "", fat: "", carbs: "" };
     });
   };
 
@@ -344,6 +371,10 @@ export default function AlumnoPage() {
     const isDiet = targetPlan?.kind === "alimentacion";
     const position = items.filter((i) => i.plan_id === itemForm.planId).length;
     if (isDiet) {
+      const qtyU = itemForm.qtyU.trim();
+      const qtyG = itemForm.qtyG.trim();
+      const qty = qtyU || qtyG;
+      const qtyMode = qtyU ? "u" : qtyG ? "g" : null;
       const { data } = await supabase
         .from("trainer_plan_items")
         .insert({
@@ -354,8 +385,9 @@ export default function AlumnoPage() {
           position,
           data: {
             meal: itemForm.meal || null,
-            qty: itemForm.qty.trim() || null,
-            unit: itemForm.unit.trim() || null,
+            qty: qty || null,
+            qty_mode: qtyMode,
+            unit: qtyMode === "u" ? "unidades" : qtyMode === "g" ? "g" : null,
             kcal: itemForm.kcal ? Number(itemForm.kcal) : null,
             protein_g: itemForm.protein ? Number(itemForm.protein) : null,
             fat_g: itemForm.fat ? Number(itemForm.fat) : null,
@@ -365,7 +397,8 @@ export default function AlumnoPage() {
         .select()
         .maybeSingle();
       if (data) setItems((prev) => [...prev, data as PlanItem]);
-      setItemForm({ planId: null, day: "", exercise: "", sets: "", reps: "", rest: "", notes: "", meal: "", qty: "", unit: "", kcal: "", protein: "", fat: "", carbs: "" });
+      setItemForm({ planId: null, day: "", exercise: "", sets: "", reps: "", rest: "", notes: "", meal: "", qtyU: "", qtyG: "", kcal: "", protein: "", fat: "", carbs: "" });
+      setSelectedFood(null);
       return;
     }
     const { data } = await supabase
@@ -383,7 +416,8 @@ export default function AlumnoPage() {
       .select()
       .maybeSingle();
     if (data) setItems((prev) => [...prev, data as PlanItem]);
-    setItemForm({ planId: null, day: "", exercise: "", sets: "", reps: "", rest: "", notes: "", meal: "", qty: "", unit: "", kcal: "", protein: "", fat: "", carbs: "" });
+    setItemForm({ planId: null, day: "", exercise: "", sets: "", reps: "", rest: "", notes: "", meal: "", qtyU: "", qtyG: "", kcal: "", protein: "", fat: "", carbs: "" });
+    setSelectedFood(null);
   };
 
   const deleteItem = async (id: string) => {
@@ -901,8 +935,8 @@ export default function AlumnoPage() {
                                     <div className="flex-1">
                                       <p className="text-sm font-medium text-ink">{it.exercise}</p>
                                       <p className="text-xs text-muted">
-                                        {(d.qty || d.unit) && (
-                                          <>{[d.qty, d.unit].filter(Boolean).join(" ")}{d.kcal ? ` · ${d.kcal} kcal` : ""}</>
+                                        {formatQuantity(d) && (
+                                          <>{formatQuantity(d)}{d.kcal ? ` · ${d.kcal} kcal` : ""}</>
                                         )}
                                         {(d.protein_g || d.fat_g || d.carbs_g) && (
                                           <> · P {d.protein_g ?? "—"}g · G {d.fat_g ?? "—"}g · C {d.carbs_g ?? "—"}g</>
@@ -976,18 +1010,28 @@ export default function AlumnoPage() {
   className="w-full"
 />
                           <div className="grid grid-cols-2 gap-2">
-                            <input
-                              value={itemForm.qty}
-                              onChange={(e) => setItemForm((v) => ({ ...v, qty: e.target.value }))}
-                              placeholder="Cantidad (ej: 150)"
-                              className="rounded-lg border border-edge bg-card px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-                            />
-                            <input
-                              value={itemForm.unit}
-                              onChange={(e) => setItemForm((v) => ({ ...v, unit: e.target.value }))}
-                              placeholder="Unidad (ej: g, unidades)"
-                              className="rounded-lg border border-edge bg-card px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-                            />
+                            <div>
+                              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted">Gramos</p>
+                              <input
+                                value={itemForm.qtyG}
+                                onChange={onQtyChange("g")}
+                                placeholder="ej: 150"
+                                type="number"
+                                min={0}
+                                className="w-full rounded-lg border border-edge bg-card px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-ember focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted">Cantidad (unid.)</p>
+                              <input
+                                value={itemForm.qtyU}
+                                onChange={onQtyChange("u")}
+                                placeholder="ej: 2 huevos"
+                                type="number"
+                                min={0}
+                                className="w-full rounded-lg border border-edge bg-card px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-ember focus:outline-none"
+                              />
+                            </div>
                           </div>
                           <div className="grid grid-cols-4 gap-2">
                             <input

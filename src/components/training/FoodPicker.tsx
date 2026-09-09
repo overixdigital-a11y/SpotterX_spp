@@ -13,6 +13,7 @@ export interface Food {
   protein_g: number | null;
   fat_g: number | null;
   carbs_g: number | null;
+  unit_grams: number | null;
 }
 
 const CATEGORY_ORDER = [
@@ -34,7 +35,7 @@ async function loadFoods(): Promise<Food[]> {
   if (cache) return cache;
   const { data, error } = await createClient()
     .from("foods")
-    .select("id, name, category, kcal, protein_g, fat_g, carbs_g")
+    .select("id, name, category, kcal, protein_g, fat_g, carbs_g, unit_grams")
     .order("name");
   if (error) throw error;
   if (!data) return [];
@@ -64,7 +65,7 @@ export default function FoodPicker({
   const [query, setQuery] = useState("");
   const [catFilter, setCatFilter] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
-  const [add, setAdd] = useState({ name: "", category: "", kcal: "", protein: "", fat: "", carbs: "" });
+  const [add, setAdd] = useState({ name: "", category: "", kcal: "", protein: "", fat: "", carbs: "", unitGrams: "" });
   const boxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -90,13 +91,13 @@ export default function FoodPicker({
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
-  const resetAdd = () => setAdd({ name: query || "", category: catFilter ?? "", kcal: "", protein: "", fat: "", carbs: "" });
+  const resetAdd = () => setAdd({ name: query || "", category: catFilter ?? "", kcal: "", protein: "", fat: "", carbs: "", unitGrams: "" });
 
   const applyFood = (f: Food, name: string) => {
     onChange(name);
     onPick({ ...f, name });
     setCatFilter(f.category?.toLowerCase() ?? null);
-    setAdd({ name: "", category: "", kcal: "", protein: "", fat: "", carbs: "" });
+    setAdd({ name: "", category: "", kcal: "", protein: "", fat: "", carbs: "", unitGrams: "" });
     setShowAdd(false);
     setQuery("");
     setOpen(false);
@@ -108,8 +109,8 @@ export default function FoodPicker({
     try {
       const { data } = await createClient()
         .from("foods")
-        .insert({ name: clean, category: catFilter ?? "Otros", kcal: 0, protein_g: 0, fat_g: 0, carbs_g: 0 })
-        .select("id, name, category, kcal, protein_g, fat_g, carbs_g")
+        .insert({ name: clean, category: catFilter ?? "Otros", kcal: 0, protein_g: 0, fat_g: 0, carbs_g: 0, unit_grams: null })
+        .select("id, name, category, kcal, protein_g, fat_g, carbs_g, unit_grams")
         .maybeSingle();
       if (data) {
         const f = data as unknown as Food;
@@ -125,7 +126,7 @@ export default function FoodPicker({
     } catch {
       // la tabla puede no existir todavía (00021 sin correr)
     }
-    onPick({ id: "", name: clean, category: catFilter, kcal: 0, protein_g: 0, fat_g: 0, carbs_g: 0 });
+    onPick({ id: "", name: clean, category: catFilter, kcal: 0, protein_g: 0, fat_g: 0, carbs_g: 0, unit_grams: null });
     onChange(clean);
     setOpen(false);
     setQuery("");
@@ -142,6 +143,7 @@ export default function FoodPicker({
       protein_g: Number(add.protein) || 0,
       fat_g: Number(add.fat) || 0,
       carbs_g: Number(add.carbs) || 0,
+      unit_grams: add.unitGrams ? Number(add.unitGrams) || null : null,
     };
     try {
       const { data } = await createClient()
@@ -153,9 +155,10 @@ export default function FoodPicker({
           protein_g: f.protein_g,
           fat_g: f.fat_g,
           carbs_g: f.carbs_g,
+          unit_grams: f.unit_grams,
           created_by: userId,
         })
-        .select("id, name, category, kcal, protein_g, fat_g, carbs_g")
+        .select("id, name, category, kcal, protein_g, fat_g, carbs_g, unit_grams")
         .maybeSingle();
       if (data) {
         const saved = data as unknown as Food;
@@ -285,7 +288,12 @@ export default function FoodPicker({
                             onClick={() => applyFood(f, f.name)}
                             className="flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left text-xs text-ink transition hover:bg-ember/10"
                           >
-                            <span className="truncate">{f.name}</span>
+                            <span className="flex min-w-0 flex-col items-start">
+                              <span className="truncate">{f.name}</span>
+                              {f.unit_grams ? (
+                                <span className="text-[9px] text-muted">1 unidad ≈ {fmt(f.unit_grams)} g</span>
+                              ) : null}
+                            </span>
                             <span className="shrink-0 text-[10px] text-muted">
                               {f.kcal ? `${fmt(f.kcal)} kcal · P ${fmt(f.protein_g)} · G ${fmt(f.fat_g)} · C ${fmt(f.carbs_g)}` : ""}
                             </span>
@@ -370,6 +378,15 @@ export default function FoodPicker({
               className="w-full rounded border border-edge bg-bg px-1.5 py-1.5 text-xs text-ink placeholder:text-muted focus:border-ember focus:outline-none"
             />
           </div>
+          <input
+            value={add.unitGrams}
+            onChange={(e) => setAdd((v) => ({ ...v, unitGrams: e.target.value }))}
+            placeholder="Gramos por 1 unidad (solo si se consume por unidad, ej: huevo = 50)"
+            type="number"
+            min={0}
+            step="0.1"
+            className="w-full rounded border border-edge bg-bg px-2 py-1.5 text-xs text-ink placeholder:text-muted focus:border-ember focus:outline-none"
+          />
           <div className="flex gap-2 pt-1">
             <button
               onClick={submitAdd}

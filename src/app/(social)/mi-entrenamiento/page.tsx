@@ -17,7 +17,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { todayLocal } from "@/lib/format";
 import { getDisciplineFields, isSeriesDiscipline, resolveSeries, formatSeries, type FieldDef } from "@/lib/disciplines";
-import { MEALS, getDietData } from "@/lib/diets";
+import { MEALS, getDietData, formatQuantity } from "@/lib/diets";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 interface Trainer {
@@ -553,8 +553,8 @@ export default function MiEntrenamientoPage() {
                                   <div key={it.id} className="rounded-lg border-b border-edge py-2">
                                     <p className="text-sm font-medium text-ink">{it.exercise}</p>
                                     <p className="text-xs text-muted">
-                                      {(d.qty || d.unit) && (
-                                        <>{[d.qty, d.unit].filter(Boolean).join(" ")}{d.kcal ? ` · ${d.kcal} kcal` : ""}</>
+                                      {formatQuantity(d) && (
+                                        <>{formatQuantity(d)}{d.kcal ? ` · ${d.kcal} kcal` : ""}</>
                                       )}
                                       {(d.protein_g || d.fat_g || d.carbs_g) && (
                                         <> · P {d.protein_g ?? "—"}g · G {d.fat_g ?? "—"}g · C {d.carbs_g ?? "—"}g</>

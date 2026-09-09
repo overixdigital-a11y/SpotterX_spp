@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
-import { DISCIPLINES, getDisciplineFields, type FieldDef } from "@/lib/disciplines";
+import { DISCIPLINES, getDisciplineFields, getSeries, resolveSeries, legacyToSeries, formatSeries, isSeriesDiscipline, type FieldDef, type Series } from "@/lib/disciplines";
 
 interface StudentProfile {
   id: string;
@@ -438,6 +438,9 @@ export default function AlumnoPage() {
       routineForm.days.forEach((day, dayIdx) => {
         day.exercises.forEach((ex, exIdx) => {
           if (ex.exercise.trim()) {
+            const data = isSeriesDiscipline(discipline)
+              ? { ...ex.data, series: resolveSeries(ex.data, discipline) }
+              : ex.data;
             allItems.push({
               routine_id: routineId!,
               day: dayIdx + 1,
@@ -445,7 +448,7 @@ export default function AlumnoPage() {
               exercise: ex.exercise.trim(),
               position: exIdx,
               notes: ex.notes.trim() || null,
-              data: ex.data,
+              data,
             });
           }
         });
@@ -508,11 +511,12 @@ export default function AlumnoPage() {
   };
 
   const addExerciseToDay = (dayIdx: number) => {
+    const seedSeries = isSeriesDiscipline(routineForm.discipline) ? { series: [{} as Series] } : {};
     setRoutineForm((prev) => ({
       ...prev,
       days: prev.days.map((d, i) =>
         i === dayIdx
-          ? { ...d, exercises: [...d.exercises, { exercise: "", data: {}, notes: "" }] }
+          ? { ...d, exercises: [...d.exercises, { exercise: "", data: seedSeries, notes: "" }] }
           : d
       ),
     }));
@@ -549,6 +553,46 @@ export default function AlumnoPage() {
     if (routineForm.discipline === "otras") return routineForm.customFields;
     return getDisciplineFields(routineForm.discipline);
   }, [routineForm.discipline, routineForm.customFields]);
+
+  const exerciseSeries = (dayIdx: number, exIdx: number): Series[] => {
+    const data = routineForm.days[dayIdx].exercises[exIdx].data;
+    const serie = getSeries(data, routineForm.discipline);
+    if (serie.length > 0) return serie;
+    return legacyToSeries(data, routineForm.discipline);
+  };
+
+  const setExerciseSeries = (dayIdx: number, exIdx: number, series: Series[]) => {
+    setRoutineForm((prev) => ({
+      ...prev,
+      days: prev.days.map((d, i) =>
+        i === dayIdx
+          ? {
+              ...d,
+              exercises: d.exercises.map((ex, j) =>
+                j === exIdx ? { ...ex, data: { ...ex.data, series } } : ex
+              ),
+            }
+          : d
+      ),
+    }));
+  };
+
+  const addSeries = (dayIdx: number, exIdx: number) => {
+    setExerciseSeries(dayIdx, exIdx, [...exerciseSeries(dayIdx, exIdx), {}]);
+  };
+
+  const removeSeries = (dayIdx: number, exIdx: number, sIdx: number) => {
+    setExerciseSeries(dayIdx, exIdx, exerciseSeries(dayIdx, exIdx).filter((_, k) => k !== sIdx));
+  };
+
+  const updateSeriesField = (dayIdx: number, exIdx: number, sIdx: number, field: keyof Series, value: unknown) => {
+    const next = exerciseSeries(dayIdx, exIdx).map((s, k) =>
+      k === sIdx
+        ? { ...s, [field]: field === "weight_kg" || field === "rest_seconds" ? (value === "" || value == null ? null : Number(value)) : value }
+        : s
+    );
+    setExerciseSeries(dayIdx, exIdx, next);
+  };
 
   const send = async () => {
     if (!userId || !msgText.trim()) return;
@@ -1016,18 +1060,62 @@ export default function AlumnoPage() {
                             </button>
                           )}
                         </div>
-                        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-                          {routineFields.map((field) => (
-                            <input
-                              key={field.key}
-                              value={String(ex.data[field.key] ?? "")}
-                              onChange={(e) => updateExerciseField(dayIdx, exIdx, field.key, field.type === "number" ? (e.target.value ? Number(e.target.value) : "") : e.target.value)}
-                              placeholder={field.label}
-                              type={field.type === "number" ? "number" : "text"}
-                              className="rounded border border-edge bg-bg px-2 py-1 text-[11px] text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-                            />
-                          ))}
-                        </div>
+                        {isSeriesDiscipline(routineForm.discipline) ? (
+                          <div className="space-y-1">
+                            {exerciseSeries(dayIdx, exIdx).map((serie, sIdx) => (
+                              <div key={sIdx} className="grid grid-cols-[1.5rem_1fr_1fr_1fr_auto] items-center gap-1">
+                                <span className="text-[10px] font-semibold text-neon">S{sIdx + 1}</span>
+                                <input
+                                  value={String(serie.reps ?? "")}
+                                  onChange={(e) => updateSeriesField(dayIdx, exIdx, sIdx, "reps", e.target.value)}
+                                  placeholder="Reps"
+                                  className="rounded border border-edge bg-bg px-2 py-1 text-[11px] text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                                />
+                                <input
+                                  value={serie.weight_kg != null ? String(serie.weight_kg) : ""}
+                                  onChange={(e) => updateSeriesField(dayIdx, exIdx, sIdx, "weight_kg", e.target.value)}
+                                  placeholder="Peso"
+                                  type="number"
+                                  inputMode="decimal"
+                                  className="rounded border border-edge bg-bg px-2 py-1 text-[11px] text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                                />
+                                <input
+                                  value={serie.rest_seconds != null ? String(serie.rest_seconds) : ""}
+                                  onChange={(e) => updateSeriesField(dayIdx, exIdx, sIdx, "rest_seconds", e.target.value)}
+                                  placeholder="Desc s"
+                                  type="number"
+                                  inputMode="numeric"
+                                  className="rounded border border-edge bg-bg px-2 py-1 text-[11px] text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                                />
+                                <button
+                                  onClick={() => removeSeries(dayIdx, exIdx, sIdx)}
+                                  className="text-muted hover:text-ember"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            ))}
+                            <button
+                              onClick={() => addSeries(dayIdx, exIdx)}
+                              className="flex items-center gap-1 text-[11px] font-semibold text-neon"
+                            >
+                              <Plus className="h-3 w-3" /> Serie
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                            {routineFields.map((field) => (
+                              <input
+                                key={field.key}
+                                value={String(ex.data[field.key] ?? "")}
+                                onChange={(e) => updateExerciseField(dayIdx, exIdx, field.key, field.type === "number" ? (e.target.value ? Number(e.target.value) : "") : e.target.value)}
+                                placeholder={field.label}
+                                type={field.type === "number" ? "number" : "text"}
+                                className="rounded border border-edge bg-bg px-2 py-1 text-[11px] text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                              />
+                            ))}
+                          </div>
+                        )}
                         <input
                           value={ex.notes}
                           onChange={(e) => setRoutineForm((v) => ({
@@ -1145,11 +1233,22 @@ export default function AlumnoPage() {
                               return String(v);
                             })
                             .join(" · ");
+                          const series = isSeriesDiscipline(r.discipline)
+                            ? resolveSeries(ri.data, r.discipline)
+                            : [];
                           return (
                             <div key={ri.id} className="mb-1 rounded-lg border-b border-edge py-1.5">
                               <p className="text-sm font-medium text-ink">{ri.exercise}</p>
-                              {plannedSummary && (
-                                <p className="text-xs text-muted">{plannedSummary}</p>
+                              {series.length > 0 ? (
+                                series.map((s, si) => (
+                                  <p key={si} className="text-xs text-muted">
+                                    Serie {si + 1}: {formatSeries(s)}
+                                  </p>
+                                ))
+                              ) : (
+                                plannedSummary && (
+                                  <p className="text-xs text-muted">{plannedSummary}</p>
+                                )
                               )}
                               {ri.notes && <p className="text-[11px] text-muted italic">{ri.notes}</p>}
                             </div>

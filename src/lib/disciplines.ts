@@ -146,6 +146,59 @@ export const DISCIPLINES: Discipline[] = [
   },
 ];
 
+export interface Series {
+  reps?: string | number | null;
+  weight_kg?: number | null;
+  rest_seconds?: number | null;
+}
+
+export interface SeriesLog {
+  done: boolean;
+  weight_kg?: number | null;
+}
+
+const SERIES_DISCIPLINES = new Set(["musculacion", "crossfit", "calistenia", "funcional"]);
+
+export function isSeriesDiscipline(disciplineId: string | null): boolean {
+  return disciplineId ? SERIES_DISCIPLINES.has(disciplineId) : false;
+}
+
+export function getSeries(data: Record<string, unknown> | null | undefined, disciplineId: string | null): Series[] {
+  const d = data ?? {};
+  if (isSeriesDiscipline(disciplineId) && Array.isArray(d.series)) {
+    return d.series as Series[];
+  }
+  if (Array.isArray(d.series)) return d.series as Series[];
+  return [];
+}
+
+export function resolveSeries(data: Record<string, unknown> | null | undefined, disciplineId: string | null): Series[] {
+  const serie = getSeries(data, disciplineId);
+  if (serie.length > 0) return serie;
+  return legacyToSeries(data, disciplineId);
+}
+
+export function legacyToSeries(data: Record<string, unknown> | null | undefined, disciplineId: string | null): Series[] {
+  const d = data ?? {};
+  const sets = Number(d.sets);
+  if (isSeriesDiscipline(disciplineId) && Number.isInteger(sets) && sets > 0) {
+    return Array.from({ length: sets }, () => ({
+      reps: (d.reps as string | number) ?? "",
+      weight_kg: d.weight_kg != null && d.weight_kg !== "" ? Number(d.weight_kg) : null,
+      rest_seconds: d.rest_seconds != null && d.rest_seconds !== "" ? Number(d.rest_seconds) : null,
+    }));
+  }
+  return [];
+}
+
+export function formatSeries(s: Series): string {
+  const parts: string[] = [];
+  if (s.reps != null && s.reps !== "") parts.push(String(s.reps));
+  if (s.weight_kg != null) parts.push(`${s.weight_kg}kg`);
+  if (s.rest_seconds != null) parts.push(`${s.rest_seconds}s`);
+  return parts.join(" · ");
+}
+
 export function getDiscipline(id: string | null): Discipline | undefined {
   return DISCIPLINES.find((d) => d.id === id);
 }

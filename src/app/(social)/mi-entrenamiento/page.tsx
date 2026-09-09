@@ -16,7 +16,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { todayLocal } from "@/lib/format";
-import { getDisciplineFields, type FieldDef } from "@/lib/disciplines";
+import { getDisciplineFields, isSeriesDiscipline, resolveSeries, formatSeries, type FieldDef } from "@/lib/disciplines";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 interface Trainer {
@@ -78,6 +78,11 @@ interface RoutineLog {
   notes: string | null;
 }
 
+interface SeriesEntry {
+  done: boolean;
+  weight_kg: number | null;
+}
+
 interface Msg {
   id: string;
   sender_id: string;
@@ -106,6 +111,7 @@ export default function MiEntrenamientoPage() {
   const [selectedRoutine, setSelectedRoutine] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<number>(1);
   const [logValues, setLogValues] = useState<Record<string, Record<string, unknown>>>({});
+  const [seriesLogs, setSeriesLogs] = useState<Record<string, SeriesEntry[]>>({});
   const [showProgress, setShowProgress] = useState<string | null>(null);
   const [progressExercise, setProgressExercise] = useState<string>("");
   const [progressData, setProgressData] = useState<{ date: string; value: number }[]>([]);
@@ -245,10 +251,57 @@ export default function MiEntrenamientoPage() {
   const saveLogs = async (routineId: string, day: number) => {
     if (!userId) return;
     const supabase = createClient();
+    const routine = routines.find((r) => r.id === routineId);
     const dayItems = routineItems.filter((ri) => ri.routine_id === routineId && ri.day === day);
     const today = todayLocal();
+    const todayLogs = routineLogs.filter(
+      (l) => l.routine_id === routineId && l.day === day && l.log_date === today
+    );
 
-    const upserts = dayItems
+    const entriesFor = (ri: RoutineItem): SeriesEntry[] => {
+      const planned = resolveSeries(ri.data, routine?.discipline ?? null);
+      const log = todayLogs.find((l) => l.item_id === ri.id);
+      if (seriesLogs[ri.id]) return seriesLogs[ri.id];
+      const series = Array.isArray(log?.data?.series)
+        ? (log.data.series as { done?: boolean; weight_kg?: number | null }[])
+        : [];
+      return planned.map((s, i) => ({
+        done: series[i]?.done ?? false,
+        weight_kg: series[i]?.weight_kg != null ? series[i].weight_kg : (s.weight_kg ?? null),
+      }));
+    };
+
+    if (isSeriesDiscipline(routine?.discipline ?? null)) {
+      const upserts = dayItems
+        .map((ri) => ({
+          item_id: ri.id,
+          routine_id: routineId,
+          student_id: userId,
+          day,
+          log_date: today,
+          data: {
+            series: entriesFor(ri).map((e) => ({
+              done: e.done,
+              weight_kg: e.done ? e.weight_kg : null,
+            })),
+          },
+        }))
+        .filter((u) => (u.data.series as SeriesEntry[]).some((s) => s.done));
+      if (upserts.length > 0) {
+        for (const u of upserts) {
+          await supabase.from("trainer_routine_logs").upsert(u, { onConflict: "item_id,log_date" });
+        }
+        const { data: freshLogs } = await supabase
+          .from("trainer_routine_logs")
+          .select("*")
+          .eq("student_id", userId)
+          .eq("routine_id", routineId);
+        if (freshLogs) setRoutineLogs(freshLogs as unknown as RoutineLog[]);
+      }
+      return;
+    }
+
+    const flatUpserts = dayItems
       .filter((ri) => logValues[ri.id] && Object.values(logValues[ri.id]).some((v) => v !== "" && v !== null && v !== undefined))
       .map((ri) => ({
         item_id: ri.id,
@@ -259,8 +312,8 @@ export default function MiEntrenamientoPage() {
         data: logValues[ri.id] ?? {},
       }));
 
-    if (upserts.length > 0) {
-      for (const u of upserts) {
+    if (flatUpserts.length > 0) {
+      for (const u of flatUpserts) {
         await supabase.from("trainer_routine_logs").upsert(u, { onConflict: "item_id,log_date" });
       }
       const { data: freshLogs } = await supabase
@@ -288,15 +341,24 @@ export default function MiEntrenamientoPage() {
       .order("log_date", { ascending: true });
 
     if (data) {
-      const fields = (() => {
-        const r = routines.find((r) => r.id === routineId);
-        return getDisciplineFields(r?.discipline ?? null, r?.custom_fields ?? undefined);
-      })();
-      const numField = fields.find((f) => f.type === "number" && f.key !== "rest_seconds" && f.key !== "hold_seconds" && f.key !== "round_duration_sec" && f.key !== "work_sec" && f.key !== "rest_sec");
-      const fieldKey = numField?.key ?? fields[0]?.key ?? "weight_kg";
+      const r = routines.find((rr) => rr.id === routineId);
 
       const points = (data as { log_date: string; data: Record<string, unknown> }[])
-        .map((d) => ({ date: d.log_date, value: Number(d.data[fieldKey]) || 0 }))
+        .map((d) => {
+          if (isSeriesDiscipline(r?.discipline ?? null)) {
+            const series = Array.isArray(d.data?.series)
+              ? (d.data.series as { done?: boolean; weight_kg?: number | null }[])
+              : [];
+            const maxW = series
+              .filter((x) => x.done)
+              .reduce((m, x) => Math.max(m, Number(x.weight_kg) || 0), 0);
+            return { date: d.log_date, value: maxW };
+          }
+          const fields = getDisciplineFields(r?.discipline ?? null, r?.custom_fields ?? undefined);
+          const numField = fields.find((f) => f.type === "number" && f.key !== "rest_seconds" && f.key !== "hold_seconds" && f.key !== "round_duration_sec" && f.key !== "work_sec" && f.key !== "rest_sec");
+          const fieldKey = numField?.key ?? fields[0]?.key ?? "weight_kg";
+          return { date: d.log_date, value: Number(d.data[fieldKey]) || 0 };
+        })
         .filter((d) => d.value > 0);
 
       setProgressData(points);
@@ -573,6 +635,39 @@ export default function MiEntrenamientoPage() {
                         <div className="space-y-2">
                           {dayItems.map((ri) => {
                             const existingLog = todayLogs.find((l) => l.item_id === ri.id);
+                            const seriesDiscipline = isSeriesDiscipline(r.discipline);
+                            const plannedSeries = seriesDiscipline
+                              ? resolveSeries(ri.data, r.discipline)
+                              : [];
+                            const entries: SeriesEntry[] = seriesLogs[ri.id]
+                              ? seriesLogs[ri.id]
+                              : plannedSeries.map((s, i) => ({
+                                  done: Array.isArray(existingLog?.data?.series)
+                                    ? ((existingLog.data.series as unknown as SeriesEntry[])[i]?.done ?? false)
+                                    : false,
+                                  weight_kg: Array.isArray(existingLog?.data?.series)
+                                    ? ((existingLog.data.series as unknown as SeriesEntry[])[i]?.weight_kg ?? (s.weight_kg ?? null))
+                                    : (s.weight_kg ?? null),
+                                }));
+                            const doneCount = entries.filter((e) => e.done).length;
+
+                            const toggleSeries = (sIdx: number) => {
+                              setSeriesLogs((prev) => ({
+                                ...prev,
+                                [ri.id]: entries.map((e, k) =>
+                                  k === sIdx ? { ...e, done: !e.done } : e
+                                ),
+                              }));
+                            };
+                            const setSeriesWeight = (sIdx: number, val: string) => {
+                              setSeriesLogs((prev) => ({
+                                ...prev,
+                                [ri.id]: entries.map((e, k) =>
+                                  k === sIdx ? { ...e, weight_kg: val === "" ? null : Number(val) } : e
+                                ),
+                              }));
+                            };
+
                             const plannedSummary = fields
                               .filter((f) => ri.data?.[f.key] != null && ri.data[f.key] !== "")
                               .map((f) => {
@@ -589,23 +684,22 @@ export default function MiEntrenamientoPage() {
                             return (
                               <div key={ri.id} className="rounded-lg border border-edge bg-bg p-2.5">
                                 <div className="flex items-start justify-between">
-                                  <div>
+                                  <div className="min-w-0">
                                     <p className="text-sm font-medium text-ink">{ri.exercise}</p>
-                                    {plannedSummary && (
-                                      <p className="text-[11px] text-muted">Plan: {plannedSummary}</p>
-                                    )}
-                                    {existingLog && (
-                                      <p className="text-[11px] text-neon">
-                                        Registrado: {fields.map((f) => {
-                                          const v = existingLog.data[f.key];
-                                          if (v == null || v === "") return null;
-                                          if (f.key === "weight_kg") return `${v}kg`;
-                                          if (f.key === "rest_seconds" || f.key === "hold_seconds" || f.key === "work_sec" || f.key === "rest_sec") return `${v}s`;
-                                          if (f.key === "distance_km") return `${v}km`;
-                                          if (f.key === "duration_min") return `${v}min`;
-                                          return String(v);
-                                        }).filter(Boolean).join(" · ")}
-                                      </p>
+                                    {seriesDiscipline ? (
+                                      plannedSeries.length > 0
+                                        ? (
+                                          <p className="text-[11px] text-muted">
+                                            {doneCount}/{plannedSeries.length} series hechas
+                                          </p>
+                                        )
+                                        : (
+                                          <p className="text-[11px] text-muted">Sin series todavía</p>
+                                        )
+                                    ) : (
+                                      plannedSummary && (
+                                        <p className="text-[11px] text-muted">Plan: {plannedSummary}</p>
+                                      )
                                     )}
                                   </div>
                                   <button
@@ -617,49 +711,93 @@ export default function MiEntrenamientoPage() {
                                   </button>
                                 </div>
 
-                                {fields.length > 0 && (
-                                  <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-                                    {fields.map((field) => (
-                                      <div key={field.key}>
-                                        <label className="text-[10px] text-muted">{field.label}</label>
-                                        {field.type === "select" && field.options ? (
-                                          <select
-                                            value={String(logValues[ri.id]?.[field.key] ?? existingLog?.data[field.key] ?? "")}
-                                            onChange={(e) =>
-                                              setLogValues((prev) => ({
-                                                ...prev,
-                                                [ri.id]: { ...prev[ri.id], [field.key]: e.target.value },
-                                              }))
-                                            }
-                                            className="mt-0.5 w-full rounded border border-edge bg-card px-2 py-1 text-[11px] text-ink focus:border-neon focus:outline-none"
-                                          >
-                                            <option value="">—</option>
-                                            {field.options.map((o) => (
-                                              <option key={o} value={o}>{o}</option>
-                                            ))}
-                                          </select>
-                                        ) : (
+                                {seriesDiscipline ? (
+                                  <div className="mt-2 space-y-1">
+                                    {plannedSeries.map((s, sIdx) => (
+                                      <div
+                                        key={sIdx}
+                                        className={`flex items-center gap-2 rounded-lg border py-1.5 pl-2 pr-1.5 ${
+                                          entries[sIdx]?.done
+                                            ? "border-neon/40 bg-neon/5"
+                                            : "border-edge bg-card"
+                                        }`}
+                                      >
+                                        <button
+                                          onClick={() => toggleSeries(sIdx)}
+                                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-[10px] font-bold transition ${
+                                            entries[sIdx]?.done
+                                              ? "border-neon bg-neon text-bg"
+                                              : "border-edge text-muted"
+                                          }`}
+                                        >
+                                          {entries[sIdx]?.done ? "✓" : ""}
+                                        </button>
+                                        <span className="w-6 shrink-0 text-[10px] font-semibold text-neon">
+                                          S{sIdx + 1}
+                                        </span>
+                                        <span className="min-w-0 flex-1 truncate text-[11px] text-muted">
+                                          {formatSeries(s)}
+                                        </span>
+                                        <label className="flex shrink-0 items-center gap-1 text-[10px] text-muted">
+                                          Peso
                                           <input
-                                            type={field.type === "number" ? "number" : "text"}
-                                            value={String(logValues[ri.id]?.[field.key] ?? existingLog?.data[field.key] ?? "")}
-                                            onChange={(e) =>
-                                              setLogValues((prev) => ({
-                                                ...prev,
-                                                [ri.id]: {
-                                                  ...prev[ri.id],
-                                                  [field.key]: field.type === "number"
-                                                    ? (e.target.value ? Number(e.target.value) : "")
-                                                    : e.target.value,
-                                                },
-                                              }))
-                                            }
-                                            placeholder={field.label}
-                                            className="mt-0.5 w-full rounded border border-edge bg-card px-2 py-1 text-[11px] text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                                            type="number"
+                                            inputMode="decimal"
+                                            step="0.5"
+                                            value={entries[sIdx]?.weight_kg != null ? String(entries[sIdx].weight_kg) : ""}
+                                            onChange={(e) => setSeriesWeight(sIdx, e.target.value)}
+                                            placeholder={s.weight_kg != null ? String(s.weight_kg) : "—"}
+                                            className="w-14 rounded border border-edge bg-card px-1.5 py-0.5 text-[11px] text-ink placeholder:text-muted focus:border-neon focus:outline-none"
                                           />
-                                        )}
+                                        </label>
                                       </div>
                                     ))}
                                   </div>
+                                ) : (
+                                  fields.length > 0 && (
+                                    <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                                      {fields.map((field) => (
+                                        <div key={field.key}>
+                                          <label className="text-[10px] text-muted">{field.label}</label>
+                                          {field.type === "select" && field.options ? (
+                                            <select
+                                              value={String(logValues[ri.id]?.[field.key] ?? existingLog?.data[field.key] ?? "")}
+                                              onChange={(e) =>
+                                                setLogValues((prev) => ({
+                                                  ...prev,
+                                                  [ri.id]: { ...prev[ri.id], [field.key]: e.target.value },
+                                                }))
+                                              }
+                                              className="mt-0.5 w-full rounded border border-edge bg-card px-2 py-1 text-[11px] text-ink focus:border-neon focus:outline-none"
+                                            >
+                                              <option value="">—</option>
+                                              {field.options.map((o) => (
+                                                <option key={o} value={o}>{o}</option>
+                                              ))}
+                                            </select>
+                                          ) : (
+                                            <input
+                                              type={field.type === "number" ? "number" : "text"}
+                                              value={String(logValues[ri.id]?.[field.key] ?? existingLog?.data[field.key] ?? "")}
+                                              onChange={(e) =>
+                                                setLogValues((prev) => ({
+                                                  ...prev,
+                                                  [ri.id]: {
+                                                    ...prev[ri.id],
+                                                    [field.key]: field.type === "number"
+                                                      ? (e.target.value ? Number(e.target.value) : "")
+                                                      : e.target.value,
+                                                  },
+                                                }))
+                                              }
+                                              placeholder={field.label}
+                                              className="mt-0.5 w-full rounded border border-edge bg-card px-2 py-1 text-[11px] text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                                            />
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )
                                 )}
                               </div>
                             );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Loader2,
   FileText,
@@ -12,6 +13,7 @@ import {
   TrendingUp,
   Award,
   Calendar,
+  MapPin,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
@@ -406,6 +408,12 @@ export default function MiEntrenamientoPage() {
           <p className="mt-1 text-sm text-muted">
             Cuando un profesor te agregue como alumno, sus planes, rutinas y mensajes van a aparecer acá.
           </p>
+          <Link
+            href="/mi-entrenamiento/buscar"
+            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-ember px-4 py-2.5 text-sm font-semibold text-bg"
+          >
+            <MapPin className="h-4 w-4" /> Buscar profe por zona
+          </Link>
         </div>
       </main>
     );
@@ -415,7 +423,15 @@ export default function MiEntrenamientoPage() {
 
   return (
     <main className="mx-auto max-w-md px-4 pt-5 pb-24">
-      <h1 className="text-xl font-bold text-ink">Mi entrenamiento</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold text-ink">Mi entrenamiento</h1>
+        <Link
+          href="/mi-entrenamiento/buscar"
+          className="flex items-center gap-1 rounded-full border border-ember/40 bg-ember/10 px-3 py-1.5 text-xs font-semibold text-ember"
+        >
+          <MapPin className="h-3.5 w-3.5" /> Buscar profe
+        </Link>
+      </div>
 
       {trainers.length > 1 && (
         <div className="mt-3 flex gap-2 overflow-x-auto pb-1">

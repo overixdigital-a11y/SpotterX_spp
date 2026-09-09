@@ -170,6 +170,21 @@ export default function PerfilPage() {
         </Link>
       )}
 
+      {profile?.role === "alumno" && (
+        <Link
+          href="/mi-entrenamiento/buscar"
+          className="mx-4 mt-2 flex items-center justify-between rounded-2xl border border-edge bg-card p-3"
+        >
+          <p className="flex items-center gap-2 text-sm font-medium text-ink">
+            <span className="rounded-full bg-neon/15 p-1.5 text-neon">
+              <MapPin className="h-4 w-4" />
+            </span>
+            Buscar profe por zona
+          </p>
+          <ChevronRight className="h-4 w-4 text-muted" />
+        </Link>
+      )}
+
       {profile?.role === "profesor" && (
         <Link
           href="/entrenamiento/zona"

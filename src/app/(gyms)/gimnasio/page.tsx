@@ -309,6 +309,22 @@ export default function GymPanelPage() {
         { gym_id: gym.id, user_id: r.trainer_id, role: "profesor_invitado", authorized: true },
         { onConflict: "gym_id,user_id" }
       );
+    const { data: memberRows } = await supabase
+      .from("gym_memberships")
+      .select("user_id")
+      .eq("gym_id", gym.id)
+      .eq("status", "activa");
+    if (memberRows && memberRows.length > 0) {
+      await supabase.from("trainer_students").upsert(
+        (memberRows as { user_id: string }[]).map((m) => ({
+          trainer_id: r.trainer_id,
+          student_id: m.user_id,
+          source: "gym",
+          active: true,
+        })),
+        { onConflict: "trainer_id,student_id" }
+      );
+    }
     await supabase.from("trainer_gym_requests").update({ status: "approved" }).eq("id", r.id);
     setRequests((prev) => prev.filter((x) => x.id !== r.id));
     setSaving(false);

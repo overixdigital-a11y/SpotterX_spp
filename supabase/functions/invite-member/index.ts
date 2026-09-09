@@ -100,6 +100,14 @@ Deno.serve(async (req: Request) => {
         { onConflict: "gym_id,user_id" }
       );
       if (staffErr) return json({ error: staffErr.message }, 500);
+      const { data: members } = await supabase
+        .from("gym_memberships").select("user_id").eq("gym_id", gym_id).eq("status", "activa");
+      if (members && members.length > 0) {
+        await supabase.from("trainer_students").upsert(
+          members.map((m) => ({ trainer_id: newUserId, student_id: m.user_id, source: "gym", active: true })),
+          { onConflict: "trainer_id,student_id" }
+        );
+      }
     } else {
       const { error: memErr } = await supabase.from("gym_memberships").upsert(
         {
@@ -114,6 +122,14 @@ Deno.serve(async (req: Request) => {
         { onConflict: "gym_id,user_id" }
       );
       if (memErr) return json({ error: memErr.message }, 500);
+      const { data: staff } = await supabase
+        .from("gym_staff").select("user_id").eq("gym_id", gym_id).eq("role", "profesor_invitado");
+      if (staff && staff.length > 0) {
+        await supabase.from("trainer_students").upsert(
+          staff.map((s) => ({ trainer_id: s.user_id, student_id: newUserId, source: "gym", active: true })),
+          { onConflict: "trainer_id,student_id" }
+        );
+      }
     }
 
     return json({

@@ -442,8 +442,12 @@ export default function AlumnoPage() {
               <textarea
                 value={planForm.content}
                 onChange={(e) => setPlanForm((v) => ({ ...v, content: e.target.value }))}
-                placeholder="Descripción / notas del plan (opcional)"
-                rows={2}
+                placeholder={
+                  planForm.kind === "alimentacion"
+                    ? "Guía nutricional (ej: Desayuno: avenida + banana + huevos | Almuerzo: pollo + arroz + ensalada | Merienda: yogur + fruta)"
+                    : "Descripción / notas del plan (opcional)"
+                }
+                rows={planForm.kind === "alimentacion" ? 4 : 2}
                 className="w-full resize-none rounded-lg border border-edge bg-bg px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
               />
               <div className="flex gap-2">

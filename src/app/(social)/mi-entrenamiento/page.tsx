@@ -43,6 +43,7 @@ interface PlanItem {
 
 interface Routine {
   id: string;
+  plan_id: string | null;
   title: string;
   description: string | null;
   done: boolean;
@@ -59,12 +60,6 @@ interface Msg {
   read: boolean;
   created_at: string;
 }
-
-const KIND_LABEL: Record<string, string> = {
-  entrenamiento: "Entrenamiento",
-  alimentacion: "Alimentación",
-  general: "General",
-};
 
 function todayDow(): number {
   const d = new Date();
@@ -262,6 +257,7 @@ export default function MiEntrenamientoPage() {
   const completed = sortedRoutines.filter((r) => r.done);
   const todayCount = pending.filter((r) => r.due_on && r.due_on === todayLocal()).length;
   const currentDay = todayDow();
+  const planMap = new Map(plans.map((p) => [p.id, p]));
 
   return (
     <main className="mx-auto max-w-md px-4 pt-5 pb-24">
@@ -343,6 +339,7 @@ export default function MiEntrenamientoPage() {
               .filter((i) => i.plan_id === p.id)
               .sort((a, b) => (a.day ?? 0) - (b.day ?? 0) || a.position - b.position);
             const expanded = openPlan === p.id;
+            const isNutrition = p.kind === "alimentacion";
             const groups = new Map<number, PlanItem[]>();
             planItems.forEach((i) => {
               const k = i.day ?? 0;
@@ -360,38 +357,55 @@ export default function MiEntrenamientoPage() {
                   <div>
                     <p className="font-semibold text-ink">{p.title}</p>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                      <span className="rounded-full border border-neon/40 bg-neon/10 px-2 py-0.5 text-[11px] text-neon">
-                        {KIND_LABEL[p.kind] ?? p.kind}
+                      <span className={`rounded-full border px-2 py-0.5 text-[11px] ${isNutrition ? "border-ember/40 bg-ember/10 text-ember" : "border-neon/40 bg-neon/10 text-neon"}`}>
+                        {isNutrition ? "Alimentación" : "Entrenamiento"}
                       </span>
                       {todayItems.length > 0 && (
                         <span className="rounded-full border border-ember/40 bg-ember/10 px-2 py-0.5 text-[11px] text-ember">
-                          {todayItems.length} ejercicios hoy
+                          {todayItems.length} {isNutrition ? "comidas hoy" : "ejercicios hoy"}
                         </span>
                       )}
                     </div>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-muted transition ${expanded ? "rotate-180" : ""}`} />
                 </button>
-                {p.content && <p className="mt-2 text-sm text-muted">{p.content}</p>}
+
+                {p.content && isNutrition && (
+                  <div className="mt-3 rounded-xl border border-ember/20 bg-ember/5 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-ember">Guía nutricional</p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-ink">{p.content}</p>
+                  </div>
+                )}
+                {p.content && !isNutrition && (
+                  <p className="mt-2 text-sm text-muted">{p.content}</p>
+                )}
 
                 {expanded && (
                   <div className="mt-3 border-t border-edge pt-3">
                     {planItems.length === 0 && (
-                      <p className="pb-2 text-sm text-muted">Este plan todavía no tiene ejercicios.</p>
+                      <p className="pb-2 text-sm text-muted">
+                        {isNutrition ? "Este plan todavía no tiene comidas." : "Este plan todavía no tiene ejercicios."}
+                      </p>
                     )}
                     {[...groups.entries()].map(([day, dayItems]) => (
                       <div key={day} className="mb-2">
                         <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
-                          {day === 0 ? "General" : `Día ${day}`}
+                          {day === 0 ? "General" : isNutrition ? `Comidas del día ${day}` : `Día ${day}`}
                         </p>
                         {dayItems.map((it) => (
                           <div key={it.id} className="rounded-lg border-b border-edge py-2">
                             <p className="text-sm font-medium text-ink">{it.exercise}</p>
-                            <p className="text-xs text-muted">
-                              {it.sets ?? "—"}×{it.reps ?? "—"}
-                              {it.rest_seconds ? ` · ${it.rest_seconds}s descanso` : ""}
-                              {it.notes ? ` · ${it.notes}` : ""}
-                            </p>
+                            {isNutrition ? (
+                              <p className="text-xs text-muted">
+                                {it.notes || "Sin detalles"}
+                              </p>
+                            ) : (
+                              <p className="text-xs text-muted">
+                                {it.sets ?? "—"}×{it.reps ?? "—"}
+                                {it.rest_seconds ? ` · ${it.rest_seconds}s descanso` : ""}
+                                {it.notes ? ` · ${it.notes}` : ""}
+                              </p>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -431,11 +445,14 @@ export default function MiEntrenamientoPage() {
                   </button>
                   <div className="flex-1">
                     <p className="text-sm text-ink">{r.title}</p>
-                    {r.due_on && (
-                      <div className="mt-0.5">
-                        <DueBadge due_on={r.due_on} done={r.done} />
-                      </div>
-                    )}
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                      {r.due_on && <DueBadge due_on={r.due_on} done={r.done} />}
+                      {r.plan_id && planMap.has(r.plan_id) && (
+                        <span className="rounded-full border border-neon/30 bg-neon/5 px-2 py-0.5 text-[10px] text-neon">
+                          {planMap.get(r.plan_id)?.title}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -461,11 +478,18 @@ export default function MiEntrenamientoPage() {
                   </button>
                   <div className="flex-1">
                     <p className="text-sm text-muted line-through">{r.title}</p>
-                    {r.completed_at && (
-                      <p className="text-[11px] text-muted">
-                        Hecha {formatDay(r.completed_at.slice(0, 10))}
-                      </p>
-                    )}
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                      {r.completed_at && (
+                        <span className="text-[11px] text-muted">
+                          Hecha {formatDay(r.completed_at.slice(0, 10))}
+                        </span>
+                      )}
+                      {r.plan_id && planMap.has(r.plan_id) && (
+                        <span className="rounded-full border border-neon/30 bg-neon/5 px-2 py-0.5 text-[10px] text-neon">
+                          {planMap.get(r.plan_id)?.title}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}

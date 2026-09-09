@@ -346,6 +346,22 @@ export default function GymMembersPage() {
       toast("No se pudo agregar: " + error.message, "error");
       return;
     }
+    const { data: staffRows } = await supabase
+      .from("gym_staff")
+      .select("user_id")
+      .eq("gym_id", gym.id)
+      .eq("role", "profesor_invitado");
+    if (staffRows && staffRows.length > 0) {
+      await supabase.from("trainer_students").upsert(
+        (staffRows as { user_id: string }[]).map((s) => ({
+          trainer_id: s.user_id,
+          student_id: picking.id,
+          source: "gym",
+          active: true,
+        })),
+        { onConflict: "trainer_id,student_id" }
+      );
+    }
     setPicking(null);
     setAlumnoPlan("");
     setMemberIds((prev) => new Set(prev).add(picking.id));
@@ -379,6 +395,22 @@ export default function GymMembersPage() {
     if (error) {
       toast("No se pudo agregar: " + error.message, "error");
       return;
+    }
+    const { data: memberRows } = await supabase
+      .from("gym_memberships")
+      .select("user_id")
+      .eq("gym_id", gym.id)
+      .eq("status", "activa");
+    if (memberRows && memberRows.length > 0) {
+      await supabase.from("trainer_students").upsert(
+        (memberRows as { user_id: string }[]).map((m) => ({
+          trainer_id: p.id,
+          student_id: m.user_id,
+          source: "gym",
+          active: true,
+        })),
+        { onConflict: "trainer_id,student_id" }
+      );
     }
     setStaffIds((prev) => new Set(prev).add(p.id));
     setMembers((prev) => [

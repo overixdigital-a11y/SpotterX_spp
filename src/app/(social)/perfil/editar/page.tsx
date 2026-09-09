@@ -7,6 +7,7 @@ import { ArrowLeft, Loader2, Camera, Save, AlertTriangle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { useToast } from "@/components/core/ToastProvider";
+import { DISCIPLINES } from "@/lib/disciplines";
 
 export default function EditarPerfilPage() {
   const { profile, userId } = useAuthState();
@@ -25,6 +26,8 @@ export default function EditarPerfilPage() {
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [disciplines, setDisciplines] = useState<string[]>(profile?.disciplines ?? []);
+  const [customDiscipline, setCustomDiscipline] = useState("");
 
   const initial = (profile?.full_name || profile?.username || "U")
     .slice(0, 2)
@@ -93,10 +96,17 @@ export default function EditarPerfilPage() {
 
       const { error: err2 } = await supabase.from("profiles").update(extended).eq("id", userId);
       if (err2) {
-        // Degradación: la migración 00010 todavía no corrió (columnas ausentes)
         const msg = (err2 as { message?: string }).message ?? "";
         if (!/column|does not exist|could not find/i.test(msg)) throw err2;
         toast("Datos básicos guardados. Corré la migración 00010 para habilitar los campos extra.", "info");
+      }
+
+      if (profile?.role === "profesor") {
+        const { error: err3 } = await supabase.from("profiles").update({ disciplines }).eq("id", userId);
+        if (err3) {
+          const msg = (err3 as { message?: string }).message ?? "";
+          if (!/column|does not exist|could not find/i.test(msg)) throw err3;
+        }
       }
 
       router.refresh();
@@ -225,6 +235,86 @@ export default function EditarPerfilPage() {
             placeholder="Contá algo sobre vos… (mencioná con @usuario)"
           />
         </div>
+
+        {profile?.role === "profesor" && (
+          <div>
+            <label className="text-xs font-medium text-muted">Mis disciplinas</label>
+            <p className="mt-1 text-xs text-muted">Elegí las disciplinas que enseñás</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {DISCIPLINES.filter((d) => d.id !== "otras").map((d) => {
+                const active = disciplines.includes(d.id);
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() =>
+                      setDisciplines((prev) =>
+                        active ? prev.filter((x) => x !== d.id) : [...prev, d.id]
+                      )
+                    }
+                    className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                      active
+                        ? "border-neon bg-neon/15 text-neon"
+                        : "border-edge bg-card text-muted hover:border-neon/40"
+                    }`}
+                  >
+                    {d.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                value={customDiscipline}
+                onChange={(e) => setCustomDiscipline(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && customDiscipline.trim()) {
+                    e.preventDefault();
+                    const val = customDiscipline.trim().toLowerCase().replace(/\s+/g, "_");
+                    if (!disciplines.includes(val)) setDisciplines((prev) => [...prev, val]);
+                    setCustomDiscipline("");
+                  }
+                }}
+                className="flex-1 rounded-xl border border-edge bg-card px-3 py-2 text-xs text-ink focus:border-neon focus:outline-none"
+                placeholder="Agregar disciplina personalizada..."
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (customDiscipline.trim()) {
+                    const val = customDiscipline.trim().toLowerCase().replace(/\s+/g, "_");
+                    if (!disciplines.includes(val)) setDisciplines((prev) => [...prev, val]);
+                    setCustomDiscipline("");
+                  }
+                }}
+                className="rounded-xl border border-edge bg-card px-3 py-2 text-xs text-muted hover:border-neon/40"
+              >
+                +
+              </button>
+            </div>
+            {disciplines.filter((d) => !DISCIPLINES.some((cd) => cd.id === d)).length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {disciplines
+                  .filter((d) => !DISCIPLINES.some((cd) => cd.id === d))
+                  .map((d) => (
+                    <span
+                      key={d}
+                      className="flex items-center gap-1 rounded-full border border-ember/40 bg-ember/10 px-2.5 py-0.5 text-[11px] text-ember"
+                    >
+                      {d.replace(/_/g, " ")}
+                      <button
+                        type="button"
+                        onClick={() => setDisciplines((prev) => prev.filter((x) => x !== d))}
+                        className="ml-0.5 hover:text-bg"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {error && (
           <p className="flex items-start gap-2 rounded-xl border border-ember/30 bg-ember/10 px-3 py-2.5 text-sm text-ember">

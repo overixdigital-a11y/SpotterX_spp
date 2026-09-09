@@ -23,6 +23,7 @@ interface PublicProfile {
   avatar_url: string | null;
   bio: string | null;
   role: string;
+  disciplines: string[] | null;
   location: string | null;
   website: string | null;
   is_verified: boolean;
@@ -59,7 +60,7 @@ export default function PublicProfilePage() {
     (async () => {
       const { data: p } = await supabase
         .from("profiles")
-        .select("id, username, full_name, avatar_url, bio, role, location, website, is_verified, created_at")
+        .select("id, username, full_name, avatar_url, bio, role, disciplines, location, website, is_verified, created_at")
         .eq("username", username)
         .maybeSingle();
       if (!p || !active) {
@@ -210,6 +211,18 @@ export default function PublicProfilePage() {
                 )
               )}
             </p>
+          )}
+          {profile.role === "profesor" && profile.disciplines && profile.disciplines.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {profile.disciplines.map((d) => (
+                <span
+                  key={d}
+                  className="rounded-full border border-neon/30 bg-neon/10 px-2 py-0.5 text-[10px] font-medium text-neon"
+                >
+                  {d.replace(/_/g, " ")}
+                </span>
+              ))}
+            </div>
           )}
         </div>
       </div>

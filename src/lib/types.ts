@@ -24,6 +24,7 @@ export interface Profile {
   is_verified: boolean;
   privacy: "publico" | "solo_seguidores";
   settings: ProfileSettings | null;
+  disciplines: string[] | null;
   created_at: string;
   updated_at?: string | null;
 }

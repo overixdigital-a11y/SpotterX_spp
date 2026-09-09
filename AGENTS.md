@@ -322,6 +322,7 @@ Orden de etapas para pulir/completar la app, módulo por módulo. Cada etapa ter
 - Realtime de Supabase para notificaciones en vivo.
 - Las Edge Functions (carpeta `supabase/functions/`) corren en **Deno**, no Node: están **excluidas del tsconfig** de Next (`exclude: ["node_modules", "supabase/functions"]`) para que el build no las type-checkee.
 - **Journal de conversaciones**: al finalizar cada sesión/feature implementada (igual que se actualiza AGENTS.md), actualizar automáticamente `docs/journal/YYYY-MM-DD.md` con los 4 bloques del formato del README (Contexto / Decisiones / Implementado / Pendiente). Cada sesión agrega su propio bloque; los archivos nunca se borran.
+- **Migraciones al usuario para copy-paste**: cada vez que una feature requiera migración, pasarle al usuario el SQL completo (que no tenga que abrir el archivo) para copiar y pegar en SQL Editor, al final del mensaje. Preferencia del usuario (09/09/2026).
 
 ## Estado de fases
 - ✅ Fase 1 — Fundación (Next + Supabase + auth roles + theme + route groups + schema 00001)

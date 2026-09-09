@@ -17,6 +17,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { todayLocal } from "@/lib/format";
 import { getDisciplineFields, isSeriesDiscipline, resolveSeries, formatSeries, type FieldDef } from "@/lib/disciplines";
+import { MEALS, getDietData } from "@/lib/diets";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 interface Trainer {
@@ -31,6 +32,7 @@ interface Plan {
   title: string;
   kind: string;
   content: string | null;
+  assigned_at: string | null;
 }
 
 interface PlanItem {
@@ -43,6 +45,7 @@ interface PlanItem {
   rest_seconds: number | null;
   notes: string | null;
   position: number;
+  data: Record<string, unknown> | null;
 }
 
 interface Routine {
@@ -167,6 +170,7 @@ export default function MiEntrenamientoPage() {
         .select("*")
         .eq("trainer_id", trainerId)
         .eq("is_template", false)
+        .not("assigned_at", "is", null)
         .order("created_at", { ascending: false });
       if (!active) return;
       if (pl) setPlans(pl as Plan[]);
@@ -484,6 +488,32 @@ export default function MiEntrenamientoPage() {
               const k = i.day ?? 0;
               groups.set(k, [...(groups.get(k) ?? []), i]);
             });
+            const MEAL_ORDER = ["desayuno", "colacion", "almuerzo", "merienda", "cena", "post_entreno"];
+            const dietGroups = new Map<number, { label: string; items: PlanItem[] }[]>();
+            if (isNutrition && expanded) {
+              const perDay = new Map<number, Map<string, PlanItem[]>>();
+              planItems.forEach((i) => {
+                const k = i.day ?? 0;
+                if (!perDay.has(k)) perDay.set(k, new Map());
+                const meals = perDay.get(k)!;
+                const meal = getDietData(i.data).meal ?? "__sin__";
+                if (!meals.has(meal)) meals.set(meal, []);
+                meals.get(meal)!.push(i);
+              });
+              for (const [k, meals] of perDay) {
+                const sorted = Array.from(meals.entries())
+                  .map(([id, list]) => ({
+                    label: id === "__sin__" ? "Sin etiquetar" : (MEALS.find((m) => m.id === id)?.label ?? id),
+                    items: list,
+                  }))
+                  .sort((a, b) => {
+                    const ai = MEAL_ORDER.indexOf(a.label === "Sin etiquetar" ? "__sin__" : a.label.toLowerCase());
+                    const bi = MEAL_ORDER.indexOf(b.label === "Sin etiquetar" ? "__sin__" : b.label.toLowerCase());
+                    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+                  });
+                dietGroups.set(k, sorted);
+              }
+            }
             return (
               <div key={p.id} className="mb-2 rounded-xl border border-edge bg-card p-3.5">
                 <button
@@ -508,27 +538,55 @@ export default function MiEntrenamientoPage() {
                 )}
                 {expanded && (
                   <div className="mt-3 border-t border-edge pt-3">
-                    {[...groups.entries()].map(([day, dayItems]) => (
-                      <div key={day} className="mb-2">
-                        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
-                          {day === 0 ? "General" : isNutrition ? `Comidas del día ${day}` : `Día ${day}`}
-                        </p>
-                        {dayItems.map((it) => (
-                          <div key={it.id} className="rounded-lg border-b border-edge py-2">
-                            <p className="text-sm font-medium text-ink">{it.exercise}</p>
-                            <p className="text-xs text-muted">
-                              {isNutrition ? (it.notes || "Sin detalles") : (
-                                <>
-                                  {it.sets ?? "—"}×{it.reps ?? "—"}
-                                  {it.rest_seconds ? ` · ${it.rest_seconds}s` : ""}
-                                  {it.notes ? ` · ${it.notes}` : ""}
-                                </>
-                              )}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    ))}
+                    {isNutrition ? (
+                      [...dietGroups.entries()].map(([day, meals]) => (
+                        <div key={day} className="mb-2">
+                          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                            {day === 0 ? "General" : `Comidas del día ${day}`}
+                          </p>
+                          {meals.map((m) => (
+                            <div key={m.label} className="mb-2">
+                              <p className="mb-1 text-[11px] font-semibold text-ember">{m.label}</p>
+                              {m.items.map((it) => {
+                                const d = getDietData(it.data);
+                                return (
+                                  <div key={it.id} className="rounded-lg border-b border-edge py-2">
+                                    <p className="text-sm font-medium text-ink">{it.exercise}</p>
+                                    <p className="text-xs text-muted">
+                                      {(d.qty || d.unit) && (
+                                        <>{[d.qty, d.unit].filter(Boolean).join(" ")}{d.kcal ? ` · ${d.kcal} kcal` : ""}</>
+                                      )}
+                                      {(d.protein_g || d.fat_g || d.carbs_g) && (
+                                        <> · P {d.protein_g ?? "—"}g · G {d.fat_g ?? "—"}g · C {d.carbs_g ?? "—"}g</>
+                                      )}
+                                      {it.notes ? ` · ${it.notes}` : ""}
+                                    </p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                      ))
+                    ) : (
+                      [...groups.entries()].map(([day, dayItems]) => (
+                        <div key={day} className="mb-2">
+                          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                            {day === 0 ? "General" : `Día ${day}`}
+                          </p>
+                          {dayItems.map((it) => (
+                            <div key={it.id} className="rounded-lg border-b border-edge py-2">
+                              <p className="text-sm font-medium text-ink">{it.exercise}</p>
+                              <p className="text-xs text-muted">
+                                {it.sets ?? "—"}×{it.reps ?? "—"}
+                                {it.rest_seconds ? ` · ${it.rest_seconds}s` : ""}
+                                {it.notes ? ` · ${it.notes}` : ""}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      ))
+                    )}
                   </div>
                 )}
               </div>

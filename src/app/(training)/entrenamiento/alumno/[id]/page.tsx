@@ -16,10 +16,12 @@ import {
   Copy,
   BookmarkPlus,
   GripVertical,
+  EyeOff,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import ExercisePicker from "@/components/training/ExercisePicker";
+import { MEALS, getDietData } from "@/lib/diets";
 import { DISCIPLINES, getDisciplineFields, getSeries, resolveSeries, legacyToSeries, formatSeries, isSeriesDiscipline, type FieldDef, type Series } from "@/lib/disciplines";
 
 interface StudentProfile {
@@ -34,6 +36,7 @@ interface Plan {
   kind: string;
   content: string | null;
   is_template: boolean | null;
+  assigned_at: string | null;
 }
 
 interface PlanItem {
@@ -46,6 +49,7 @@ interface PlanItem {
   rest_seconds: number | null;
   notes: string | null;
   position: number;
+  data: Record<string, unknown> | null;
 }
 
 interface Routine {
@@ -122,7 +126,29 @@ export default function AlumnoPage() {
     reps: string;
     rest: string;
     notes: string;
-  }>({ planId: null, day: "", exercise: "", sets: "", reps: "", rest: "", notes: "" });
+    meal: string;
+    qty: string;
+    unit: string;
+    kcal: string;
+    protein: string;
+    fat: string;
+    carbs: string;
+  }>({
+    planId: null,
+    day: "",
+    exercise: "",
+    sets: "",
+    reps: "",
+    rest: "",
+    notes: "",
+    meal: "",
+    qty: "",
+    unit: "",
+    kcal: "",
+    protein: "",
+    fat: "",
+    carbs: "",
+  });
 
   const [routineFormOpen, setRoutineFormOpen] = useState(false);
   const [routineForm, setRoutineForm] = useState({
@@ -233,6 +259,7 @@ export default function AlumnoPage() {
   const createPlan = async () => {
     if (!userId || !planForm.title.trim()) return;
     const supabase = createClient();
+    const isDiet = planForm.kind === "alimentacion";
     const { data } = await supabase
       .from("trainer_plans")
       .insert({
@@ -241,6 +268,7 @@ export default function AlumnoPage() {
         title: planForm.title.trim(),
         kind: planForm.kind,
         content: planForm.content.trim() || null,
+        assigned_at: isDiet ? null : new Date().toISOString(),
       })
       .select()
       .maybeSingle();
@@ -255,14 +283,70 @@ export default function AlumnoPage() {
     setItems((prev) => prev.filter((i) => i.plan_id !== id));
   };
 
+  const toggleAssign = async (p: Plan) => {
+    const nowAssigned = !!p.assigned_at;
+    const { data } = await createClient()
+      .from("trainer_plans")
+      .update({ assigned_at: nowAssigned ? null : new Date().toISOString() })
+      .eq("id", p.id)
+      .select("assigned_at")
+      .maybeSingle();
+    if (data) {
+      const a = (data as { assigned_at: string | null }).assigned_at;
+      setPlans((prev) => prev.map((x) => (x.id === p.id ? { ...x, assigned_at: a } : x)));
+    }
+  };
+
   const openItemForm = (planId: string) => {
-    setItemForm({ planId, day: "", exercise: "", sets: "", reps: "", rest: "", notes: "" });
+    setItemForm({
+      planId,
+      day: "",
+      exercise: "",
+      sets: "",
+      reps: "",
+      rest: "",
+      notes: "",
+      meal: "",
+      qty: "",
+      unit: "",
+      kcal: "",
+      protein: "",
+      fat: "",
+      carbs: "",
+    });
   };
 
   const addItem = async () => {
     if (!itemForm.planId || !itemForm.exercise.trim()) return;
     const supabase = createClient();
+    const targetPlan = plans.find((p) => p.id === itemForm.planId);
+    const isDiet = targetPlan?.kind === "alimentacion";
     const position = items.filter((i) => i.plan_id === itemForm.planId).length;
+    if (isDiet) {
+      const { data } = await supabase
+        .from("trainer_plan_items")
+        .insert({
+          plan_id: itemForm.planId,
+          day: itemForm.day ? parseInt(itemForm.day, 10) : null,
+          exercise: itemForm.exercise.trim(),
+          notes: itemForm.notes.trim() || null,
+          position,
+          data: {
+            meal: itemForm.meal || null,
+            qty: itemForm.qty.trim() || null,
+            unit: itemForm.unit.trim() || null,
+            kcal: itemForm.kcal ? Number(itemForm.kcal) : null,
+            protein_g: itemForm.protein ? Number(itemForm.protein) : null,
+            fat_g: itemForm.fat ? Number(itemForm.fat) : null,
+            carbs_g: itemForm.carbs ? Number(itemForm.carbs) : null,
+          },
+        })
+        .select()
+        .maybeSingle();
+      if (data) setItems((prev) => [...prev, data as PlanItem]);
+      setItemForm({ planId: null, day: "", exercise: "", sets: "", reps: "", rest: "", notes: "", meal: "", qty: "", unit: "", kcal: "", protein: "", fat: "", carbs: "" });
+      return;
+    }
     const { data } = await supabase
       .from("trainer_plan_items")
       .insert({
@@ -278,7 +362,7 @@ export default function AlumnoPage() {
       .select()
       .maybeSingle();
     if (data) setItems((prev) => [...prev, data as PlanItem]);
-    setItemForm({ planId: null, day: "", exercise: "", sets: "", reps: "", rest: "", notes: "" });
+    setItemForm({ planId: null, day: "", exercise: "", sets: "", reps: "", rest: "", notes: "", meal: "", qty: "", unit: "", kcal: "", protein: "", fat: "", carbs: "" });
   };
 
   const deleteItem = async (id: string) => {
@@ -318,6 +402,7 @@ export default function AlumnoPage() {
     if (!userId) return;
     const supabase = createClient();
     const srcItems = tplItems.filter((i) => i.plan_id === tpl.id);
+    const isDiet = tpl.kind === "alimentacion";
     const { data } = await supabase
       .from("trainer_plans")
       .insert({
@@ -326,6 +411,7 @@ export default function AlumnoPage() {
         title: tpl.title,
         kind: tpl.kind,
         content: tpl.content,
+        assigned_at: isDiet ? null : new Date().toISOString(),
       })
       .select()
       .maybeSingle();
@@ -342,6 +428,7 @@ export default function AlumnoPage() {
           rest_seconds: i.rest_seconds,
           notes: i.notes,
           position: i.position,
+          data: i.data,
         }))
       );
       const { data: newIts } = await supabase
@@ -721,6 +808,7 @@ export default function AlumnoPage() {
           )}
 
           {plans.map((p) => {
+            const isDiet = p.kind === "alimentacion";
             const planItems = items
               .filter((i) => i.plan_id === p.id)
               .sort((a, b) => (a.day ?? 0) - (b.day ?? 0) || a.position - b.position);
@@ -730,6 +818,32 @@ export default function AlumnoPage() {
               const k = i.day ?? 0;
               groups.set(k, [...(groups.get(k) ?? []), i]);
             });
+            const MEAL_ORDER = ["desayuno", "colacion", "almuerzo", "merienda", "cena", "post_entreno"];
+            const dietGroups = new Map<number, { label: string; items: PlanItem[] }[]>();
+            if (isDiet) {
+              const perDay = new Map<number, Map<string, PlanItem[]>>();
+              planItems.forEach((i) => {
+                const k = i.day ?? 0;
+                if (!perDay.has(k)) perDay.set(k, new Map());
+                const meals = perDay.get(k)!;
+                const meal = getDietData(i.data).meal ?? "__sin__";
+                if (!meals.has(meal)) meals.set(meal, []);
+                meals.get(meal)!.push(i);
+              });
+              for (const [k, meals] of perDay) {
+                const sorted = Array.from(meals.entries())
+                  .map(([id, list]) => ({
+                    label: id === "__sin__" ? "Sin etiquetar" : (MEALS.find((m) => m.id === id)?.label ?? id),
+                    items: list,
+                  }))
+                  .sort((a, b) => {
+                    const ai = MEAL_ORDER.indexOf(a.label === "Sin etiquetar" ? "__sin__" : a.label.toLowerCase());
+                    const bi = MEAL_ORDER.indexOf(b.label === "Sin etiquetar" ? "__sin__" : b.label.toLowerCase());
+                    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+                  });
+                dietGroups.set(k, sorted);
+              }
+            }
             return (
               <div key={p.id} className="mb-2 rounded-xl border border-edge bg-card p-3.5">
                 <button
@@ -738,12 +852,17 @@ export default function AlumnoPage() {
                 >
                   <div>
                     <p className="font-semibold text-ink">{p.title}</p>
-                    <span className="rounded-full border border-neon/40 bg-neon/10 px-2 py-0.5 text-[11px] text-neon">
+                    <span className={`mt-0.5 rounded-full border px-2 py-0.5 text-[11px] ${isDiet ? "border-ember/40 bg-ember/10 text-ember" : "border-neon/40 bg-neon/10 text-neon"}`}>
                       {KIND_LABEL[p.kind] ?? p.kind}
                     </span>
+                    {isDiet && !p.is_template && (
+                      <span className={`ml-1 rounded-full border px-2 py-0.5 text-[11px] ${p.assigned_at ? "border-neon/40 bg-neon/10 text-neon" : "border-edge bg-bg text-muted"}`}>
+                        {p.assigned_at ? "Asignada" : "Borrador"}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-1">
-                    {!expanded && <span className="text-[11px] text-muted">{planItems.length} ej.</span>}
+                    {!expanded && <span className="text-[11px] text-muted">{planItems.length} {isDiet ? "alim." : "ej."}</span>}
                     <ChevronDown className={`h-4 w-4 text-muted transition ${expanded ? "rotate-180" : ""}`} />
                   </div>
                 </button>
@@ -757,6 +876,16 @@ export default function AlumnoPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
+                    {isDiet && !p.is_template && (
+                      <button
+                        onClick={() => toggleAssign(p)}
+                        title={p.assigned_at ? "Quitar la dieta (queda borrador)" : "Asignar la dieta al alumno"}
+                        className={`flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold ${p.assigned_at ? "border-edge text-muted hover:text-ember" : "border-neon bg-neon text-bg"}`}
+                      >
+                        {p.assigned_at ? <EyeOff className="h-3 w-3" /> : <Send className="h-3 w-3" />}
+                        {p.assigned_at ? "Quitar" : "Asignar"}
+                      </button>
+                    )}
                     {!p.is_template && (
                       <button onClick={() => saveAsTemplate(p.id)} title="Guardar como plantilla" className="text-muted transition hover:text-ember">
                         <BookmarkPlus className="h-4 w-4" />
@@ -771,95 +900,231 @@ export default function AlumnoPage() {
                 {expanded && (
                   <div className="mt-3 border-t border-edge pt-3">
                     {planItems.length === 0 && (
-                      <p className="pb-2 text-sm text-muted">Sin ejercicios. Agregá el primero abajo.</p>
+                      <p className="pb-2 text-sm text-muted">
+                        {isDiet ? "Sin alimentos. Agregá el primero abajo." : "Sin ejercicios. Agregá el primero abajo."}
+                      </p>
                     )}
-                    {[...groups.entries()].map(([day, dayItems]) => (
-                      <div key={day} className="mb-2">
-                        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
-                          {day === 0 ? "General" : `Día ${day}`}
-                        </p>
-                        {dayItems.map((it) => (
-                          <div key={it.id} className="mb-1 flex items-start gap-2 rounded-lg border-b border-edge py-2">
-                            <div className="flex-1">
-                              <p className="text-sm font-medium text-ink">{it.exercise}</p>
-                              <p className="text-xs text-muted">
-                                {it.sets ?? "—"}×{it.reps ?? "—"}
-                                {it.rest_seconds ? ` · ${it.rest_seconds}s` : ""}
-                                {it.notes ? ` · ${it.notes}` : ""}
-                              </p>
+                    {isDiet ? (
+                      [...dietGroups.entries()].map(([day, meals]) => (
+                        <div key={day} className="mb-2">
+                          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                            {day === 0 ? "General" : `Día ${day}`}
+                          </p>
+                          {meals.map((m) => (
+                            <div key={m.label} className="mb-2">
+                              <p className="mb-1 text-[11px] font-semibold text-neon">{m.label}</p>
+                              {m.items.map((it) => {
+                                const d = getDietData(it.data);
+                                return (
+                                  <div key={it.id} className="mb-1 flex items-start gap-2 rounded-lg border-b border-edge py-2">
+                                    <div className="flex-1">
+                                      <p className="text-sm font-medium text-ink">{it.exercise}</p>
+                                      <p className="text-xs text-muted">
+                                        {(d.qty || d.unit) && (
+                                          <>{[d.qty, d.unit].filter(Boolean).join(" ")}{d.kcal ? ` · ${d.kcal} kcal` : ""}</>
+                                        )}
+                                        {(d.protein_g || d.fat_g || d.carbs_g) && (
+                                          <> · P {d.protein_g ?? "—"}g · G {d.fat_g ?? "—"}g · C {d.carbs_g ?? "—"}g</>
+                                        )}
+                                        {it.notes ? ` · ${it.notes}` : ""}
+                                      </p>
+                                    </div>
+                                    <button onClick={() => deleteItem(it.id)} className="text-muted hover:text-ember">
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                );
+                              })}
                             </div>
-                            <button onClick={() => deleteItem(it.id)} className="text-muted hover:text-ember">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    ))}
+                          ))}
+                        </div>
+                      ))
+                    ) : (
+                      [...groups.entries()].map(([day, dayItems]) => (
+                        <div key={day} className="mb-2">
+                          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                            {day === 0 ? "General" : `Día ${day}`}
+                          </p>
+                          {dayItems.map((it) => (
+                            <div key={it.id} className="mb-1 flex items-start gap-2 rounded-lg border-b border-edge py-2">
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-ink">{it.exercise}</p>
+                                <p className="text-xs text-muted">
+                                  {it.sets ?? "—"}×{it.reps ?? "—"}
+                                  {it.rest_seconds ? ` · ${it.rest_seconds}s` : ""}
+                                  {it.notes ? ` · ${it.notes}` : ""}
+                                </p>
+                              </div>
+                              <button onClick={() => deleteItem(it.id)} className="text-muted hover:text-ember">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ))
+                    )}
 
                     {itemForm.planId === p.id ? (
-                      <div className="mt-2 space-y-2 rounded-lg border border-edge bg-bg p-3">
-                        <div className="flex gap-2">
-                          <input
-                            value={itemForm.day}
-                            onChange={(e) => setItemForm((v) => ({ ...v, day: e.target.value }))}
-                            placeholder="Día"
-                            type="number"
-                            min={1}
-                            className="w-16 rounded-lg border border-edge bg-card px-2 py-1.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-                          />
+                      isDiet ? (
+                        <div className="mt-2 space-y-2 rounded-lg border border-edge bg-bg p-3">
+                          <div className="flex gap-2">
+                            <input
+                              value={itemForm.day}
+                              onChange={(e) => setItemForm((v) => ({ ...v, day: e.target.value }))}
+                              placeholder="Día"
+                              type="number"
+                              min={1}
+                              className="w-16 rounded-lg border border-edge bg-card px-2 py-1.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                            />
+                            <select
+                              value={itemForm.meal}
+                              onChange={(e) => setItemForm((v) => ({ ...v, meal: e.target.value }))}
+                              className="grow rounded-lg border border-edge bg-card px-3 py-1.5 text-sm text-ink focus:border-neon focus:outline-none"
+                            >
+                              <option value="">Comida</option>
+                              {MEALS.map((m) => (
+                                <option key={m.id} value={m.id}>{m.label}</option>
+                              ))}
+                            </select>
+                          </div>
                           <input
                             value={itemForm.exercise}
                             onChange={(e) => setItemForm((v) => ({ ...v, exercise: e.target.value }))}
-                            placeholder="Ejercicio (ej: sentadilla)"
-                            className="grow rounded-lg border border-edge bg-card px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                            placeholder="Alimento (ej: arroz integral)"
+                            className="w-full rounded-lg border border-edge bg-card px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
                           />
-                        </div>
-                        <div className="grid grid-cols-3 gap-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <input
+                              value={itemForm.qty}
+                              onChange={(e) => setItemForm((v) => ({ ...v, qty: e.target.value }))}
+                              placeholder="Cantidad (ej: 150)"
+                              className="rounded-lg border border-edge bg-card px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                            />
+                            <input
+                              value={itemForm.unit}
+                              onChange={(e) => setItemForm((v) => ({ ...v, unit: e.target.value }))}
+                              placeholder="Unidad (ej: g, unidades)"
+                              className="rounded-lg border border-edge bg-card px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                            />
+                          </div>
+                          <div className="grid grid-cols-4 gap-2">
+                            <input
+                              value={itemForm.kcal}
+                              onChange={(e) => setItemForm((v) => ({ ...v, kcal: e.target.value }))}
+                              placeholder="kcal"
+                              type="number"
+                              min={0}
+                              className="rounded-lg border border-edge bg-card px-2 py-1.5 text-xs text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                            />
+                            <input
+                              value={itemForm.protein}
+                              onChange={(e) => setItemForm((v) => ({ ...v, protein: e.target.value }))}
+                              placeholder="Prot g"
+                              type="number"
+                              min={0}
+                              className="rounded-lg border border-edge bg-card px-2 py-1.5 text-xs text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                            />
+                            <input
+                              value={itemForm.fat}
+                              onChange={(e) => setItemForm((v) => ({ ...v, fat: e.target.value }))}
+                              placeholder="Grasas g"
+                              type="number"
+                              min={0}
+                              className="rounded-lg border border-edge bg-card px-2 py-1.5 text-xs text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                            />
+                            <input
+                              value={itemForm.carbs}
+                              onChange={(e) => setItemForm((v) => ({ ...v, carbs: e.target.value }))}
+                              placeholder="Carbs g"
+                              type="number"
+                              min={0}
+                              className="rounded-lg border border-edge bg-card px-2 py-1.5 text-xs text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                            />
+                          </div>
                           <input
-                            value={itemForm.sets}
-                            onChange={(e) => setItemForm((v) => ({ ...v, sets: e.target.value }))}
-                            placeholder="Series"
-                            type="number"
-                            min={1}
-                            className="rounded-lg border border-edge bg-card px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                            value={itemForm.notes}
+                            onChange={(e) => setItemForm((v) => ({ ...v, notes: e.target.value }))}
+                            placeholder="Nota (opcional, ej: cocinar al vapor)"
+                            className="w-full rounded-lg border border-edge bg-card px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
                           />
-                          <input
-                            value={itemForm.reps}
-                            onChange={(e) => setItemForm((v) => ({ ...v, reps: e.target.value }))}
-                            placeholder="Reps (ej: 10-12)"
-                            className="rounded-lg border border-edge bg-card px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-                          />
-                          <input
-                            value={itemForm.rest}
-                            onChange={(e) => setItemForm((v) => ({ ...v, rest: e.target.value }))}
-                            placeholder="Descanso s"
-                            type="number"
-                            min={0}
-                            className="rounded-lg border border-edge bg-card px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={addItem}
+                              disabled={!itemForm.exercise.trim()}
+                              className="grow rounded-lg bg-ember py-2 text-xs font-semibold text-bg disabled:opacity-50"
+                            >
+                              Agregar alimento
+                            </button>
+                            <button onClick={() => setItemForm((v) => ({ ...v, planId: null }))} className="rounded-lg border border-edge px-3 text-muted">
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
                         </div>
-                        <input
-                          value={itemForm.notes}
-                          onChange={(e) => setItemForm((v) => ({ ...v, notes: e.target.value }))}
-                          placeholder="Nota (opcional)"
-                          className="w-full rounded-lg border border-edge bg-card px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            onClick={addItem}
-                            disabled={!itemForm.exercise.trim()}
-                            className="grow rounded-lg bg-neon py-2 text-xs font-semibold text-bg shadow-neon disabled:opacity-50"
-                          >
-                            Agregar ejercicio
-                          </button>
-                          <button onClick={() => setItemForm((v) => ({ ...v, planId: null }))} className="rounded-lg border border-edge px-3 text-muted">
-                            <X className="h-4 w-4" />
-                          </button>
+                      ) : (
+                        <div className="mt-2 space-y-2 rounded-lg border border-edge bg-bg p-3">
+                          <div className="flex gap-2">
+                            <input
+                              value={itemForm.day}
+                              onChange={(e) => setItemForm((v) => ({ ...v, day: e.target.value }))}
+                              placeholder="Día"
+                              type="number"
+                              min={1}
+                              className="w-16 rounded-lg border border-edge bg-card px-2 py-1.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                            />
+                            <input
+                              value={itemForm.exercise}
+                              onChange={(e) => setItemForm((v) => ({ ...v, exercise: e.target.value }))}
+                              placeholder="Ejercicio (ej: sentadilla)"
+                              className="grow rounded-lg border border-edge bg-card px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                            />
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <input
+                              value={itemForm.sets}
+                              onChange={(e) => setItemForm((v) => ({ ...v, sets: e.target.value }))}
+                              placeholder="Series"
+                              type="number"
+                              min={1}
+                              className="rounded-lg border border-edge bg-card px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                            />
+                            <input
+                              value={itemForm.reps}
+                              onChange={(e) => setItemForm((v) => ({ ...v, reps: e.target.value }))}
+                              placeholder="Reps (ej: 10-12)"
+                              className="rounded-lg border border-edge bg-card px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                            />
+                            <input
+                              value={itemForm.rest}
+                              onChange={(e) => setItemForm((v) => ({ ...v, rest: e.target.value }))}
+                              placeholder="Descanso s"
+                              type="number"
+                              min={0}
+                              className="rounded-lg border border-edge bg-card px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                            />
+                          </div>
+                          <input
+                            value={itemForm.notes}
+                            onChange={(e) => setItemForm((v) => ({ ...v, notes: e.target.value }))}
+                            placeholder="Nota (opcional)"
+                            className="w-full rounded-lg border border-edge bg-card px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={addItem}
+                              disabled={!itemForm.exercise.trim()}
+                              className="grow rounded-lg bg-neon py-2 text-xs font-semibold text-bg shadow-neon disabled:opacity-50"
+                            >
+                              Agregar ejercicio
+                            </button>
+                            <button onClick={() => setItemForm((v) => ({ ...v, planId: null }))} className="rounded-lg border border-edge px-3 text-muted">
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
                         </div>
-                      </div>
+                      )
                     ) : (
                       <button onClick={() => openItemForm(p.id)} className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-neon">
-                        <Plus className="h-3.5 w-3.5" /> Agregar ejercicio
+                        <Plus className="h-3.5 w-3.5" /> {isDiet ? "Agregar alimento" : "Agregar ejercicio"}
                       </button>
                     )}
                   </div>

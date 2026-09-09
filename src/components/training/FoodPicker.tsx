@@ -23,7 +23,12 @@ const CATEGORY_ORDER = [
   "Verduras",
   "Lácteos",
   "Grasas y frutos secos",
+  "Panadería y tostadas",
+  "Comidas preparadas",
   "Bebidas",
+  "Snacks y ultraprocesados",
+  "Conservas",
+  "Condimentos y especias",
   "Otros",
 ];
 

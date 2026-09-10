@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Loader2, Send } from "lucide-react";
+import { ArrowLeft, ImagePlus, Loader2, Send, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { Avatar } from "@/components/core/Avatar";
@@ -16,11 +16,17 @@ interface OtherUser {
   avatar_url: string | null;
 }
 
+interface Attachment {
+  type: string;
+  url: string;
+}
+
 interface Msg {
   id: string;
   sender_id: string;
   recipient_id: string;
-  content: string;
+  content: string | null;
+  attachment: Attachment | null;
   created_at: string;
 }
 
@@ -34,6 +40,15 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const endRef = useRef<HTMLDivElement | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [attachFile, setAttachFile] = useState<File | null>(null);
+  const [attachPreview, setAttachPreview] = useState<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (attachPreview) URL.revokeObjectURL(attachPreview);
+    };
+  }, [attachPreview]);
 
   useEffect(() => {
     if (!userId) return;
@@ -50,7 +65,7 @@ export default function ChatPage() {
 
       const { data } = await supabase
         .from("messages")
-        .select("id, sender_id, recipient_id, content, created_at")
+        .select("id, sender_id, recipient_id, content, attachment, created_at")
         .or(`and(sender_id.eq.${userId},recipient_id.eq.${otherId}),and(sender_id.eq.${otherId},recipient_id.eq.${userId})`)
         .order("created_at", { ascending: true })
         .limit(200);
@@ -85,24 +100,58 @@ export default function ChatPage() {
   }, [messages.length]);
 
   const send = async () => {
-    if (!userId || !draft.trim() || sending) return;
+    if (!userId || sending) return;
+    if (!draft.trim() && !attachFile) return;
     setSending(true);
     const supabase = createClient();
-    const { error } = await supabase.from("messages").insert({
-      sender_id: userId,
-      recipient_id: otherId,
-      content: draft.trim(),
-    });
-    setSending(false);
-    if (error) return;
-    setDraft("");
-    const { data } = await supabase
-      .from("messages")
-      .select("id, sender_id, recipient_id, content, created_at")
-      .or(`and(sender_id.eq.${userId},recipient_id.eq.${otherId}),and(sender_id.eq.${otherId},recipient_id.eq.${userId})`)
-      .order("created_at", { ascending: true })
-      .limit(200);
-    if (data) setMessages(data as Msg[]);
+    try {
+      let attachment: Attachment | null = null;
+      if (attachFile) {
+        const ext = attachFile.name.split(".").pop() || "jpg";
+        const path = `${userId}/chat/${Date.now()}.${ext}`;
+        const { error: upErr } = await supabase.storage
+          .from("media")
+          .upload(path, attachFile, { upsert: false });
+        if (upErr) throw upErr;
+        const { data: pub } = supabase.storage.from("media").getPublicUrl(path);
+        attachment = { type: attachFile.type.startsWith("video") ? "video" : "image", url: pub.publicUrl };
+      }
+      const { error } = await supabase.from("messages").insert({
+        sender_id: userId,
+        recipient_id: otherId,
+        content: draft.trim() || null,
+        attachment,
+      });
+      if (error) throw error;
+      setDraft("");
+      if (attachPreview) URL.revokeObjectURL(attachPreview);
+      setAttachFile(null);
+      setAttachPreview(null);
+      const { data } = await supabase
+        .from("messages")
+        .select("id, sender_id, recipient_id, content, attachment, created_at")
+        .or(`and(sender_id.eq.${userId},recipient_id.eq.${otherId}),and(sender_id.eq.${otherId},recipient_id.eq.${userId})`)
+        .order("created_at", { ascending: true })
+        .limit(200);
+      if (data) setMessages(data as Msg[]);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0] ?? null;
+    if (!f) return;
+    if (attachPreview) URL.revokeObjectURL(attachPreview);
+    setAttachFile(f);
+    setAttachPreview(URL.createObjectURL(f));
+    e.target.value = "";
+  };
+
+  const clearAttach = () => {
+    if (attachPreview) URL.revokeObjectURL(attachPreview);
+    setAttachFile(null);
+    setAttachPreview(null);
   };
 
   if (loading) {
@@ -147,7 +196,15 @@ export default function ChatPage() {
                   mine ? "bg-neon text-bg" : "border border-edge bg-card text-ink"
                 }`}
               >
-                <p className="text-sm">{m.content}</p>
+                {m.attachment && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={m.attachment.url}
+                    alt="Adjunto"
+                    className="mb-1.5 max-h-60 w-full rounded-xl object-cover"
+                  />
+                )}
+                {m.content && <p className="text-sm">{m.content}</p>}
                 <p className={`mt-0.5 text-[10px] ${mine ? "text-bg/70" : "text-muted"}`}>
                   {timeAgo(m.created_at)}
                 </p>
@@ -158,7 +215,44 @@ export default function ChatPage() {
         <div ref={endRef} />
       </div>
 
+      {attachPreview && (
+        <div className="flex items-center gap-2 border-t border-edge bg-bg px-4 pt-3">
+          <div className="relative">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={attachPreview}
+              alt="Vista previa"
+              className="h-16 w-16 rounded-lg border border-neon/40 object-cover"
+            />
+            <button
+              onClick={clearAttach}
+              className="absolute -right-1.5 -top-1.5 rounded-full bg-ember p-1 text-bg"
+              aria-label="Quitar adjunto"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+          <p className="truncate text-xs text-muted">{attachFile?.name}</p>
+        </div>
+      )}
+
       <div className="flex items-center gap-2 border-t border-edge bg-bg px-4 py-3 pb-20">
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*,video/*"
+          capture="environment"
+          className="hidden"
+          onChange={onPickFile}
+        />
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={sending}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-edge bg-card text-neon transition active:scale-95 disabled:opacity-50"
+          aria-label="Adjuntar foto"
+        >
+          <ImagePlus className="h-5 w-5" />
+        </button>
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -168,11 +262,11 @@ export default function ChatPage() {
         />
         <button
           onClick={send}
-          disabled={sending || !draft.trim()}
+          disabled={sending || (!draft.trim() && !attachFile)}
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neon text-bg shadow-neon transition active:scale-95 disabled:opacity-50"
           aria-label="Enviar"
         >
-          <Send className="h-4 w-4" />
+          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
         </button>
       </div>
     </main>

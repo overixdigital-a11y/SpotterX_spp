@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Loader2,
@@ -14,6 +14,8 @@ import {
   Award,
   Calendar,
   MapPin,
+  ImagePlus,
+  X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
@@ -88,11 +90,17 @@ interface SeriesEntry {
   weight_kg: number | null;
 }
 
+interface Attachment {
+  type: string;
+  url: string;
+}
+
 interface Msg {
   id: string;
   sender_id: string;
   recipient_id: string;
-  content: string;
+  content: string | null;
+  attachment: Attachment | null;
   read: boolean;
   created_at: string;
 }
@@ -112,6 +120,15 @@ export default function MiEntrenamientoPage() {
   const [loading, setLoading] = useState(true);
   const [openPlan, setOpenPlan] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [attachFile, setAttachFile] = useState<File | null>(null);
+  const [attachPreview, setAttachPreview] = useState<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (attachPreview) URL.revokeObjectURL(attachPreview);
+    };
+  }, [attachPreview]);
 
   const [selectedRoutine, setSelectedRoutine] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<number>(1);
@@ -374,18 +391,48 @@ export default function MiEntrenamientoPage() {
   };
 
   const send = async () => {
-    if (!userId || !trainerId || !msgText.trim()) return;
+    if (!userId || !trainerId) return;
+    if (!msgText.trim() && !attachFile) return;
     const supabase = createClient();
+    let attachment: Attachment | null = null;
+    if (attachFile) {
+      const ext = attachFile.name.split(".").pop() || "jpg";
+      const path = `${userId}/chat/${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("media")
+        .upload(path, attachFile, { upsert: false });
+      if (upErr) return;
+      const { data: pub } = supabase.storage.from("media").getPublicUrl(path);
+      attachment = { type: attachFile.type.startsWith("video") ? "video" : "image", url: pub.publicUrl };
+    }
     await supabase
       .from("messages")
-      .insert({ sender_id: userId, recipient_id: trainerId, content: msgText.trim() });
+      .insert({ sender_id: userId, recipient_id: trainerId, content: msgText.trim() || null, attachment });
     setMsgText("");
+    if (attachPreview) URL.revokeObjectURL(attachPreview);
+    setAttachFile(null);
+    setAttachPreview(null);
     const { data } = await supabase
       .from("messages")
       .select("*")
       .or(`sender_id.eq.${trainerId},recipient_id.eq.${trainerId}`)
       .order("created_at", { ascending: true });
     if (data) setMessages(data as Msg[]);
+  };
+
+  const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0] ?? null;
+    if (!f) return;
+    if (attachPreview) URL.revokeObjectURL(attachPreview);
+    setAttachFile(f);
+    setAttachPreview(URL.createObjectURL(f));
+    e.target.value = "";
+  };
+
+  const clearAttach = () => {
+    if (attachPreview) URL.revokeObjectURL(attachPreview);
+    setAttachFile(null);
+    setAttachPreview(null);
   };
 
   if (loading) {
@@ -979,12 +1026,55 @@ export default function MiEntrenamientoPage() {
                       mine ? "ml-auto bg-neon text-bg" : "bg-elevated text-ink"
                     }`}
                   >
-                    {m.content}
+                    {m.attachment && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={m.attachment.url}
+                        alt="Adjunto"
+                        className="mb-1.5 max-h-48 w-full rounded-lg object-cover"
+                      />
+                    )}
+                    {m.content && <span>{m.content}</span>}
                   </div>
                 );
               })}
             </div>
+            {attachPreview && (
+              <div className="mt-2 flex items-center gap-2 border-t border-edge pt-2">
+                <div className="relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={attachPreview}
+                    alt="Vista previa"
+                    className="h-14 w-14 rounded-lg border border-neon/40 object-cover"
+                  />
+                  <button
+                    onClick={clearAttach}
+                    className="absolute -right-1.5 -top-1.5 rounded-full bg-ember p-0.5 text-bg"
+                    aria-label="Quitar adjunto"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+                <p className="truncate text-xs text-muted">{attachFile?.name}</p>
+              </div>
+            )}
             <div className="mt-2 flex items-center gap-2 border-t border-edge pt-2">
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*,video/*"
+                capture="environment"
+                className="hidden"
+                onChange={onPickFile}
+              />
+              <button
+                onClick={() => fileRef.current?.click()}
+                className="rounded-lg border border-edge bg-bg p-2.5 text-neon"
+                aria-label="Adjuntar foto"
+              >
+                <ImagePlus className="h-4 w-4" />
+              </button>
               <input
                 value={msgText}
                 onChange={(e) => setMsgText(e.target.value)}
@@ -992,7 +1082,11 @@ export default function MiEntrenamientoPage() {
                 placeholder="Escribí un mensaje…"
                 className="flex-1 rounded-lg border border-edge bg-bg px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
               />
-              <button onClick={send} className="rounded-lg bg-neon p-2.5 text-bg shadow-neon">
+              <button
+                onClick={send}
+                disabled={!msgText.trim() && !attachFile}
+                className="rounded-lg bg-neon p-2.5 text-bg shadow-neon disabled:opacity-50"
+              >
                 <Send className="h-4 w-4" />
               </button>
             </div>

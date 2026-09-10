@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { ImagePlus, Loader2, Send, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Loader2, Send, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
+import MediaPicker from "@/components/core/MediaPicker";
 
 export const POST_CATEGORIES = [
   "#CrossFit",
@@ -40,7 +41,6 @@ export default function PostComposer({
   const [preview, setPreview] = useState<string | null>(null);
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     return () => {
@@ -49,15 +49,6 @@ export default function PostComposer({
   }, [preview]);
 
   if (!open) return null;
-
-  const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0] ?? null;
-    if (!f) return;
-    if (preview) URL.revokeObjectURL(preview);
-    setFile(f);
-    setPreview(URL.createObjectURL(f));
-    e.target.value = "";
-  };
 
   const clearFile = () => {
     if (preview) URL.revokeObjectURL(preview);
@@ -151,23 +142,17 @@ export default function PostComposer({
             </button>
           </div>
         ) : (
-          <button
-            onClick={() => fileRef.current?.click()}
-            className="mt-3 flex w-full flex-col items-center gap-1 rounded-2xl border border-dashed border-edge bg-bg px-4 py-6 text-muted"
-          >
-            <ImagePlus className="h-8 w-8 text-neon" />
-            <span className="text-sm">Adjuntar foto o reel</span>
-          </button>
+          <div className="mt-3 flex justify-center">
+            <MediaPicker
+              mode="row"
+              onPick={(f) => {
+                if (preview) URL.revokeObjectURL(preview);
+                setFile(f);
+                setPreview(URL.createObjectURL(f));
+              }}
+            />
+          </div>
         )}
-
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*,video/*"
-          capture="environment"
-          className="hidden"
-          onChange={onFile}
-        />
 
         <textarea
           value={caption}

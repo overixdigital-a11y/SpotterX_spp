@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ImagePlus, Loader2, Send, X } from "lucide-react";
+import { ArrowLeft, Loader2, Send, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { Avatar } from "@/components/core/Avatar";
 import { timeAgo } from "@/lib/format";
+import MediaPicker from "@/components/core/MediaPicker";
 
 interface OtherUser {
   id: string;
@@ -40,7 +41,6 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const endRef = useRef<HTMLDivElement | null>(null);
-  const fileRef = useRef<HTMLInputElement | null>(null);
   const [attachFile, setAttachFile] = useState<File | null>(null);
   const [attachPreview, setAttachPreview] = useState<string | null>(null);
 
@@ -139,15 +139,6 @@ export default function ChatPage() {
     }
   };
 
-  const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0] ?? null;
-    if (!f) return;
-    if (attachPreview) URL.revokeObjectURL(attachPreview);
-    setAttachFile(f);
-    setAttachPreview(URL.createObjectURL(f));
-    e.target.value = "";
-  };
-
   const clearAttach = () => {
     if (attachPreview) URL.revokeObjectURL(attachPreview);
     setAttachFile(null);
@@ -237,22 +228,14 @@ export default function ChatPage() {
       )}
 
       <div className="flex items-center gap-2 border-t border-edge bg-bg px-4 py-3 pb-20">
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*,video/*"
-          capture="environment"
-          className="hidden"
-          onChange={onPickFile}
+        <MediaPicker
+          mode="popover"
+          onPick={(f) => {
+            if (attachPreview) URL.revokeObjectURL(attachPreview);
+            setAttachFile(f);
+            setAttachPreview(URL.createObjectURL(f));
+          }}
         />
-        <button
-          onClick={() => fileRef.current?.click()}
-          disabled={sending}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-edge bg-card text-neon transition active:scale-95 disabled:opacity-50"
-          aria-label="Adjuntar foto"
-        >
-          <ImagePlus className="h-5 w-5" />
-        </button>
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}

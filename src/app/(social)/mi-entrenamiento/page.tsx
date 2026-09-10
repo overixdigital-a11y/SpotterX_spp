@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Loader2,
@@ -18,7 +18,6 @@ import {
   Flame,
   Share2,
   MapPin,
-  ImagePlus,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -27,6 +26,7 @@ import { todayLocal } from "@/lib/format";
 import { getDisciplineFields, isSeriesDiscipline, resolveSeries, formatSeries, type FieldDef } from "@/lib/disciplines";
 import { MEALS, getDietData, formatQuantity } from "@/lib/diets";
 import PostComposer from "@/components/social/PostComposer";
+import MediaPicker from "@/components/core/MediaPicker";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import {
   type SessionInfo,
@@ -138,7 +138,6 @@ export default function MiEntrenamientoPage() {
   const [loading, setLoading] = useState(true);
   const [openPlan, setOpenPlan] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
-  const fileRef = useRef<HTMLInputElement | null>(null);
   const [attachFile, setAttachFile] = useState<File | null>(null);
   const [attachPreview, setAttachPreview] = useState<string | null>(null);
 
@@ -447,15 +446,6 @@ export default function MiEntrenamientoPage() {
       .or(`sender_id.eq.${trainerId},recipient_id.eq.${trainerId}`)
       .order("created_at", { ascending: true });
     if (data) setMessages(data as Msg[]);
-  };
-
-  const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0] ?? null;
-    if (!f) return;
-    if (attachPreview) URL.revokeObjectURL(attachPreview);
-    setAttachFile(f);
-    setAttachPreview(URL.createObjectURL(f));
-    e.target.value = "";
   };
 
   const clearAttach = () => {
@@ -1374,21 +1364,14 @@ export default function MiEntrenamientoPage() {
               </div>
             )}
             <div className="mt-2 flex items-center gap-2 border-t border-edge pt-2">
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*,video/*"
-                capture="environment"
-                className="hidden"
-                onChange={onPickFile}
+              <MediaPicker
+                mode="popover"
+                onPick={(f) => {
+                  if (attachPreview) URL.revokeObjectURL(attachPreview);
+                  setAttachFile(f);
+                  setAttachPreview(URL.createObjectURL(f));
+                }}
               />
-              <button
-                onClick={() => fileRef.current?.click()}
-                className="rounded-lg border border-edge bg-bg p-2.5 text-neon"
-                aria-label="Adjuntar foto"
-              >
-                <ImagePlus className="h-4 w-4" />
-              </button>
               <input
                 value={msgText}
                 onChange={(e) => setMsgText(e.target.value)}

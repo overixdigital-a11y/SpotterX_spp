@@ -363,6 +363,14 @@ Orden de etapas para pulir/completar la app, módulo por módulo. Cada etapa ter
 - **UI en ambos chats** (`/chat/[id]` y pestaña Chat de `/mi-entrenamiento`): botón 📎 (input `capture="environment"`, acepta `image/*,video/*`) → **preview** con quitar, texto opcional + adjunto, spinner de envío, y burbujas que muestran la imagen + el texto debajo.
 - `messages` ya está en realtime (00013), así el adjunto llega en vivo; el re-select de `/chat/[id]` ahora incluye `attachment`.
 
+## Historial de rutinas: calendario + racha + cumplimiento + publicar en feed (hecho, commit `3aae915`)
+- **Componente compartido** `src/lib/history.ts` (puro, sin migración ni deps): `monthGrid`, `monthLabel`, `isFutureDate`, `countLogsByDate`, `sessionsByDate`, `plannedDates`, `computeStreak` (racha terminando hoy), `monthlySeries` (últimos 6 meses: hechas vs planificadas), `categoryForDiscipline` (disciplina → hashtag).
+- **Nueva pestaña "Historial"** (4ª) en `/mi-entrenamiento` (alumno) **y** en `/entrenamiento/alumno/[id]` (profe): calendario mensual (grid CSS, intensidad neón por sesiones del día, borde ember en planificadas sin completar, anillo en hoy, futuro gris, navegación ◀ ▶ sin ir al futuro), stats (días entrenados, racha 🔥, top mes) y **BarChart** de cumplimiento 6 meses (hechas neón / planificadas ember, recharts).
+- **Tap a un día** → bottom sheet con las sesiones de ese día (rutina + n° de día + label).
+- **Publicar en el feed** (solo alumno): botón por sesión → inserta `posts` solo-texto (`caption: 🔥 Terminé "Rutina" · Día N`, categoría mapeada de la disciplina, `media_url null`) → link "Ver publicación" a `/posts/[id]`. Anti-doble-click.
+- **Datos**: `trainer_routine_logs.log_date` (hechas) + `trainer_routines.due_on` (planificadas). El profe ahora carga los logs del alumno (policy "Routine logs: profe lee" de 00016) — **sin migración**. Se agregó realtime de `trainer_routine_logs` en AMBAS páginas (filtro `student_id`) para que el calendario se refresque solo.
+- Lint/build OK (27 rutas); sin SQL.
+
 ## Reglas / recordatorios
 - NO tocar `fitpro`. Este proyecto es independiente.
 - Texto en español. Identidad visual neón/dark.

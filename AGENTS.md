@@ -357,6 +357,12 @@ Orden de etapas para pulir/completar la app, módulo por módulo. Cada etapa ter
 - **Entradas**: botón "Buscar profe" en el header de `/mi-entrenamiento` (+ empty state "Todavía no tenés un profe" → botón ember) y card "Buscar profe por zona" en `/perfil` (alumno, debajo de "Mi entrenamiento").
 - Sin migración: `trainer_gyms` ya se lee público y `profiles`/`trainer_students` aplican policies existentes.
 
+## Adjuntos en el chat (hecho, commit `ebe091f`)
+- **Columna `messages.attachment jsonb`** (`{ type: "image"|"video", url }`) + `content` pasa a permitir **NULL** (mensaje solo imagen). Migración **`00024_chat_attachments.sql` PENDIENTE de correr**.
+- **Subida**: fotos/videos al bucket `media` en `chat/<userId>/<timestamp>.<ext>` — ojo: la policy de storage exige que el primer folder sea `auth.uid()` (los posts usan `<uid>/`), por eso NO se usa `chat/` como carpeta raíz.
+- **UI en ambos chats** (`/chat/[id]` y pestaña Chat de `/mi-entrenamiento`): botón 📎 (input `capture="environment"`, acepta `image/*,video/*`) → **preview** con quitar, texto opcional + adjunto, spinner de envío, y burbujas que muestran la imagen + el texto debajo.
+- `messages` ya está en realtime (00013), así el adjunto llega en vivo; el re-select de `/chat/[id]` ahora incluye `attachment`.
+
 ## Reglas / recordatorios
 - NO tocar `fitpro`. Este proyecto es independiente.
 - Texto en español. Identidad visual neón/dark.

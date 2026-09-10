@@ -349,6 +349,14 @@ Orden de etapas para pulir/completar la app, módulo por módulo. Cada etapa ter
 - **6 categorías nuevas** (aparecen solas en los chips del picker, ordenadas por `CATEGORY_ORDER` y select de "Agregar alimento"): **Panadería y tostadas** (tostadas integrales/de salvado/de centeno, galletitas de arroz, pan de molde, francés, árabe, centeno, hamburguesa, bizcochos, grissines), **Comidas preparadas** (milanesas, pizza, empanada, guiso, locro, pastel de papas...), **Bebidas** (agua, gaseosas, jugos, gatorade, leches vegetales, café, té, cerveza, vino, licuado, batido de proteína, chocolatada), **Snacks y ultraprocesados** (barras, galletas, doritos, helado, chocolate, turfón/mantecol budín/alfajor), **Conservas** (atún al aceite, caballa, anchoas, sardinas, legumbres en lata, tomate triturado, pepinillos), **Condimentos y especias** (orégano, pimentón, curry, comino, ajos en polvo, soja, vinagre).
 - **`FoodPicker.tsx`**: `CATEGORY_ORDER` actualizado con las categorías nuevas entre "Grasas y frutos secos" y "Otros". Chips y busqueda funcionan igual (matchean nombre o categoría).
 
+## Buscar profe por zona (alumno, hecho, commit `809ba0c`)
+- **Página `/mi-entrenamiento/buscar`** (nueva): el alumno encuentra profes por zona en **mapa Leaflet** (multi-marcador, icono naranja reutilizando patrón de `GymMap`) + **buscador** (filtra por ciudad/dirección/zona/nombre del profe) + **lista de profes** con Avatar, @username, zona, disponibilidad y badge "Ya te entrena".
+- **Datos**: `trainer_gyms` (lectura pública) + `profiles` en **consulta separada** con joeña `Map` (lección: no fiarse del embed) + `trainer_students` activos del alumno para el badge. Los profes sin coordenadas no salen en el mapa pero sí en la lista.
+- **Contacto directo** (decisión del usuario, sin migración): cada profe tiene botones **Ver perfil** (`/perfil/<username>`) y **Mensaje** (`/chat/<trainerId>`) — el chat funciona con cualquier usuario sin chat previo; el mensaje dispara la notificación `message` (trigger 00010).
+- **Mi zona en el mapa**: botón que centra el mapa con la geolocalización GPS del alumno (default: Argentina, zoom 5).
+- **Entradas**: botón "Buscar profe" en el header de `/mi-entrenamiento` (+ empty state "Todavía no tenés un profe" → botón ember) y card "Buscar profe por zona" en `/perfil` (alumno, debajo de "Mi entrenamiento").
+- Sin migración: `trainer_gyms` ya se lee público y `profiles`/`trainer_students` aplican policies existentes.
+
 ## Reglas / recordatorios
 - NO tocar `fitpro`. Este proyecto es independiente.
 - Texto en español. Identidad visual neón/dark.

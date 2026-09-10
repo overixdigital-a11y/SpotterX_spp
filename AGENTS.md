@@ -378,6 +378,12 @@ Orden de etapas para pulir/completar la app, módulo por módulo. Cada etapa ter
 - **Racha en el feed social** (`Feed.tsx` en `/home`): botón 🔥 "Racha" en la barra sticky de tabs → consulta `trainer_routine_logs` (`log_date`) del usuario, calcula la racha (`computeStreak` + `logDates` nuevo en `src/lib/history.ts`) y abre el composer con `🔥 Mi racha actual: N días`.
 - Sin migración ni deps nuevas. Lint/build OK (27 rutas).
 
+## Cámara nativa: Foto / Reel / Galería (hecho, commit `62ac44f`)
+- **`src/components/core/MediaPicker.tsx`** (NUEVO, compartido): componente con 3 inputs ocultos nativos — **Foto** (`image/*` + `capture` → cámara en modo foto), **Reel** (`video/*` + `capture` → cámara en modo video), **Galería** (`image/*,video/*` sin capture). Dos modos de render: `mode="row"` (botones inline) y `mode="popover"` (📎 → mini-sheet con las 3 opciones + cancelar).
+- **`PostComposer.tsx`**: reemplazado el botón "Adjuntar foto o reel" por `MediaPicker mode="row"` — en el composer de sesión y racha ahora aparecen 3 botones: 📷 Foto / 🎬 Reel / 🖼️ Galería.
+- **Chat** (`/chat/[id]` y pestaña Chat de `/mi-entrenamiento`): el botón 📎 con el input combinado se reemplazó por `MediaPicker mode="popover"` — al tocar abre un mini-sheet con las 3 opciones.
+- Sin migración ni deps nuevas. Lint/build OK (27 rutas).
+
 ## Reglas / recordatorios
 - NO tocar `fitpro`. Este proyecto es independiente.
 - Texto en español. Identidad visual neón/dark.

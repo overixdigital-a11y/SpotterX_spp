@@ -371,6 +371,13 @@ Orden de etapas para pulir/completar la app, módulo por módulo. Cada etapa ter
 - **Datos**: `trainer_routine_logs.log_date` (hechas) + `trainer_routines.due_on` (planificadas). El profe ahora carga los logs del alumno (policy "Routine logs: profe lee" de 00016) — **sin migración**. Se agregó realtime de `trainer_routine_logs` en AMBAS páginas (filtro `student_id`) para que el calendario se refresque solo.
 - Lint/build OK (27 rutas); sin SQL.
 
+## Publicar con foto/reel + Compartir racha (hecho, commit `045825d`)
+- **`src/components/social/PostComposer.tsx`** (NUEVO, compartido): bottom sheet para crear un post con **foto o reel** opcionales (`accept="image/*,video/*"` + `capture` → cámara), preview removible, caption editable, categoría con chips (`POST_CATEGORIES` exportado) y botón Publicar con spinner. Sube a `media/<uid>/<ts>.<ext>` (policy OK) → `posts.insert` con `media_url`/`media_type` (sin medio = texto). El padre lo monta con `key` por apertura (estado fresco, lint-safe, sin effects de sync).
+- **Sesión** (`/mi-entrenamiento`, Historial → detalle del día): el botón "Publicar en el feed" ya no publica al instante — abre el composer con caption `🔥 Terminé "…" · Día N` y categoría según disciplina; al publicar muestra link "Ver publicación". Se eliminó la lógica `publishSession` inline.
+- **Racha en el Historial** (`/mi-entrenamiento`): botón "Compartir racha" en la card 🔥 → composer con `🔥 Mi racha actual: N días` + link "Ver publicación" tras publicar.
+- **Racha en el feed social** (`Feed.tsx` en `/home`): botón 🔥 "Racha" en la barra sticky de tabs → consulta `trainer_routine_logs` (`log_date`) del usuario, calcula la racha (`computeStreak` + `logDates` nuevo en `src/lib/history.ts`) y abre el composer con `🔥 Mi racha actual: N días`.
+- Sin migración ni deps nuevas. Lint/build OK (27 rutas).
+
 ## Reglas / recordatorios
 - NO tocar `fitpro`. Este proyecto es independiente.
 - Texto en español. Identidad visual neón/dark.

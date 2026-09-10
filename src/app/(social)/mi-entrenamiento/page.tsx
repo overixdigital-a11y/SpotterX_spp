@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Loader2,
@@ -9,10 +9,14 @@ import {
   MessageCircle,
   Send,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Users,
   TrendingUp,
   Award,
   Calendar,
+  Flame,
+  Share2,
   MapPin,
   ImagePlus,
   X,
@@ -22,7 +26,20 @@ import { useAuthState } from "@/lib/auth-context";
 import { todayLocal } from "@/lib/format";
 import { getDisciplineFields, isSeriesDiscipline, resolveSeries, formatSeries, type FieldDef } from "@/lib/disciplines";
 import { MEALS, getDietData, formatQuantity } from "@/lib/diets";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import {
+  type SessionInfo,
+  monthGrid,
+  monthLabel,
+  isFutureDate,
+  countLogsByDate,
+  sessionsByDate,
+  plannedDates,
+  computeStreak,
+  monthlySeries,
+  categoryForDiscipline,
+  pad,
+} from "@/lib/history";
 
 interface Trainer {
   id: string;
@@ -109,7 +126,7 @@ export default function MiEntrenamientoPage() {
   const { userId } = useAuthState();
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [trainerId, setTrainerId] = useState<string | null>(null);
-  const [tab, setTab] = useState<"planes" | "rutinas" | "chat">("planes");
+  const [tab, setTab] = useState<"planes" | "rutinas" | "historial" | "chat">("planes");
   const [plans, setPlans] = useState<Plan[]>([]);
   const [items, setItems] = useState<PlanItem[]>([]);
   const [routines, setRoutines] = useState<Routine[]>([]);
@@ -137,6 +154,10 @@ export default function MiEntrenamientoPage() {
   const [showProgress, setShowProgress] = useState<string | null>(null);
   const [progressExercise, setProgressExercise] = useState<string>("");
   const [progressData, setProgressData] = useState<{ date: string; value: number }[]>([]);
+  const [calMonth, setCalMonth] = useState<string>(() => todayLocal().slice(0, 7));
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [publishingKey, setPublishingKey] = useState<string | null>(null);
+  const [posted, setPosted] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!userId) return;
@@ -263,6 +284,7 @@ export default function MiEntrenamientoPage() {
       .on("postgres_changes", { event: "*", schema: "public", table: "trainer_routines", filter: `trainer_id=eq.${trainerId}` }, () => loadData())
       .on("postgres_changes", { event: "*", schema: "public", table: "trainer_routine_items" }, () => loadData())
       .on("postgres_changes", { event: "*", schema: "public", table: "trainer_plans", filter: `trainer_id=eq.${trainerId}` }, () => loadData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "trainer_routine_logs", filter: `student_id=eq.${userId}` }, () => loadData())
       .subscribe();
 
     return () => {
@@ -435,6 +457,72 @@ export default function MiEntrenamientoPage() {
     setAttachPreview(null);
   };
 
+  const history = useMemo(() => {
+    const logs = routineLogs as { log_date: string; routine_id: string; day: number }[];
+    const byDate = countLogsByDate(logs);
+    const dates = new Set(byDate.keys());
+    const planned = plannedDates(routines as { due_on: string | null }[]);
+    const sessions = sessionsByDate(
+      logs,
+      routines as { id: string; title: string }[],
+      routineItems as { routine_id: string; day: number; day_label: string | null }[]
+    );
+    const today = todayLocal();
+    const bars = monthlySeries(byDate, planned, 6, today);
+    let mostMes = "";
+    let mostCount = 0;
+    for (const b of bars) {
+      if (b.hechas > mostCount) {
+        mostCount = b.hechas;
+        mostMes = b.mes;
+      }
+    }
+    return {
+      byDate,
+      dates,
+      planned,
+      sessions,
+      streak: computeStreak(dates, today),
+      bars,
+      totalDays: dates.size,
+      mostMes: mostCount > 0 ? mostMes : "",
+    };
+  }, [routineLogs, routines, routineItems]);
+
+  const cy = Number(calMonth.slice(0, 4));
+  const cm = Number(calMonth.slice(5, 7));
+  const todayStr = todayLocal();
+  const daySessions = selectedDate ? (history.sessions.get(selectedDate) ?? []) : [];
+
+  const goMonth = (delta: number) => {
+    const next = new Date(cy, cm - 1 + delta, 1);
+    const key = `${next.getFullYear()}-${pad(next.getMonth() + 1)}`;
+    if (key > todayStr.slice(0, 7)) return;
+    setCalMonth(key);
+  };
+
+  const publishSession = async (s: SessionInfo) => {
+    if (!userId || publishingKey) return;
+    const key = `${s.routineId}-${s.day}`;
+    setPublishingKey(key);
+    const supabase = createClient();
+    const routine = routines.find((r) => r.id === s.routineId);
+    const { data, error } = await supabase
+      .from("posts")
+      .insert({
+        user_id: userId,
+        caption: `🔥 Terminé "${s.routineTitle}" · Día ${s.day}${s.dayLabel ? `: ${s.dayLabel}` : ""}`,
+        category: categoryForDiscipline(routine?.discipline),
+        media_url: null,
+        media_type: null,
+      })
+      .select("id")
+      .single();
+    setPublishingKey(null);
+    if (error) return;
+    setPosted((prev) => ({ ...prev, [key]: data.id }));
+  };
+
   if (loading) {
     return (
       <main className="flex justify-center py-20">
@@ -506,11 +594,12 @@ export default function MiEntrenamientoPage() {
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl bg-card p-1">
+      <div className="mt-4 grid grid-cols-4 gap-2 rounded-xl bg-card p-1">
         {(
           [
             ["planes", "Planes", FileText],
             ["rutinas", "Rutinas", ListChecks],
+            ["historial", "Historial", Calendar],
             ["chat", "Chat", MessageCircle],
           ] as const
         ).map(([key, label, Icon]) => (
@@ -1006,6 +1095,199 @@ export default function MiEntrenamientoPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* ─── HISTORIAL ─── */}
+      {tab === "historial" && (
+        <div className="mt-4">
+          <div className="rounded-xl border border-edge bg-card p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold capitalize text-ink">{monthLabel(cy, cm)}</p>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => goMonth(-1)}
+                  className="rounded-lg border border-edge bg-bg p-1.5 text-muted"
+                  aria-label="Mes anterior"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => goMonth(1)}
+                  disabled={calMonth >= todayStr.slice(0, 7)}
+                  className="rounded-lg border border-edge bg-bg p-1.5 text-muted disabled:opacity-40"
+                  aria-label="Mes siguiente"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-7 gap-1 text-center">
+              {["L", "M", "X", "J", "V", "S", "D"].map((d) => (
+                <span key={d} className="text-[10px] font-semibold text-muted">
+                  {d}
+                </span>
+              ))}
+              {monthGrid(cy, cm).map((cell, i) => {
+                if (!cell.date) return <span key={`p${i}`} />;
+                const cnt = history.byDate.get(cell.date) ?? 0;
+                const isPlanned = history.planned.has(cell.date);
+                const future = isFutureDate(cell.date, todayStr);
+                const isToday = cell.date === todayStr;
+                const bg =
+                  cnt >= 3
+                    ? "bg-neon text-bg"
+                    : cnt === 2
+                      ? "bg-neon/50 text-neon"
+                      : cnt === 1
+                        ? "bg-neon/20 text-neon"
+                        : isPlanned
+                          ? "border border-ember/60 bg-ember/5 text-ember"
+                          : "bg-edge text-muted";
+                return (
+                  <button
+                    key={cell.date}
+                    onClick={() => setSelectedDate(cell.date)}
+                    disabled={future}
+                    className={`flex h-9 items-center justify-center rounded-lg text-xs font-semibold transition active:scale-95 ${bg} ${
+                      isToday ? "ring-2 ring-neon" : ""
+                    } ${future ? "opacity-30" : ""}`}
+                  >
+                    {cell.dayNumber}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-3 text-[10px] text-muted">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2.5 w-2.5 rounded-sm bg-neon/20" /> 1 sesión
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2.5 w-2.5 rounded-sm bg-neon/50" /> 2 sesiones
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2.5 w-2.5 rounded-sm bg-neon" /> 3+
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2.5 w-2.5 rounded-sm border border-ember/60 bg-ember/5" /> Planificada
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <div className="rounded-xl border border-edge bg-card p-3 text-center">
+              <Calendar className="mx-auto h-4 w-4 text-neon" />
+              <p className="mt-1 text-lg font-bold text-ink">{history.totalDays}</p>
+              <p className="text-[10px] text-muted">Días entrenados</p>
+            </div>
+            <div className="rounded-xl border border-edge bg-card p-3 text-center">
+              <Flame className="mx-auto h-4 w-4 text-ember" />
+              <p className="mt-1 text-lg font-bold text-ink">{history.streak} 🔥</p>
+              <p className="text-[10px] text-muted">Racha actual</p>
+            </div>
+            <div className="rounded-xl border border-edge bg-card p-3 text-center">
+              <TrendingUp className="mx-auto h-4 w-4 text-neon" />
+              <p className="mt-1 text-lg font-bold capitalize text-ink">
+                {history.mostMes ? history.mostMes.slice(0, 8) : "—"}
+              </p>
+              <p className="text-[10px] text-muted">Top mes</p>
+            </div>
+          </div>
+
+          <div className="mt-3 rounded-xl border border-edge bg-card p-4">
+            <p className="text-sm font-semibold text-ink">Cumplimiento · últimos 6 meses</p>
+            <div className="mt-3 h-40">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={history.bars}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e2530" vertical={false} />
+                  <XAxis dataKey="mes" tick={{ fill: "#6b7280", fontSize: 10 }} />
+                  <YAxis tick={{ fill: "#6b7280", fontSize: 10 }} width={24} allowDecimals={false} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#161b22",
+                      border: "1px solid #1e2530",
+                      borderRadius: 8,
+                      fontSize: 12,
+                    }}
+                    labelStyle={{ color: "#9ca3af" }}
+                  />
+                  <Bar dataKey="hechas" name="Hechas" fill="#00f2fe" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="planificadas" name="Planificadas" fill="#ff5e36" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {history.totalDays === 0 && (
+            <p className="py-8 text-center text-sm text-muted">
+              Todavía no registraste sesiones. ¡Cuando entrenes, aparecen acá!
+            </p>
+          )}
+        </div>
+      )}
+
+      {selectedDate && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60"
+          onClick={() => setSelectedDate(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-t-2xl border border-edge bg-card p-4 pb-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold capitalize text-ink">
+                {new Date(`${selectedDate}T12:00:00`).toLocaleDateString("es-AR", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                })}
+              </p>
+              <button onClick={() => setSelectedDate(null)} className="text-muted" aria-label="Cerrar">
+                ✕
+              </button>
+            </div>
+            <div className="mt-3 max-h-[60vh] space-y-2 overflow-y-auto">
+              {daySessions.length === 0 && (
+                <p className="py-6 text-center text-sm text-muted">Sin sesiones este día.</p>
+              )}
+              {daySessions.map((s) => {
+                const pkey = `${s.routineId}-${s.day}`;
+                return (
+                  <div key={pkey} className="rounded-lg border border-edge bg-bg p-3">
+                    <p className="text-sm font-medium text-ink">{s.routineTitle}</p>
+                    <p className="text-xs text-muted">
+                      Día {s.day}
+                      {s.dayLabel ? `: ${s.dayLabel}` : ""}
+                    </p>
+                    {posted[pkey] ? (
+                      <Link
+                        href={`/posts/${posted[pkey]}`}
+                        className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-neon px-3 py-1.5 text-xs font-semibold text-bg"
+                      >
+                        <Share2 className="h-3.5 w-3.5" /> Ver publicación
+                      </Link>
+                    ) : (
+                      <button
+                        onClick={() => publishSession(s)}
+                        disabled={publishingKey === pkey}
+                        className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-ember/50 bg-ember/10 px-3 py-1.5 text-xs font-semibold text-ember disabled:opacity-50"
+                      >
+                        {publishingKey === pkey ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Share2 className="h-3.5 w-3.5" />
+                        )}{" "}
+                        Publicar en el feed
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
 

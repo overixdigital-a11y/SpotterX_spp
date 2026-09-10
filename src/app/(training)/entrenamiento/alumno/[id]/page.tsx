@@ -12,19 +12,37 @@ import {
   Send,
   X,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   LayoutTemplate,
   Copy,
   BookmarkPlus,
   GripVertical,
   EyeOff,
   UtensilsCrossed,
+  Calendar,
+  Flame,
+  TrendingUp,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
+import { todayLocal } from "@/lib/format";
 import ExercisePicker from "@/components/training/ExercisePicker";
 import FoodPicker, { type Food } from "@/components/training/FoodPicker";
 import { MEALS, getDietData, formatQuantity } from "@/lib/diets";
 import { DISCIPLINES, getDisciplineFields, getSeries, resolveSeries, legacyToSeries, formatSeries, isSeriesDiscipline, type FieldDef, type Series } from "@/lib/disciplines";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import {
+  monthGrid,
+  monthLabel,
+  isFutureDate,
+  countLogsByDate,
+  sessionsByDate,
+  plannedDates,
+  computeStreak,
+  monthlySeries,
+  pad,
+} from "@/lib/history";
 
 interface StudentProfile {
   id: string;
@@ -77,6 +95,14 @@ interface RoutineItem {
   data: Record<string, unknown>;
 }
 
+interface RoutineLog {
+  id: string;
+  routine_id: string;
+  day: number;
+  log_date: string;
+  data: Record<string, unknown>;
+}
+
 interface RoutineDay {
   label: string;
   exercises: {
@@ -104,14 +130,17 @@ export default function AlumnoPage() {
   const studentId = params.id;
   const { userId, profile } = useAuthState();
   const [student, setStudent] = useState<StudentProfile | null>(null);
-  const [tab, setTab] = useState<"planes" | "rutinas" | "chat">("planes");
+  const [tab, setTab] = useState<"planes" | "rutinas" | "historial" | "chat">("planes");
   const [plans, setPlans] = useState<Plan[]>([]);
   const [items, setItems] = useState<PlanItem[]>([]);
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [routineItems, setRoutineItems] = useState<RoutineItem[]>([]);
+  const [routineLogs, setRoutineLogs] = useState<RoutineLog[]>([]);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [msgText, setMsgText] = useState("");
   const [loading, setLoading] = useState(true);
+  const [calMonth, setCalMonth] = useState<string>(() => todayLocal().slice(0, 7));
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const [openPlan, setOpenPlan] = useState<string | null>(null);
   const [itemForm, setItemForm] = useState<{
@@ -223,6 +252,12 @@ export default function AlumnoPage() {
         if (active && ri) setRoutineItems(ri as unknown as RoutineItem[]);
       }
 
+      const { data: rl } = await supabase
+        .from("trainer_routine_logs")
+        .select("*")
+        .eq("student_id", studentId);
+      if (active && rl) setRoutineLogs(rl as unknown as RoutineLog[]);
+
       const { data: ms } = await supabase
         .from("messages")
         .select("*")
@@ -251,6 +286,7 @@ export default function AlumnoPage() {
       .on("postgres_changes", { event: "*", schema: "public", table: "trainer_routines", filter: `student_id=eq.${studentId}` }, () => load())
       .on("postgres_changes", { event: "*", schema: "public", table: "trainer_routine_items" }, () => load())
       .on("postgres_changes", { event: "*", schema: "public", table: "trainer_plans", filter: `student_id=eq.${studentId}` }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "trainer_routine_logs", filter: `student_id=eq.${studentId}` }, () => load())
       .subscribe();
 
     return () => {
@@ -752,6 +788,50 @@ export default function AlumnoPage() {
     if (data) setMessages(data as Msg[]);
   };
 
+  const history = useMemo(() => {
+    const logs = routineLogs as { log_date: string; routine_id: string; day: number }[];
+    const byDate = countLogsByDate(logs);
+    const dates = new Set(byDate.keys());
+    const planned = plannedDates(routines as { due_on: string | null }[]);
+    const sessions = sessionsByDate(
+      logs,
+      routines as { id: string; title: string }[],
+      routineItems as { routine_id: string; day: number; day_label: string | null }[]
+    );
+    const today = todayLocal();
+    const bars = monthlySeries(byDate, planned, 6, today);
+    let mostMes = "";
+    let mostCount = 0;
+    for (const b of bars) {
+      if (b.hechas > mostCount) {
+        mostCount = b.hechas;
+        mostMes = b.mes;
+      }
+    }
+    return {
+      byDate,
+      dates,
+      planned,
+      sessions,
+      streak: computeStreak(dates, today),
+      bars,
+      totalDays: dates.size,
+      mostMes: mostCount > 0 ? mostMes : "",
+    };
+  }, [routineLogs, routines, routineItems]);
+
+  const cy = Number(calMonth.slice(0, 4));
+  const cm = Number(calMonth.slice(5, 7));
+  const todayStr = todayLocal();
+  const daySessions = selectedDate ? (history.sessions.get(selectedDate) ?? []) : [];
+
+  const goMonth = (delta: number) => {
+    const next = new Date(cy, cm - 1 + delta, 1);
+    const key = `${next.getFullYear()}-${pad(next.getMonth() + 1)}`;
+    if (key > todayStr.slice(0, 7)) return;
+    setCalMonth(key);
+  };
+
   if (loading) {
     return (
       <main className="flex justify-center py-20">
@@ -774,11 +854,12 @@ export default function AlumnoPage() {
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl bg-card p-1">
+      <div className="mt-4 grid grid-cols-4 gap-2 rounded-xl bg-card p-1">
         {(
           [
             ["planes", "Planes", FileText],
             ["rutinas", "Rutinas", ListChecks],
+            ["historial", "Historial", Calendar],
             ["chat", "Chat", MessageCircle],
           ] as const
         ).map(([key, label, Icon]) => (
@@ -1554,6 +1635,175 @@ export default function AlumnoPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* ─── HISTORIAL ─── */}
+      {tab === "historial" && (
+        <div className="mt-4">
+          <div className="rounded-xl border border-edge bg-card p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold capitalize text-ink">{monthLabel(cy, cm)}</p>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => goMonth(-1)}
+                  className="rounded-lg border border-edge bg-bg p-1.5 text-muted"
+                  aria-label="Mes anterior"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => goMonth(1)}
+                  disabled={calMonth >= todayStr.slice(0, 7)}
+                  className="rounded-lg border border-edge bg-bg p-1.5 text-muted disabled:opacity-40"
+                  aria-label="Mes siguiente"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-7 gap-1 text-center">
+              {["L", "M", "X", "J", "V", "S", "D"].map((d) => (
+                <span key={d} className="text-[10px] font-semibold text-muted">
+                  {d}
+                </span>
+              ))}
+              {monthGrid(cy, cm).map((cell, i) => {
+                if (!cell.date) return <span key={`p${i}`} />;
+                const cnt = history.byDate.get(cell.date) ?? 0;
+                const isPlanned = history.planned.has(cell.date);
+                const future = isFutureDate(cell.date, todayStr);
+                const isToday = cell.date === todayStr;
+                const bg =
+                  cnt >= 3
+                    ? "bg-neon text-bg"
+                    : cnt === 2
+                      ? "bg-neon/50 text-neon"
+                      : cnt === 1
+                        ? "bg-neon/20 text-neon"
+                        : isPlanned
+                          ? "border border-ember/60 bg-ember/5 text-ember"
+                          : "bg-edge text-muted";
+                return (
+                  <button
+                    key={cell.date}
+                    onClick={() => setSelectedDate(cell.date)}
+                    disabled={future}
+                    className={`flex h-9 items-center justify-center rounded-lg text-xs font-semibold transition active:scale-95 ${bg} ${
+                      isToday ? "ring-2 ring-neon" : ""
+                    } ${future ? "opacity-30" : ""}`}
+                  >
+                    {cell.dayNumber}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-3 text-[10px] text-muted">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2.5 w-2.5 rounded-sm bg-neon/20" /> 1 sesión
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2.5 w-2.5 rounded-sm bg-neon/50" /> 2 sesiones
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2.5 w-2.5 rounded-sm bg-neon" /> 3+
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2.5 w-2.5 rounded-sm border border-ember/60 bg-ember/5" /> Planificada
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <div className="rounded-xl border border-edge bg-card p-3 text-center">
+              <Calendar className="mx-auto h-4 w-4 text-neon" />
+              <p className="mt-1 text-lg font-bold text-ink">{history.totalDays}</p>
+              <p className="text-[10px] text-muted">Días entrenados</p>
+            </div>
+            <div className="rounded-xl border border-edge bg-card p-3 text-center">
+              <Flame className="mx-auto h-4 w-4 text-ember" />
+              <p className="mt-1 text-lg font-bold text-ink">{history.streak} 🔥</p>
+              <p className="text-[10px] text-muted">Racha actual</p>
+            </div>
+            <div className="rounded-xl border border-edge bg-card p-3 text-center">
+              <TrendingUp className="mx-auto h-4 w-4 text-neon" />
+              <p className="mt-1 text-lg font-bold capitalize text-ink">
+                {history.mostMes ? history.mostMes.slice(0, 8) : "—"}
+              </p>
+              <p className="text-[10px] text-muted">Top mes</p>
+            </div>
+          </div>
+
+          <div className="mt-3 rounded-xl border border-edge bg-card p-4">
+            <p className="text-sm font-semibold text-ink">Cumplimiento · últimos 6 meses</p>
+            <div className="mt-3 h-40">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={history.bars}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e2530" vertical={false} />
+                  <XAxis dataKey="mes" tick={{ fill: "#6b7280", fontSize: 10 }} />
+                  <YAxis tick={{ fill: "#6b7280", fontSize: 10 }} width={24} allowDecimals={false} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#161b22",
+                      border: "1px solid #1e2530",
+                      borderRadius: 8,
+                      fontSize: 12,
+                    }}
+                    labelStyle={{ color: "#9ca3af" }}
+                  />
+                  <Bar dataKey="hechas" name="Hechas" fill="#00f2fe" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="planificadas" name="Planificadas" fill="#ff5e36" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {history.totalDays === 0 && (
+            <p className="py-8 text-center text-sm text-muted">
+              {student?.full_name || "El alumno"} todavía no registró sesiones.
+            </p>
+          )}
+        </div>
+      )}
+
+      {selectedDate && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60"
+          onClick={() => setSelectedDate(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-t-2xl border border-edge bg-card p-4 pb-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold capitalize text-ink">
+                {new Date(`${selectedDate}T12:00:00`).toLocaleDateString("es-AR", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                })}
+              </p>
+              <button onClick={() => setSelectedDate(null)} className="text-muted" aria-label="Cerrar">
+                ✕
+              </button>
+            </div>
+            <div className="mt-3 max-h-[60vh] space-y-2 overflow-y-auto">
+              {daySessions.length === 0 && (
+                <p className="py-6 text-center text-sm text-muted">Sin sesiones este día.</p>
+              )}
+              {daySessions.map((s) => (
+                <div key={`${s.routineId}-${s.day}`} className="rounded-lg border border-edge bg-bg p-3">
+                  <p className="text-sm font-medium text-ink">{s.routineTitle}</p>
+                  <p className="text-xs text-muted">
+                    Día {s.day}
+                    {s.dayLabel ? `: ${s.dayLabel}` : ""}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 

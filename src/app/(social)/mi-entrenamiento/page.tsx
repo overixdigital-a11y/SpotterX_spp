@@ -26,6 +26,7 @@ import { useAuthState } from "@/lib/auth-context";
 import { todayLocal } from "@/lib/format";
 import { getDisciplineFields, isSeriesDiscipline, resolveSeries, formatSeries, type FieldDef } from "@/lib/disciplines";
 import { MEALS, getDietData, formatQuantity } from "@/lib/diets";
+import PostComposer from "@/components/social/PostComposer";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import {
   type SessionInfo,
@@ -156,7 +157,13 @@ export default function MiEntrenamientoPage() {
   const [progressData, setProgressData] = useState<{ date: string; value: number }[]>([]);
   const [calMonth, setCalMonth] = useState<string>(() => todayLocal().slice(0, 7));
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [publishingKey, setPublishingKey] = useState<string | null>(null);
+  const [composer, setComposer] = useState<{
+    key: string;
+    title: string;
+    caption: string;
+    category: string;
+  } | null>(null);
+  const [composerNonce, setComposerNonce] = useState(0);
   const [posted, setPosted] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -501,26 +508,30 @@ export default function MiEntrenamientoPage() {
     setCalMonth(key);
   };
 
-  const publishSession = async (s: SessionInfo) => {
-    if (!userId || publishingKey) return;
-    const key = `${s.routineId}-${s.day}`;
-    setPublishingKey(key);
-    const supabase = createClient();
+  const openSessionComposer = (s: SessionInfo) => {
     const routine = routines.find((r) => r.id === s.routineId);
-    const { data, error } = await supabase
-      .from("posts")
-      .insert({
-        user_id: userId,
-        caption: `🔥 Terminé "${s.routineTitle}" · Día ${s.day}${s.dayLabel ? `: ${s.dayLabel}` : ""}`,
-        category: categoryForDiscipline(routine?.discipline),
-        media_url: null,
-        media_type: null,
-      })
-      .select("id")
-      .single();
-    setPublishingKey(null);
-    if (error) return;
-    setPosted((prev) => ({ ...prev, [key]: data.id }));
+    setComposer({
+      key: `${s.routineId}-${s.day}`,
+      title: "Compartir sesión",
+      caption: `🔥 Terminé "${s.routineTitle}" · Día ${s.day}${s.dayLabel ? `: ${s.dayLabel}` : ""}`,
+      category: categoryForDiscipline(routine?.discipline),
+    });
+    setComposerNonce((n) => n + 1);
+  };
+
+  const openStreakComposer = () => {
+    setComposer({
+      key: "streak",
+      title: "Compartir mi racha",
+      caption: `🔥 Mi racha actual: ${history.streak} ${history.streak === 1 ? "día" : "días"}`,
+      category: "#CrossFit",
+    });
+    setComposerNonce((n) => n + 1);
+  };
+
+  const handlePosted = (id: string) => {
+    if (!composer) return;
+    setPosted((prev) => ({ ...prev, [composer.key]: id }));
   };
 
   if (loading) {
@@ -1186,6 +1197,21 @@ export default function MiEntrenamientoPage() {
               <Flame className="mx-auto h-4 w-4 text-ember" />
               <p className="mt-1 text-lg font-bold text-ink">{history.streak} 🔥</p>
               <p className="text-[10px] text-muted">Racha actual</p>
+              {posted.streak ? (
+                <Link
+                  href={`/posts/${posted.streak}`}
+                  className="mt-2 inline-flex items-center gap-1 rounded-lg bg-neon px-2.5 py-1 text-[11px] font-semibold text-bg"
+                >
+                  <Share2 className="h-3 w-3" /> Ver publicación
+                </Link>
+              ) : (
+                <button
+                  onClick={openStreakComposer}
+                  className="mt-2 inline-flex items-center gap-1 rounded-full border border-ember/50 bg-ember/10 px-2.5 py-1 text-[11px] font-semibold text-ember"
+                >
+                  Compartir racha
+                </button>
+              )}
             </div>
             <div className="rounded-xl border border-edge bg-card p-3 text-center">
               <TrendingUp className="mx-auto h-4 w-4 text-neon" />
@@ -1271,16 +1297,10 @@ export default function MiEntrenamientoPage() {
                       </Link>
                     ) : (
                       <button
-                        onClick={() => publishSession(s)}
-                        disabled={publishingKey === pkey}
-                        className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-ember/50 bg-ember/10 px-3 py-1.5 text-xs font-semibold text-ember disabled:opacity-50"
+                        onClick={() => openSessionComposer(s)}
+                        className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-ember/50 bg-ember/10 px-3 py-1.5 text-xs font-semibold text-ember"
                       >
-                        {publishingKey === pkey ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Share2 className="h-3.5 w-3.5" />
-                        )}{" "}
-                        Publicar en el feed
+                        <Share2 className="h-3.5 w-3.5" /> Publicar en el feed
                       </button>
                     )}
                   </div>
@@ -1289,6 +1309,18 @@ export default function MiEntrenamientoPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {composer && (
+        <PostComposer
+          key={composerNonce}
+          open
+          onClose={() => setComposer(null)}
+          title={composer.title}
+          defaultCaption={composer.caption}
+          category={composer.category}
+          onPosted={handlePosted}
+        />
       )}
 
       {/* ─── CHAT ─── */}

@@ -7,7 +7,10 @@ import { hydratePosts, type PostRow } from "@/lib/posts";
 import { EmptyState } from "@/components/core/EmptyState";
 import { Skeleton } from "@/components/core/Skeleton";
 import { useAuthState } from "@/lib/auth-context";
-import { Sparkles, Users, Loader2 } from "lucide-react";
+import { Sparkles, Users, Loader2, Flame } from "lucide-react";
+import { computeStreak, logDates } from "@/lib/history";
+import { todayLocal } from "@/lib/format";
+import PostComposer from "./PostComposer";
 
 const PAGE = 12;
 
@@ -33,6 +36,24 @@ export function Feed() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const cursorRef = useRef<string | null>(null);
+  const [composer, setComposer] = useState<{ caption: string } | null>(null);
+  const [composerNonce, setComposerNonce] = useState(0);
+  const [loadingStreak, setLoadingStreak] = useState(false);
+
+  const openStreak = async () => {
+    if (!userId) return;
+    setLoadingStreak(true);
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("trainer_routine_logs")
+      .select("log_date")
+      .eq("student_id", userId);
+    const dates = logDates((data as { log_date: string }[] | null) ?? []);
+    const streak = computeStreak(dates, todayLocal());
+    setComposer({ caption: `🔥 Mi racha actual: ${streak} ${streak === 1 ? "día" : "días"}` });
+    setComposerNonce((n) => n + 1);
+    setLoadingStreak(false);
+  };
 
   const fetchPage = async (replace: boolean) => {
     const supabase = createClient();
@@ -135,6 +156,14 @@ export function Feed() {
             {t.label}
           </button>
         ))}
+        <button
+          onClick={openStreak}
+          disabled={loadingStreak || !userId}
+          className="ml-auto flex shrink-0 items-center gap-1 rounded-full border border-ember/50 bg-ember/10 px-3 py-1.5 text-sm font-semibold text-ember transition active:scale-95 disabled:opacity-50"
+        >
+          {loadingStreak ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flame className="h-4 w-4" />}
+          Racha
+        </button>
       </div>
 
       {/* Categorías */}
@@ -207,6 +236,17 @@ export function Feed() {
             </div>
           )}
         </>
+      )}
+
+      {composer && (
+        <PostComposer
+          key={composerNonce}
+          open
+          onClose={() => setComposer(null)}
+          title="Compartir mi racha"
+          defaultCaption={composer.caption}
+          category="#CrossFit"
+        />
       )}
     </div>
   );

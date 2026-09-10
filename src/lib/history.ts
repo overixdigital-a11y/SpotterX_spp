@@ -47,6 +47,12 @@ export function countLogsByDate(logs: { log_date: string }[]): Map<string, numbe
   return m;
 }
 
+export function logDates(logs: { log_date: string }[]): Set<string> {
+  const s = new Set<string>();
+  for (const l of logs) s.add(l.log_date);
+  return s;
+}
+
 export function sessionsByDate(
   logs: { log_date: string; routine_id: string; day: number }[],
   routines: { id: string; title: string }[],

@@ -160,10 +160,11 @@ Orden de etapas para pulir/completar la app, módulo por módulo. Cada etapa ter
 - Páginas: `/market`, `/market/[id]`, `/market/crear`, `/market/carrito`, `/market/mis-publicaciones`, `/market/mis-compras`, `/market/billetera`.
 - Entry points: card Marketplace en `/perfil` (todos los roles) + link en header `/market`.
 
-**Lote 2 — Panel admin del market (`/market/admin`, solo `is_admin`):**
+**Lote 2 — Panel admin del market (`/market/admin`, solo `is_admin`) — IMPLEMENTADO (commit `a87fd33`, deployado 12/09/2026):**
 - Dashboard (KPIs: productos, órdenes, ventas del mes, comisión acumulada, top categorías) + gráfico recharts.
 - Comisión: muestra actual + input + botón guardar (`admin_set_commission`).
 - Cargas pendientes → "Acreditar saldo"; retiros pendientes → "Marcar transferido".
+- Entry point: icono Shield Admin en header de `/market` (solo visible para `is_admin`).
 
 **Lote 3 — Panel de plataforma (futuro, fuera de Etapa 5):** moderación de reportes (`post_reports`, sin UI hoy), verificación de perfiles (`is_verified`), revisar catálogo ejercicios/alimentos, KPIs globales, usuarios/ban, CSV ventas/comisiones, comunicado masivo.
 

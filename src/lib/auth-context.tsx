@@ -8,12 +8,14 @@ interface AuthState {
   userId: string | null;
   profile: Profile | null;
   loading: boolean;
+  banned: boolean;
 }
 
 const AuthContext = createContext<AuthState>({
   userId: null,
   profile: null,
   loading: true,
+  banned: false,
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -21,6 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     userId: null,
     profile: null,
     loading: true,
+    banned: false,
   });
 
   useEffect(() => {
@@ -34,7 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!active) return;
 
       if (!user) {
-        setState({ userId: null, profile: null, loading: false });
+        setState({ userId: null, profile: null, loading: false, banned: false });
         return;
       }
 
@@ -47,7 +50,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!active) return;
 
       if (profile) {
-        setState({ userId: user.id, profile: profile as Profile, loading: false });
+        if ((profile as Profile).is_banned) {
+          setState({ userId: null, profile: null, loading: false, banned: true });
+          await supabase.auth.signOut();
+          window.location.href = "/login?banned=1";
+          return;
+        }
+        setState({ userId: user.id, profile: profile as Profile, loading: false, banned: false });
       } else {
         // Perfil aún no creado por el trigger (fallback)
         setState({
@@ -67,12 +76,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             social_links: null,
             is_verified: false,
             is_admin: false,
+            is_banned: false,
             privacy: "publico",
             settings: null,
             disciplines: null,
             created_at: new Date().toISOString(),
           },
           loading: false,
+          banned: false,
         });
       }
     };

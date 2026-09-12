@@ -9,6 +9,7 @@ function LoginForm() {
   const { signIn } = useAuth();
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? undefined;
+  const banned = searchParams.get("banned") === "1";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +64,12 @@ function LoginForm() {
             ¿Olvidaste tu contraseña?
           </Link>
         </div>
+
+        {banned && (
+          <div className="rounded-xl border border-ember/30 bg-ember/10 p-3 text-sm text-ember">
+            Tu cuenta ha sido suspendida. Contactá al administrador.
+          </div>
+        )}
 
         {error && <p className="text-sm text-ember">{error}</p>}
 

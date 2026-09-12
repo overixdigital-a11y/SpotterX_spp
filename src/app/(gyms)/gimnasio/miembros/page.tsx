@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { UserPlus, Loader2, KeyRound, Copy, Check, Users, Gift, XCircle, ChevronRight, Search } from "lucide-react";
+import { UserPlus, Loader2, KeyRound, Copy, Check, Users, Gift, XCircle, ChevronRight, Search, Upload } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { Avatar } from "@/components/core/Avatar";
@@ -667,6 +667,73 @@ export default function GymMembersPage() {
             </button>
           </div>
         )}
+      </div>
+
+      {/* CSV Import */}
+      <div className="mt-6 rounded-2xl border border-edge bg-card p-4">
+        <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+          <Upload className="h-4 w-4 text-ember" /> Importar desde CSV
+        </p>
+        <p className="mt-0.5 text-xs text-muted">
+          Subí un archivo .csv con columnas: nombre, email, teléfono (opcional), plan (opcional), rol (alumno/profesor, default: alumno).
+        </p>
+        <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-ember/40 bg-ember/5 py-3 text-xs font-semibold text-ember">
+          <Upload className="h-4 w-4" />
+          Elegir archivo CSV
+          <input
+            type="file"
+            accept=".csv"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = (ev) => {
+                const text = ev.target?.result as string;
+                const lines = text.split("\n").filter((l) => l.trim());
+                const rows = lines.slice(1).map((line) => {
+                  const cols = line.split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
+                  return {
+                    full_name: cols[0] ?? "",
+                    email: cols[1] ?? "",
+                    username: (cols[1] ?? "").split("@")[0] || `user_${Math.random().toString(36).slice(2, 6)}`,
+                    role: (cols[4] ?? "alumno").toLowerCase().includes("profe") ? "profesor" : "alumno",
+                    plan_name: cols[3] || undefined,
+                  };
+                }).filter((r) => r.full_name && r.email);
+                if (rows.length === 0) {
+                  alert("No se encontraron filas válidas en el CSV");
+                  return;
+                }
+                if (!confirm(`¿Importar ${rows.length} miembros?`)) return;
+                // Import via invite-member batch
+                const importAll = async () => {
+                  const supa = createClient();
+                  const token = (await supa.auth.getSession()).data.session?.access_token;
+                  const res = await fetch(FUNC_URL, {
+                    method: "POST",
+                    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+                    body: JSON.stringify({ gym_id: gym.id, users: rows, as_admin: false }),
+                  });
+                  const data = await res.json();
+                  if (data.error) {
+                    alert(`Error: ${data.error}`);
+                    return;
+                  }
+                  const results = data.results ?? [data];
+                  const created = results.filter((r: { ok?: boolean }) => r.ok).length;
+                  const existed = results.filter((r: { existed?: boolean }) => r.existed).length;
+                  const errors = results.filter((r: { ok?: boolean }) => !r.ok);
+                  alert(`Importados: ${created} nuevos, ${existed} ya existentes${errors.length > 0 ? `, ${errors.length} errores` : ""}`);
+                  window.location.reload();
+                };
+                importAll();
+              };
+              reader.readAsText(file);
+              e.target.value = "";
+            }}
+          />
+        </label>
       </div>
 
       <div className="mt-6">

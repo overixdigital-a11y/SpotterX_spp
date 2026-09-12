@@ -16,6 +16,29 @@ function randomCode(n = 8) {
   return s;
 }
 
+interface InviteBody {
+  gym_id: string;
+  role?: string;
+  full_name?: string;
+  username?: string;
+  email?: string;
+  plan_name?: string;
+  pay_status?: string;
+  expires_on?: string | null;
+  price?: number;
+  as_admin?: boolean;
+  users?: Array<{
+    full_name: string;
+    username: string;
+    email: string;
+    role?: string;
+    plan_name?: string;
+    pay_status?: string;
+    expires_on?: string | null;
+    price?: number;
+  }>;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
@@ -33,112 +56,174 @@ Deno.serve(async (req: Request) => {
     }
 
     // 2) Leer body
-    const body = await req.json();
-    const { gym_id, role, full_name, username, email, plan_name, pay_status, expires_on, price } = body ?? {};
-    if (!gym_id || !role || !full_name || !username || !email) {
-      return json({ error: "Faltan campos: gym_id, role, full_name, username, email" }, 400);
-    }
-    if (role !== "alumno" && role !== "profesor") {
-      return json({ error: "role debe ser alumno o profesor" }, 400);
+    const body: InviteBody = await req.json();
+    const { gym_id, as_admin, users } = body ?? {};
+    if (!gym_id) {
+      return json({ error: "Faltan campos: gym_id" }, 400);
     }
 
-    // 3) Verificar que el caller es owner del gym
-    const { data: gym, error: gymErr } = await supabase
-      .from("gyms").select("id").eq("id", gym_id).eq("owner_id", caller.id).maybeSingle();
-    if (gymErr || !gym) {
-      return json({ error: "No sos el dueño de este gimnasio" }, 403);
+    // 3) Verificar permisos: owner del gym o admin
+    let isAdmin = false;
+    if (as_admin) {
+      const { data: prof } = await supabase
+        .from("profiles").select("is_admin").eq("id", caller.id).maybeSingle();
+      isAdmin = !!prof?.is_admin;
+    }
+    if (!isAdmin) {
+      const { data: gym, error: gymErr } = await supabase
+        .from("gyms").select("id").eq("id", gym_id).eq("owner_id", caller.id).maybeSingle();
+      if (gymErr || !gym) {
+        return json({ error: "No sos el dueño de este gimnasio" }, 403);
+      }
     }
 
-    // 4) Contraseña provisional
-    const password = `Spotter${randomCode(6)}!`;
+    // 4) Determinar si es batch o single
+    const isBatch = Array.isArray(users) && users.length > 0;
+    const items = isBatch
+      ? users.map((u) => ({
+          full_name: u.full_name,
+          username: u.username,
+          email: u.email,
+          role: u.role ?? "alumno",
+          plan_name: u.plan_name,
+          pay_status: u.pay_status,
+          expires_on: u.expires_on,
+          price: u.price,
+        }))
+      : [{
+          full_name: body.full_name ?? "",
+          username: body.username ?? "",
+          email: body.email ?? "",
+          role: body.role ?? "alumno",
+          plan_name: body.plan_name,
+          pay_status: body.pay_status,
+          expires_on: body.expires_on,
+          price: body.price,
+        }];
 
-    // 5) Ver si el usuario ya existe (por email)
-    let existingUserId: string | null = null;
-    const { data: list, error: listErr } = await supabase.auth.admin.listUsers();
-    if (!listErr) {
-      const found = (list.users ?? []).find((u) => u.email?.toLowerCase() === email.toLowerCase());
-      if (found) existingUserId = found.id;
+    // 5) Listar usuarios existentes una sola vez
+    const { data: existingUsers } = await supabase.auth.admin.listUsers();
+    const existingMap = new Map<string, string>();
+    for (const u of existingUsers?.users ?? []) {
+      if (u.email) existingMap.set(u.email.toLowerCase(), u.id);
     }
 
-    let newUserId: string;
-    let created;
-    let provisional = password;
+    // 6) Procesar cada usuario
+    const results: Array<{
+      ok?: boolean;
+      user_id?: string;
+      provisional_password?: string;
+      existed?: boolean;
+      email?: string;
+      error?: string;
+    }> = [];
 
-    if (existingUserId) {
-      // Caso 1: ya existe -> NO creamos cuenta, solo lo vinculamos al gym
-      newUserId = existingUserId;
-      provisional = "";
-    } else {
-      // 5b) Crear el usuario
-      const res = await supabase.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: { username, full_name, role },
+    for (const item of items) {
+      if (!item.full_name || !item.username || !item.email) {
+        results.push({ ok: false, email: item.email, error: "Faltan campos: full_name, username, email" });
+        continue;
+      }
+      if (item.role !== "alumno" && item.role !== "profesor") {
+        results.push({ ok: false, email: item.email, error: "role debe ser alumno o profesor" });
+        continue;
+      }
+
+      const password = `Spotter${randomCode(6)}!`;
+      const existingUserId = existingMap.get(item.email.toLowerCase());
+
+      let newUserId: string;
+      let provisional = password;
+
+      if (existingUserId) {
+        newUserId = existingUserId;
+        provisional = "";
+      } else {
+        const res = await supabase.auth.admin.createUser({
+          email: item.email,
+          password,
+          email_confirm: true,
+          user_metadata: { username: item.username, full_name: item.full_name, role: item.role },
+        });
+        if (res.error) {
+          results.push({ ok: false, email: item.email, error: res.error.message });
+          continue;
+        }
+        newUserId = res.data.user!.id;
+
+        const { error: profErr } = await supabase
+          .from("profiles")
+          .upsert({
+            id: newUserId,
+            email: item.email,
+            username: item.username,
+            full_name: item.full_name,
+            role: item.role,
+          }, { onConflict: "id" });
+        if (profErr) {
+          results.push({ ok: false, email: item.email, error: profErr.message });
+          continue;
+        }
+      }
+
+      // Relacion staff/gym o membresia
+      if (item.role === "profesor") {
+        const { error: staffErr } = await supabase.from("gym_staff").upsert(
+          { gym_id, user_id: newUserId, role: "profesor_invitado", authorized: true },
+          { onConflict: "gym_id,user_id" }
+        );
+        if (staffErr) {
+          results.push({ ok: false, email: item.email, error: staffErr.message });
+          continue;
+        }
+        const { data: members } = await supabase
+          .from("gym_memberships").select("user_id").eq("gym_id", gym_id).eq("status", "activa");
+        if (members && members.length > 0) {
+          await supabase.from("trainer_students").upsert(
+            members.map((m) => ({ trainer_id: newUserId, student_id: m.user_id, source: "gym", active: true })),
+            { onConflict: "trainer_id,student_id" }
+          );
+        }
+      } else {
+        const { error: memErr } = await supabase.from("gym_memberships").upsert(
+          {
+            gym_id,
+            user_id: newUserId,
+            plan_name: item.plan_name ?? "Plan inicial",
+            status: "activa",
+            pay_status: item.pay_status ?? "pendiente",
+            expires_on: item.expires_on ?? null,
+            price: typeof item.price === "number" && item.price >= 0 ? item.price : null,
+          },
+          { onConflict: "gym_id,user_id" }
+        );
+        if (memErr) {
+          results.push({ ok: false, email: item.email, error: memErr.message });
+          continue;
+        }
+        const { data: staff } = await supabase
+          .from("gym_staff").select("user_id").eq("gym_id", gym_id).eq("role", "profesor_invitado");
+        if (staff && staff.length > 0) {
+          await supabase.from("trainer_students").upsert(
+            staff.map((s) => ({ trainer_id: s.user_id, student_id: newUserId, source: "gym", active: true })),
+            { onConflict: "trainer_id,student_id" }
+          );
+        }
+      }
+
+      results.push({
+        ok: true,
+        user_id: newUserId,
+        provisional_password: provisional,
+        existed: !!existingUserId,
+        email: item.email,
       });
-      if (res.error) return json({ error: res.error.message }, 400);
-      created = res.data;
-      newUserId = created.user!.id;
-
-      // 6) Asegurar perfil (por si el trigger no corrio con admin)
-      const { error: profErr } = await supabase
-        .from("profiles")
-        .upsert({
-          id: newUserId,
-          email,
-          username,
-          full_name,
-          role,
-        }, { onConflict: "id" });
-      if (profErr) return json({ error: profErr.message }, 500);
     }
 
-    // 7) Relacion staff/gym o membresia
-    if (role === "profesor") {
-      const { error: staffErr } = await supabase.from("gym_staff").upsert(
-        { gym_id, user_id: newUserId, role: "profesor_invitado", authorized: true },
-        { onConflict: "gym_id,user_id" }
-      );
-      if (staffErr) return json({ error: staffErr.message }, 500);
-      const { data: members } = await supabase
-        .from("gym_memberships").select("user_id").eq("gym_id", gym_id).eq("status", "activa");
-      if (members && members.length > 0) {
-        await supabase.from("trainer_students").upsert(
-          members.map((m) => ({ trainer_id: newUserId, student_id: m.user_id, source: "gym", active: true })),
-          { onConflict: "trainer_id,student_id" }
-        );
-      }
-    } else {
-      const { error: memErr } = await supabase.from("gym_memberships").upsert(
-        {
-          gym_id,
-          user_id: newUserId,
-          plan_name: plan_name ?? "Plan inicial",
-          status: "activa",
-          pay_status: pay_status ?? "pendiente",
-          expires_on: expires_on ?? null,
-          price: typeof price === "number" && price >= 0 ? price : null,
-        },
-        { onConflict: "gym_id,user_id" }
-      );
-      if (memErr) return json({ error: memErr.message }, 500);
-      const { data: staff } = await supabase
-        .from("gym_staff").select("user_id").eq("gym_id", gym_id).eq("role", "profesor_invitado");
-      if (staff && staff.length > 0) {
-        await supabase.from("trainer_students").upsert(
-          staff.map((s) => ({ trainer_id: s.user_id, student_id: newUserId, source: "gym", active: true })),
-          { onConflict: "trainer_id,student_id" }
-        );
-      }
+    // Si es single, devolver resultado directo (compatibilidad con UI existente)
+    if (!isBatch) {
+      return json(results[0]);
     }
-
-    return json({
-      ok: true,
-      user_id: newUserId,
-      provisional_password: provisional,
-      existed: !!existingUserId,
-      email,
-    });
+    return json({ ok: true, results });
   } catch (e) {
     return json({ error: String(e?.message || e) }, 500);
   }

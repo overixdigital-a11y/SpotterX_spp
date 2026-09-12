@@ -142,11 +142,30 @@ Orden de etapas para pulir/completar la app, módulo por módulo. Cada etapa ter
 - **Chat 1:1** con leídos y adjuntos (foto/reel/galería).
 - **Vinculación bidireccional profe↔gym** (solicitudes + aprobación).
 
-### 🟦 Etapa 5 — Marketplace fit (estilo MercadoLibre)
-- `market_products` (publicador: gym/profe/usuario, nombre, descripción, precio, fotos bucket `market`, stock, estado), `market_orders` + items (carrito, total, estados, dirección retiro/envío).
-- Reseñas por vendedor/producto.
-- **Comisión de la plataforma** vía `credits`/`wallet` (schema base ya preparado).
-- UI: home grid, detalle, carrito, comprar, Mis publicaciones, Mis pedidos, reseñas.
+### 🟦 Etapa 5 — Marketplace fit + billetera + panel admin (PLAN APROBADO 12/09/2026, dividido en 3 lotes)
+
+**Decisiones cerradas:**
+- Comisión configurable, inicial **1%** (via `platform_config`, editable desde el panel admin; cada orden guarda snapshot del % del momento).
+- Billetera interna (wallet): cargas/retiros manuales por el dueño (desde el panel admin); compra, comisión y acreditación al vendedor 100% automáticas (RPC).
+- Pago manual/efectivo; entrega por **retiro o envío** coordinada por chat.
+- "Preguntar" → abre el chat 1:1 existente (sin tabla de mensajes de mercado).
+- Vende cualquier usuario logueado; reseñas solo compradores con orden **entregada** (unique producto+usuario).
+- Categorías (todas deportivas): Ropa deportiva · Calzado deportivo · Equipamiento de entrenamiento · Suplementos y nutrición · Accesorios de gimnasio · Electrónica deportiva · Otros.
+- Fotos en bucket `media` (`<uid>/market/<ts>.<ext>`, sin bucket nuevo).
+- Admin: `profiles.is_admin` (setup con `UPDATE ... WHERE email='TU_EMAIL'`), panel `/market/admin`.
+
+**Lote 1 — Marketplace + billetera (migraciones 00026 + 00027):**
+- `00026_market.sql`: `market_products`, `market_orders`, `market_order_items`, `market_reviews` + RLS + índices + realtime + RPC `market_checkout` (`security definer`, transacción `FOR UPDATE`, stock, 0 → `sold`) + trigger notif `orden`.
+- `00027_wallet_admin.sql`: `profiles.is_admin`, `platform_config` (comisión 1%), `wallet` + `wallet_transactions` (ledger inmutable), RPCs (checkout-wallet, `admin_set_commission`, `admin_credit_wallet`, `admin_mark_withdrawal_paid`).
+- Páginas: `/market`, `/market/[id]`, `/market/crear`, `/market/carrito`, `/market/mis-publicaciones`, `/market/mis-compras`, `/market/billetera`.
+- Entradas: card Marketplace en `/perfil` + botón Store en `/home`.
+
+**Lote 2 — Panel admin del market (`/market/admin`, solo `is_admin`):**
+- Dashboard (KPIs: productos, órdenes, ventas del mes, comisión acumulada, top categorías) + gráfico recharts.
+- Comisión: muestra actual + input + botón guardar (`admin_set_commission`).
+- Cargas pendientes → "Acreditar saldo"; retiros pendientes → "Marcar transferido".
+
+**Lote 3 — Panel de plataforma (futuro, fuera de Etapa 5):** moderación de reportes (`post_reports`, sin UI hoy), verificación de perfiles (`is_verified`), revisar catálogo ejercicios/alimentos, KPIs globales, usuarios/ban, CSV ventas/comisiones, comunicado masivo.
 
 ### 🟦 Etapa 6 — Empaquetado app (bonus, final del roadmap)
 - Capacitor → APK/iOS, escaneo QR nativo, push reales.

@@ -119,136 +119,15 @@ Completar todos los módulos existentes, pulir la experiencia de usuario y prepa
 
 ---
 
-## Fase E: Marketplace Fit (Fase 6)
+## Fase E: Marketplace Fit + Billetera + Panel Admin — PLAN APROBADO 12/09/2026
 
-### E1. Schema Database
-```sql
--- Productos
-CREATE TABLE market_products (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  seller_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  description TEXT,
-  price NUMERIC(10,2) NOT NULL,
-  images TEXT[] DEFAULT '{}',
-  category TEXT NOT NULL,
-  subcategory TEXT,
-  stock INTEGER DEFAULT 0,
-  status TEXT DEFAULT 'active', -- active, sold, paused
-  condition TEXT DEFAULT 'new', -- new, used
-  location TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+Ver **AGENTS.md → Etapa 5** para el plan completo y decisiones cerradas. Dividido en 3 lotes:
 
--- Categorías de productos
--- Ropa, Calzado, Equipamiento, Suplementos, Accesorios, Electrónica
+- **Lote 1 (ahora):** Marketplace + billetera (migraciones 00026 + 00027, páginas, componentes).
+- **Lote 2 (después):** Panel admin `/market/admin` (dashboard + comisión + cargas/retiros).
+- **Lote 3 (futuro):** Panel de plataforma completo (moderación, verificación, usuarios, KPIs globales).
 
--- Órdenes
-CREATE TABLE market_orders (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  buyer_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
-  seller_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
-  status TEXT DEFAULT 'pending', -- pending, paid, shipped, delivered, cancelled
-  total NUMERIC(10,2) NOT NULL,
-  payment_method TEXT,
-  shipping_address JSONB,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Items de orden
-CREATE TABLE market_order_items (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id UUID REFERENCES market_orders(id) ON DELETE CASCADE,
-  product_id UUID REFERENCES market_products(id),
-  quantity INTEGER DEFAULT 1,
-  price NUMERIC(10,2) NOT NULL
-);
-
--- Reseñas
-CREATE TABLE market_reviews (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  product_id UUID REFERENCES market_products(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
-  rating INTEGER CHECK (rating >= 1 AND rating <= 5),
-  comment TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Conversaciones/mensajes
-CREATE TABLE market_messages (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  product_id UUID REFERENCES market_products(id),
-  sender_id UUID REFERENCES profiles(id),
-  receiver_id UUID REFERENCES profiles(id),
-  content TEXT NOT NULL,
-  read BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
-
-### E2. Storage Buckets
-- [ ] Bucket `market-products` para fotos de productos
-- [ ] Policies: upload autenticado, lectura pública
-
-### E3. Páginas del Marketplace
-
-#### Home (`/marketplace`)
-- [ ] Grid de productos destacados
-- [ ] Categorías (Ropa, Equipamiento, etc.)
-- [ ] Búsqueda con filtros (precio, categoría, condición)
-- [ ] Geolocalización (productos cercanos)
-
-#### Detalle (`/marketplace/[id]`)
-- [ ] Galería de fotos
-- [ ] Información del vendedor
-- [ ] Precio, stock, condición
-- [ ] Botón "Preguntar" (abre chat)
-- [ ] Botón "Comprar" (flow de checkout)
-- [ ] Reseñas del producto
-
-#### Crear/Publicar (`/marketplace/crear`)
-- [ ] Form: nombre, descripción, precio, categoría, condición
-- [ ] Upload de fotos (múltiples)
-- [ ] Ubicación
-- [ ] Preview antes de publicar
-
-#### Mis Publicaciones (`/marketplace/mis-publicaciones`)
-- [ ] Lista de productos del usuario
-- [ ] Editar/eliminar producto
-- [ ] Marcar como vendido
-- [ ] Estadísticas (vistas, preguntas)
-
-#### Mis Compras (`/marketplace/mis-compras`)
-- [ ] Órdenes realizadas
-- [ ] Estado del envío
-- [ ] Calificar vendedor/producto
-
-#### Carrito (`/marketplace/carrito`)
-- [ ] Agregar/quitar productos
-- [ ] Calcular total
-- [ ] Seleccionar método de pago
-- [ ] Dirección de envío/retiro
-
-#### Chat (`/marketplace/chat/[productId]`)
-- [ ] Mensajes sobre un producto
-- [ ] Vendedor y comprador
-- [ ] Realtime
-
-### E4. Funcionalidades Backend
-- [ ] RPC para búsqueda con filtros
-- [ ] Sistema de comisión (5% por venta)
-- [ ] Wallet/credits para vendedores
-- [ ] Notificaciones de venta/mensaje
-
-### E5. UI Components
-- [ ] `ProductCard.tsx` - Card de producto en grid
-- [ ] `ProductGallery.tsx` - Galería de fotos
-- [ ] `CategoryFilter.tsx` - Filtro de categorías
-- [ ] `PriceFilter.tsx` - Filtro de precio
-- [ ] `SellerCard.tsx` - Info del vendedor
-- [ ] `ReviewCard.tsx` - Reseña individual
-- [ ] `OrderStatus.tsx` - Estado de orden
+El schema original de esta sección fue **reemplazado** por las migraciones reales 00026_market.sql y 00027_wallet_admin.sql (ver carpeta `supabase/migrations/`).
 
 ---
 
@@ -277,14 +156,12 @@ CREATE TABLE market_messages (
 
 ## Orden de Implementación Recomendado
 
-1. **Fase A** (Profesor) - 2-3 días
-2. **Fase B** (Gym) - 2-3 días
-3. **Fase C** (Alumno) - 2-3 días
-4. **Fase D** (Pulido) - 3-4 días
-5. **Fase F** (Técnico) - 1-2 días (paralelo)
-6. **Fase E** (Marketplace) - 5-7 días
-
-**Total estimado: 15-22 días**
+1. **Fase A** (Profesor) - ✅ Hecha
+2. **Fase B** (Gym) - ✅ Hecha
+3. **Fase C** (Alumno) - ✅ Hecha
+4. **Fase D** (Pulido) - ✅ Hecha
+5. **Fase F** (Técnico) - ✅ Hecha (delete-account deployada, 00025 corrida)
+6. **Fase E** (Marketplace + Billetera + Admin) - 🟦 En progreso (Lote 1 = marketplace+billetera, Lote 2 = panel admin, Lote 3 = panel plataforma futuro)
 
 ---
 

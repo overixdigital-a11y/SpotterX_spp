@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   ClipboardList,
   Loader2,
+  Store,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
@@ -214,6 +215,19 @@ export default function PerfilPage() {
           <ChevronRight className="h-4 w-4 text-neon" />
         </Link>
       )}
+
+      <Link
+        href="/market"
+        className="mx-4 mt-4 flex items-center justify-between rounded-2xl border border-ember/30 bg-ember/10 p-3.5"
+      >
+        <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+          <span className="rounded-full bg-ember/20 p-1.5 text-ember">
+            <Store className="h-4 w-4" />
+          </span>
+          Marketplace
+        </p>
+        <ChevronRight className="h-4 w-4 text-ember" />
+      </Link>
 
       <div className="mt-5 grid grid-cols-3 divide-x divide-edge border-b border-t border-edge text-center">
         <div className="py-3">

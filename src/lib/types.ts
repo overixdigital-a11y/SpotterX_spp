@@ -22,6 +22,7 @@ export interface Profile {
   website: string | null;
   social_links: Record<string, string> | null;
   is_verified: boolean;
+  is_admin: boolean;
   privacy: "publico" | "solo_seguidores";
   settings: ProfileSettings | null;
   disciplines: string[] | null;

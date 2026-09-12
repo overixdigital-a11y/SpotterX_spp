@@ -2,12 +2,14 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Search, ShoppingCart, Store } from "lucide-react";
+import { Search, ShoppingCart, Store, Shield } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useAuthState } from "@/lib/auth-context";
 import { MARKET_CATEGORIES, type MarketProduct } from "@/lib/market";
 import ProductCard from "@/components/market/ProductCard";
 
 export default function MarketPage() {
+  const { profile } = useAuthState();
   const [products, setProducts] = useState<MarketProduct[]>([]);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -71,6 +73,11 @@ export default function MarketPage() {
           <Store className="h-5 w-5 text-ember" />
           <h1 className="text-lg font-bold text-ink">Marketplace</h1>
           <div className="ml-auto flex items-center gap-2">
+            {profile?.is_admin && (
+              <Link href="/market/admin" className="text-xs font-semibold text-ember">
+                <Shield className="inline h-4 w-4" /> Admin
+              </Link>
+            )}
             <Link href="/market/mis-publicaciones" className="text-xs font-semibold text-neon">
               Mis ventas
             </Link>

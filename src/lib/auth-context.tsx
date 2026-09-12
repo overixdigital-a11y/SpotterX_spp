@@ -66,6 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             website: null,
             social_links: null,
             is_verified: false,
+            is_admin: false,
             privacy: "publico",
             settings: null,
             disciplines: null,

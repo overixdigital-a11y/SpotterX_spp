@@ -93,7 +93,7 @@ export default function PublicProfilePage() {
       }
 
       // Trainer stats
-      if (p.role === "profesor") {
+      if (p.role === "profesor" || p.role === "admin") {
         const { data: stats } = await supabase.rpc("get_trainer_stats", { p_trainer_id: p.id });
         if (active && stats) setTrainerStats(stats as TrainerStats);
       }
@@ -143,7 +143,7 @@ export default function PublicProfilePage() {
     );
   }
 
-  const isProfe = profile.role === "profesor";
+  const isProfe = profile.role === "profesor" || profile.role === "admin";
 
   return (
     <div className="w-full">

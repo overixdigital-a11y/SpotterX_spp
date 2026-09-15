@@ -42,7 +42,7 @@ export default function EditarPerfilPage() {
   const [customDiscipline, setCustomDiscipline] = useState("");
 
   // Professor fields
-  const isProfe = profile?.role === "profesor";
+  const isProfe = profile?.role === "profesor" || profile?.role === "admin";
   const [certifications, setCertifications] = useState<Certification[]>(
     (profile?.certifications as Certification[] | null) ?? []
   );

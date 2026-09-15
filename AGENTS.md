@@ -201,6 +201,13 @@ Orden de etapas para pulir/completar la app, módulo por módulo. Cada etapa ter
 - **Columna "Dueño"** en `/admin/gyms`: username + @ del owner vía consulta separada a `profiles`.
 - **Diagnóstico RLS**: la causa de "no me deja hacer muchas cosas" era que las policies existentes filtraban por dueño/participante; el admin (sin ownership) no veía memberships, staff, students, ni órdenes.
 
+**Lote 5 — PWA (commit `a9da20b` + merge `3d3bdb1`, 15/09/2026):**
+- **`src/app/manifest.ts`** (nuevo): Web App Manifest para instalación en pantalla de inicio (name "SpotterX", display standalone, theme `#05070a`, icons 192/512/maskable).
+- **`src/components/core/InstallPrompt.tsx`** (nuevo): banner "Instalá SpotterX en tu cel" con soporte Android (beforeinstallprompt) e iOS (tip "Compartir → Agregar a inicio"), dismiss con sessionStorage.
+- **`src/app/layout.tsx`**: merge con remote (max-w-md removido, responsive full-width) + `appleWebApp`, `viewportFit: cover`, icons PWA + `<InstallPrompt />` montado.
+- Iconos en `public/`: `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`, `apple-touch-icon.png` (traídos de la copia Antigravity, textos corregidos — la copia tenía mojibake "Entrenǭ").
+- **Merge con GitHub**: resueltos conflictos con commits del remote (invite-member API route, GymShell fixes, responsive layout, kiosk fixes). Se tomó la versión remota para archivos no modificados por nosotros.
+
 ### 🟦 Etapa 6 — Empaquetado app (bonus, final del roadmap)
 - Capacitor → APK/iOS, escaneo QR nativo, push reales.
 

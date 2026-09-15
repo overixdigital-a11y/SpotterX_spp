@@ -188,7 +188,7 @@ export function Feed() {
         <div className="px-4">
           {Array.from({ length: 2 }).map((_, i) => (
             <div key={i} className="mb-3 overflow-hidden rounded-2xl border border-edge bg-card">
-              <Skeleton className="aspect-[4/5] w-full rounded-none" />
+                <Skeleton className="aspect-square w-full rounded-none md:aspect-[4/5]" />
               <div className="flex items-center gap-2 p-3">
                 <Skeleton className="h-9 w-9 rounded-full" />
                 <div className="space-y-1.5">

@@ -203,18 +203,18 @@ export function PostCard({
             muted
             loop
             playsInline
-            className="aspect-[4/5] w-full bg-bg object-cover"
+            className="aspect-square w-full bg-bg object-cover md:aspect-[4/5]"
           />
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={post.media_url}
             alt={post.caption || ""}
-            className="aspect-[4/5] w-full bg-bg object-cover"
+            className="aspect-square w-full bg-bg object-cover md:aspect-[4/5]"
           />
         )
       ) : (
-        <Link href={`/posts/${post.id}`} className="block aspect-[4/5] w-full bg-gradient-to-br from-elevated to-bg">
+        <Link href={`/posts/${post.id}`} className="block aspect-square w-full bg-gradient-to-br from-elevated to-bg md:aspect-[4/5]">
           <div className="flex h-full items-center justify-center">
             <Zap className="h-12 w-12 text-neon/70" />
           </div>

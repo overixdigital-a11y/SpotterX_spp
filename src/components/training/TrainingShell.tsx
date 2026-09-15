@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Users, MapPin } from "lucide-react";
+import { Users, MapPin, User, Settings } from "lucide-react";
 import { AuthProvider } from "@/lib/auth-context";
 import { createClient } from "@/lib/supabase/client";
 
@@ -24,6 +24,9 @@ function Header() {
         <span className="rounded-full border border-ember/40 bg-ember/10 px-3 py-1 text-xs font-semibold text-ember">
           Profesor
         </span>
+        <Link href="/perfil/editar" className="text-muted hover:text-neon">
+          <Settings className="h-5 w-5" />
+        </Link>
         <button onClick={onLogout} className="text-xs font-medium text-muted hover:text-ember">
           Salir
         </button>
@@ -35,6 +38,7 @@ function Header() {
 const nav = [
   { href: "/entrenamiento", label: "Alumnos", icon: Users },
   { href: "/entrenamiento/zona", label: "Mi zona", icon: MapPin },
+  { href: "/perfil", label: "Perfil", icon: User },
 ];
 
 function ProfeNav() {

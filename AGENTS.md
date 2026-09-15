@@ -187,13 +187,19 @@ Orden de etapas para pulir/completar la app, módulo por módulo. Cada etapa ter
 - **AdminShell rediseñado**: sidebar fijo (desktop ≥lg) con nav items, full-width, paleta enterprise oscuro (fondos `#070a0f`/`#0c1017`/`#121722`, bordes `#1e2530`, acento teal `#00e5c7`). Mobile: drawer sidebar + top bar.
 - **Todas las páginas admin** (`/admin/*`) convertidas de cards mobile a **tablas enterprise** con densidad, bordes, fondos consistentes.
 - **Rol `admin`** agregado a `AppRole` + root redirect `/admin` + `homeByRole`.
-- **Migración `00029_admin_role.sql`** (pendiente de correr): CHECK constraint ampliado a `('gym','profesor','alumno','admin')`, UPDATE role='admin' para Alla + DELETE gym "Lautiadmin".
+- **Migración `00029_admin_role.sql`** **CORRIDA** 15/09/2026: CHECK constraint ampliado a `('gym','profesor','alumno','admin')`, UPDATE role='admin' para Alla + DELETE gym "Lautiadmin".
 - **Edge function `admin-delete-user`** (deployada): valida caller `is_admin`, borra `auth.admin.deleteUser()` (cascade profiles + children). Protege: no self-delete, no borrar otros admins.
 - **`/admin/usuarios`**: botón "Eliminar" por usuario + confirmación (bloquea admins).
 - **`/admin/gyms`**: botón "Planilla" por gym → importar CSV o Excel (.xlsx) vía `invite-member` batch `as_admin:true`.
 - **`lib/parsePlanilla.ts`**: helper compartido para parsear CSV + XLSX (SheetJS `xlsx`).
 - **Dependencia `xlsx`** (SheetJS) agregada para soporte Excel.
 - **Auth guard** admin permanece: `(admin)/layout.tsx` + `(admin)/admin/` solo con `is_admin`.
+
+**Lote 4b — Fix consola admin (commit `c562b7e`, 15/09/2026):**
+- **Botón "Cerrar sesión"** en AdminShell (desktop sidebar + drawer mobile): `createClient().auth.signOut()` → `/login` (patrón SocialShell).
+- **Migración `00030_admin_global_read.sql`** (PENDIENTE de correr): policies RLS "Admin: lectura global" en 8 tablas (`gym_memberships`, `gym_staff`, `gym_plans`, `gym_access_logs`, `gym_member_details`, `trainer_students`, `market_orders`, `market_order_items`) para que el admin pueda leer todos los datos (sin esto, las páginas Gyms/Profes/Market mostraban 0 o vacío).
+- **Columna "Dueño"** en `/admin/gyms`: username + @ del owner vía consulta separada a `profiles`.
+- **Diagnóstico RLS**: la causa de "no me deja hacer muchas cosas" era que las policies existentes filtraban por dueño/participante; el admin (sin ownership) no veía memberships, staff, students, ni órdenes.
 
 ### 🟦 Etapa 6 — Empaquetado app (bonus, final del roadmap)
 - Capacitor → APK/iOS, escaneo QR nativo, push reales.

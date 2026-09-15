@@ -38,7 +38,6 @@ export const viewport: Viewport = {
   themeColor: "#05070a",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
   viewportFit: "cover",
 };
 
@@ -48,7 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="es"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full bg-bg text-ink">
+      <body className="min-h-full bg-bg text-ink overflow-x-hidden">
         <ToastProvider>
           <InstallPrompt />
           <div className="min-h-full w-full bg-bg">

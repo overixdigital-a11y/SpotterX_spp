@@ -20,6 +20,8 @@ import {
   Sparkles,
   ShieldCheck,
   UserPlus,
+  MessageSquare,
+  ShoppingBag,
 } from "lucide-react";
 
 const navItems = [
@@ -27,6 +29,8 @@ const navItems = [
   { href: "/discover", label: "Descubrir", icon: Compass },
   { href: "/crear", label: "Crear publicación", icon: Plus, highlight: true },
   { href: "/notificaciones", label: "Notificaciones", icon: Bell },
+  { href: "/chat", label: "Mensajes", icon: MessageSquare },
+  { href: "/market", label: "Market", icon: ShoppingBag },
   { href: "/perfil", label: "Mi Perfil", icon: User },
 ];
 

@@ -70,6 +70,15 @@ export default function ChatPage() {
         .order("created_at", { ascending: true })
         .limit(200);
       if (active && data) setMessages(data as Msg[]);
+
+      // Mark received messages as read
+      await supabase
+        .from("messages")
+        .update({ read: true })
+        .eq("sender_id", otherId)
+        .eq("recipient_id", userId!)
+        .eq("read", false);
+
       if (active) setLoading(false);
     };
 

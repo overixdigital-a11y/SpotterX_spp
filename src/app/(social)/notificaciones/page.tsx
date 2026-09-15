@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Zap, MessageCircle, UserPlus, Loader2, Mail, DoorOpen, CheckCheck, ShieldAlert, CalendarClock, Store, UserCheck } from "lucide-react";
+import { Zap, MessageCircle, UserPlus, Loader2, Mail, DoorOpen, CheckCheck, ShieldAlert, CalendarClock, Store, UserCheck, ShoppingBag } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { timeAgo } from "@/lib/format";
@@ -13,7 +13,7 @@ type NotifType = "pulse" | "comment" | "follow" | "message" | "checkin" | "venci
 interface Notif {
   id: string;
   type: NotifType;
-  actor: { username: string; full_name: string | null; avatar_url: string | null } | null;
+  actor: { id: string; username: string; full_name: string | null; avatar_url: string | null } | null;
   post_id: string | null;
   gym_id: string | null;
   read: boolean;
@@ -29,6 +29,7 @@ const iconMap: Record<string, { Icon: typeof Zap; tone: string }> = {
   vencimiento: { Icon: CalendarClock, tone: "text-ember" },
   solicitud_staff: { Icon: Store, tone: "text-ember" },
   staff_aprobado: { Icon: UserCheck, tone: "text-neon" },
+  orden: { Icon: ShoppingBag, tone: "text-neon" },
 };
 
 const textMap: Record<string, string> = {
@@ -40,6 +41,7 @@ const textMap: Record<string, string> = {
   vencimiento: "te avisa que tu membresía vence pronto",
   solicitud_staff: "se postuló para trabajar en tu gimnasio",
   staff_aprobado: "aprobó tu postulación en su gimnasio",
+  orden: "tiene una nueva orden en el marketplace",
 };
 
 export default function NotificacionesPage() {
@@ -55,7 +57,7 @@ export default function NotificacionesPage() {
     const load = async () => {
       const { data } = await supabase
         .from("notifications")
-        .select("*, actor:actor_id(username, full_name, avatar_url)")
+        .select("*, actor:actor_id(id, username, full_name, avatar_url)")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(50);
@@ -187,6 +189,27 @@ export default function NotificacionesPage() {
                     href={n.type === "vencimiento" ? "/mi-gimnasio" : n.type === "staff_aprobado" ? "/entrenamiento/zona" : "/gimnasio"}
                     className="block"
                   >
+                    {inner}
+                  </Link>
+                );
+              }
+              if (n.type === "follow" && n.actor?.username) {
+                return (
+                  <Link key={n.id} href={`/perfil/${n.actor.username}`} className="block">
+                    {inner}
+                  </Link>
+                );
+              }
+              if (n.type === "message" && n.actor?.id) {
+                return (
+                  <Link key={n.id} href={`/chat/${n.actor.id}`} className="block">
+                    {inner}
+                  </Link>
+                );
+              }
+              if (n.type === "orden") {
+                return (
+                  <Link key={n.id} href="/market/mis-compras" className="block">
                     {inner}
                   </Link>
                 );

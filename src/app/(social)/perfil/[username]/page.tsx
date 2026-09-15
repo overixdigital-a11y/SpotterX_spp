@@ -3,10 +3,23 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { MapPin, Zap, UserPlus, Check, Loader2, Award, DollarSign, MessageCircle, ExternalLink, Clock } from "lucide-react";
+import { MapPin, Zap, UserPlus, Check, Loader2, Award, DollarSign, MessageCircle, ExternalLink, Clock, Store } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { Avatar } from "@/components/core/Avatar";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+
+const gymIcon = L.icon({
+  iconUrl: "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="30" height="46"><path fill="#00f2fe" stroke="#05070a" stroke-width="1.5" d="M15 0C6.7 0 0 6.7 0 15c0 9.7 15 31 15 31s15-21.3 15-31C30 6.7 23.3 0 15 0z"/><circle cx="15" cy="15" r="6" fill="#05070a"/></svg>`),
+  iconSize: [30, 46], iconAnchor: [15, 46], popupAnchor: [0, -40],
+});
+
+const zonaIcon = L.icon({
+  iconUrl: "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="30" height="46"><path fill="#ff5e36" stroke="#05070a" stroke-width="1.5" d="M15 0C6.7 0 0 6.7 0 15c0 9.7 15 31 15 31s15-21.3 15-31C30 6.7 23.3 0 15 0z"/><circle cx="15" cy="15" r="6" fill="#05070a"/></svg>`),
+  iconSize: [30, 46], iconAnchor: [15, 46], popupAnchor: [0, -40],
+});
 
 interface PublicProfile {
   id: string;
@@ -35,6 +48,33 @@ interface TrainerStats {
   routines_completed: number;
 }
 
+interface WorkplaceGym {
+  gym_id: string;
+  name: string | null;
+  city: string | null;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+interface WorkplaceZona {
+  id: string;
+  name: string | null;
+  city: string | null;
+  address: string | null;
+  availability: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+interface TrainerStudent {
+  student_id: string;
+  source: string | null;
+  full_name: string | null;
+  username: string;
+  avatar_url: string | null;
+}
+
 export default function PublicProfilePage() {
   const params = useParams<{ username: string }>();
   const username = params.username;
@@ -46,6 +86,8 @@ export default function PublicProfilePage() {
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [trainerStats, setTrainerStats] = useState<TrainerStats | null>(null);
+  const [workplaces, setWorkplaces] = useState<{ gyms: WorkplaceGym[]; zonas: WorkplaceZona[] }>({ gyms: [], zonas: [] });
+  const [students, setStudents] = useState<TrainerStudent[]>([]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -94,8 +136,39 @@ export default function PublicProfilePage() {
 
       // Trainer stats
       if (p.role === "profesor" || p.role === "admin") {
-        const { data: stats } = await supabase.rpc("get_trainer_stats", { p_trainer_id: p.id });
+        const [{ data: stats }, { data: wp }] = await Promise.all([
+          supabase.rpc("get_trainer_stats", { p_trainer_id: p.id }),
+          supabase.rpc("get_trainer_workplaces", { p_trainer_id: p.id }),
+        ]);
         if (active && stats) setTrainerStats(stats as TrainerStats);
+        if (active && wp) setWorkplaces(wp as { gyms: WorkplaceGym[]; zonas: WorkplaceZona[] });
+
+        // Students
+        const { data: ts } = await supabase
+          .from("trainer_students")
+          .select("student_id, source")
+          .eq("trainer_id", p.id)
+          .eq("active", true);
+        if (active && ts && ts.length > 0) {
+          const ids = ts.map((s) => s.student_id);
+          const { data: profs } = await supabase
+            .from("profiles")
+            .select("id, full_name, username, avatar_url")
+            .in("id", ids);
+          const profMap = new Map<string, { full_name: string | null; username: string; avatar_url: string | null }>();
+          (profs ?? []).forEach((pr) => profMap.set(pr.id, pr));
+          setStudents(
+            ts.map((s) => ({
+              student_id: s.student_id,
+              source: s.source,
+              full_name: profMap.get(s.student_id)?.full_name ?? null,
+              username: profMap.get(s.student_id)?.username ?? "@?",
+              avatar_url: profMap.get(s.student_id)?.avatar_url ?? null,
+            }))
+          );
+        } else if (active) {
+          setStudents([]);
+        }
       }
 
       if (active) setLoading(false);
@@ -344,6 +417,83 @@ export default function PublicProfilePage() {
                   )
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Lugares donde trabaja */}
+          {(workplaces.gyms.length > 0 || workplaces.zonas.length > 0) && (
+            <div className="space-y-3">
+              <p className="flex items-center gap-2 text-xs font-semibold text-muted">
+                <MapPin className="h-3.5 w-3.5" /> Lugares donde trabaja
+              </p>
+              {(() => {
+                const allPlaces = [
+                  ...workplaces.gyms.map((g) => ({ name: g.name, city: g.city, address: g.address, lat: g.latitude, lng: g.longitude, isGym: true })),
+                  ...workplaces.zonas.map((z) => ({ name: z.name, city: z.city, address: z.address, lat: z.latitude, lng: z.longitude, isGym: false })),
+                ];
+                const withCoords = allPlaces.filter((p) => typeof p.lat === "number" && typeof p.lng === "number");
+                return (
+                  <>
+                    {withCoords.length > 0 && (
+                      <div className="overflow-hidden rounded-2xl border border-edge">
+                        <MapContainer center={[withCoords[0].lat!, withCoords[0].lng!]} zoom={12} scrollWheelZoom={false} style={{ height: "220px", width: "100%" }}>
+                          <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                          {workplaces.gyms.filter((g) => typeof g.latitude === "number" && typeof g.longitude === "number").map((g) => (
+                            <Marker key={`gym-${g.gym_id}`} position={[g.latitude!, g.longitude!]} icon={gymIcon}>
+                              <Popup><div className="min-w-[140px] text-sm"><p className="font-bold text-[#111]">{g.name}</p><p className="text-xs text-[#555]">{g.city}{g.address ? ` · ${g.address}` : ""}</p></div></Popup>
+                            </Marker>
+                          ))}
+                          {workplaces.zonas.filter((z) => typeof z.latitude === "number" && typeof z.longitude === "number").map((z) => (
+                            <Marker key={`zona-${z.id}`} position={[z.latitude!, z.longitude!]} icon={zonaIcon}>
+                              <Popup><div className="min-w-[140px] text-sm"><p className="font-bold text-[#111]">{z.name}</p><p className="text-xs text-[#555]">{z.city}{z.address ? ` · ${z.address}` : ""}</p>{z.availability && <p className="mt-0.5 text-xs text-[#0a6]">Horarios: {z.availability}</p>}</div></Popup>
+                            </Marker>
+                          ))}
+                        </MapContainer>
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      {allPlaces.map((p, idx) => (
+                        <div key={idx} className="flex items-center gap-2.5 rounded-xl border border-edge bg-card px-3.5 py-2.5">
+                          <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${p.isGym ? "bg-neon/20 text-neon" : "bg-ember/20 text-ember"}`}>
+                            {p.isGym ? <Store className="h-4 w-4" /> : <MapPin className="h-4 w-4" />}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-ink">{p.name}</p>
+                            <p className="truncate text-xs text-muted">{p.city}{p.address ? ` · ${p.address}` : ""}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* Alumnos */}
+          {students.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-muted">Alumnos</p>
+                {profile.id === userId && (
+                  <Link href="/entrenamiento" className="text-xs font-semibold text-neon hover:underline">+ Agregar alumno</Link>
+                )}
+              </div>
+              {students.slice(0, 8).map((s) => (
+                <Link key={s.student_id} href={`/perfil/${s.username}`} className="flex items-center gap-2.5 rounded-xl border border-edge bg-card px-3.5 py-2.5">
+                  <Avatar src={s.avatar_url} name={s.full_name} username={s.username} size="sm" />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-ink">{s.full_name || s.username}</p>
+                    <p className="truncate text-xs text-muted">@{s.username}</p>
+                  </div>
+                  {s.source === "gym" && (
+                    <span className="ml-auto shrink-0 rounded-full bg-neon/10 px-2 py-0.5 text-[10px] font-semibold text-neon">del gym</span>
+                  )}
+                </Link>
+              ))}
+              {students.length > 8 && (
+                <p className="text-center text-xs text-muted">y {students.length - 8} más</p>
+              )}
             </div>
           )}
         </div>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Users, MapPin, User, Settings } from "lucide-react";
+import { Users, MapPin, User, Settings, ShoppingBag } from "lucide-react";
 import { AuthProvider } from "@/lib/auth-context";
 import { createClient } from "@/lib/supabase/client";
 
@@ -38,6 +38,7 @@ function Header() {
 const nav = [
   { href: "/entrenamiento", label: "Alumnos", icon: Users },
   { href: "/entrenamiento/zona", label: "Mi zona", icon: MapPin },
+  { href: "/market", label: "Market", icon: ShoppingBag },
   { href: "/perfil", label: "Perfil", icon: User },
 ];
 

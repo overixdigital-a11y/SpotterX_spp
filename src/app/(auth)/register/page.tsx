@@ -56,7 +56,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex min-h-screen max-w-md flex-col justify-center px-6 py-8">
+    <div className="flex min-h-screen w-full max-w-md mx-auto flex-col justify-center px-6 py-8">
       <div className="text-center">
         <img src="/logofull-transparente.png" alt="SpotterX" className="mx-auto h-20 w-auto" />
         <h1 className="mt-2 text-3xl font-extrabold tracking-tight">

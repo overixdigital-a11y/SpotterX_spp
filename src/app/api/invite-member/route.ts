@@ -1,13 +1,11 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_ROLE = Deno.env.get("SPOTTERX_SERVICE_ROLE")!;
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SERVICE_ROLE =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SPOTTERX_SERVICE_ROLE ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 function randomCode(n = 8) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -16,46 +14,43 @@ function randomCode(n = 8) {
   return s;
 }
 
-Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+export async function POST(req: Request) {
   try {
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
-    // 1) Verificar quien llama: debe estar autenticado
+    // 1) Verificar quién llama: token en header Authorization
     const authHeader = req.headers.get("Authorization") ?? "";
     const token = authHeader.replace("Bearer ", "");
     if (!token) {
-      return json({ error: "No autorizado" }, 401);
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
     const { data: { user: caller }, error: authErr } = await supabase.auth.getUser(token);
     if (authErr || !caller) {
-      return json({ error: "Sesión inválida" }, 401);
+      return NextResponse.json({ error: "Sesión inválida" }, { status: 401 });
     }
 
     // 2) Leer body
     const body = await req.json();
     const { gym_id, role, full_name, username, email, plan_name, pay_status, expires_on, price } = body ?? {};
     if (!gym_id || !role || !email) {
-      return json({ error: "Faltan campos obligatorios: gym_id, role, email" }, 400);
+      return NextResponse.json({ error: "Faltan campos obligatorios: gym_id, role, email" }, { status: 400 });
     }
     if (role !== "alumno" && role !== "profesor") {
-      return json({ error: "role debe ser alumno o profesor" }, 400);
+      return NextResponse.json({ error: "role debe ser alumno o profesor" }, { status: 400 });
     }
 
     const cleanEmail = String(email).trim().toLowerCase();
     const cleanUsername = username ? String(username).trim().toLowerCase() : cleanEmail.split("@")[0];
     const cleanFullName = full_name ? String(full_name).trim() : cleanUsername;
 
-    // 3) Verificar que el caller es owner del gym
+    // 3) Verificar que el caller sea owner del gimnasio
     const { data: gym, error: gymErr } = await supabase
       .from("gyms").select("id").eq("id", gym_id).eq("owner_id", caller.id).maybeSingle();
     if (gymErr || !gym) {
-      return json({ error: "No sos el dueño de este gimnasio" }, 403);
+      return NextResponse.json({ error: "No sos el dueño de este gimnasio" }, { status: 403 });
     }
 
-    // Helper para vincular miembro o staff
     const linkUserToGym = async (userId: string) => {
-      // Asegurar perfil
       await supabase.from("profiles").upsert({
         id: userId,
         email: cleanEmail,
@@ -99,7 +94,7 @@ Deno.serve(async (req: Request) => {
       }
     };
 
-    // 4) Verificar si el usuario YA existe en la tabla profiles
+    // 4) Buscar en profiles
     const { data: existingProfile } = await supabase
       .from("profiles")
       .select("id, email, username, full_name, role")
@@ -108,7 +103,7 @@ Deno.serve(async (req: Request) => {
 
     if (existingProfile) {
       await linkUserToGym(existingProfile.id);
-      return json({
+      return NextResponse.json({
         ok: true,
         existing: true,
         user_id: existingProfile.id,
@@ -119,7 +114,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // 5) Verificar si el usuario existe directamente en Auth (auth.users)
+    // 5) Buscar en auth.users
     const { data: userList } = await supabase.auth.admin.listUsers();
     const existingAuthUser = userList?.users?.find(
       (u) => u.email?.toLowerCase() === cleanEmail || u.user_metadata?.username?.toLowerCase() === cleanUsername
@@ -127,7 +122,7 @@ Deno.serve(async (req: Request) => {
 
     if (existingAuthUser) {
       await linkUserToGym(existingAuthUser.id);
-      return json({
+      return NextResponse.json({
         ok: true,
         existing: true,
         user_id: existingAuthUser.id,
@@ -138,9 +133,8 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // 6) Si NO existe en profiles ni en auth.users, crear la cuenta nueva
+    // 6) Crear cuenta nueva
     const password = `Spotter${randomCode(6)}!`;
-
     const { data: created, error: createErr } = await supabase.auth.admin.createUser({
       email: cleanEmail,
       password,
@@ -149,13 +143,12 @@ Deno.serve(async (req: Request) => {
     });
 
     if (createErr) {
-      // Si por alguna carrera de condiciones el usuario ya estaba registrado en auth:
       if (createErr.message.toLowerCase().includes("already")) {
         const { data: retryList } = await supabase.auth.admin.listUsers();
         const retryUser = retryList?.users?.find((u) => u.email?.toLowerCase() === cleanEmail);
         if (retryUser) {
           await linkUserToGym(retryUser.id);
-          return json({
+          return NextResponse.json({
             ok: true,
             existing: true,
             user_id: retryUser.id,
@@ -166,13 +159,13 @@ Deno.serve(async (req: Request) => {
           });
         }
       }
-      return json({ error: createErr.message }, 400);
+      return NextResponse.json({ error: createErr.message }, { status: 400 });
     }
 
     const newUserId = created.user!.id;
     await linkUserToGym(newUserId);
 
-    return json({
+    return NextResponse.json({
       ok: true,
       existing: false,
       user_id: newUserId,
@@ -183,13 +176,6 @@ Deno.serve(async (req: Request) => {
       message: `Se creó la cuenta nueva para ${cleanEmail} con clave provisoria.`,
     });
   } catch (e) {
-    return json({ error: String(e?.message || e) }, 500);
+    return NextResponse.json({ error: String(e instanceof Error ? e.message : e) }, { status: 500 });
   }
-});
-
-function json(obj: unknown, status = 200) {
-  return new Response(JSON.stringify(obj), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
 }

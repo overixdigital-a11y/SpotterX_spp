@@ -123,120 +123,149 @@ export default function GymPlansPage() {
   const monthLabel = (m: number) => (m === 1 ? "1 mes" : `${m} meses`);
 
   return (
-    <main className="mx-auto max-w-md px-4 pt-5">
-      <h1 className="text-xl font-bold text-ink">Planes / membresías</h1>
-      <p className="mt-1 text-sm text-muted">
-        Definí tus planes, promociones y precios.
-      </p>
-
-      <div className="mt-5 rounded-2xl border border-edge bg-card p-4">
-        <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
-          {editingId ? <Pencil className="h-4 w-4 text-neon" /> : <Plus className="h-4 w-4 text-neon" />}
-          {editingId ? "Editar plan" : "Nuevo plan"}
+    <main className="mx-auto max-w-5xl px-4 pt-2 md:pt-4">
+      <div className="border-b border-edge/60 pb-4">
+        <h1 className="text-2xl font-bold text-ink">Planes y Membresías</h1>
+        <p className="mt-0.5 text-sm text-muted">
+          Definí tus opciones de suscripción, duraciones, precios y promociones de captación.
         </p>
-        <div className="mt-3 space-y-2">
-          <input
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            placeholder="Nombre (ej. Trimestral Confort)"
-            className="w-full rounded-lg border border-edge bg-elevated px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-          />
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className="text-[11px] font-medium text-muted">Duración</label>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Formulario de Plan */}
+        <div className="lg:col-span-1 space-y-4 rounded-2xl border border-edge bg-card p-5 h-fit">
+          <p className="flex items-center gap-2 text-base font-bold text-ink">
+            {editingId ? <Pencil className="h-5 w-5 text-neon" /> : <Plus className="h-5 w-5 text-neon" />}
+            {editingId ? "Editar Plan" : "Crear Nuevo Plan"}
+          </p>
+
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-muted">Nombre del Plan</label>
+              <input
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="Ej: Trimestral Musculación"
+                className="w-full rounded-xl border border-edge bg-bg px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-muted">Duración</label>
+                <select
+                  value={form.duration_months}
+                  onChange={(e) => setForm({ ...form, duration_months: e.target.value })}
+                  className="w-full rounded-xl border border-edge bg-bg px-3.5 py-2.5 text-sm text-ink focus:border-neon focus:outline-none"
+                >
+                  {MONTHS.map((m) => (
+                    <option key={m} value={m}>
+                      {monthLabel(m)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-muted">Precio ($)</label>
+                <input
+                  value={form.price}
+                  onChange={(e) => setForm({ ...form, price: e.target.value })}
+                  placeholder="0"
+                  type="number"
+                  className="w-full rounded-xl border border-edge bg-bg px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-muted">Promo de Captación</label>
               <select
-                value={form.duration_months}
-                onChange={(e) => setForm({ ...form, duration_months: e.target.value })}
-                className="mt-1 w-full rounded-lg border border-edge bg-elevated px-3 py-2 text-sm text-ink focus:border-neon focus:outline-none"
+                value={form.promo_type}
+                onChange={(e) => setForm({ ...form, promo_type: e.target.value })}
+                className="w-full rounded-xl border border-edge bg-bg px-3.5 py-2.5 text-sm text-ink focus:border-neon focus:outline-none"
               >
-                {MONTHS.map((m) => (
-                  <option key={m} value={m}>
-                    {monthLabel(m)}
+                {PROMOS.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
                   </option>
                 ))}
               </select>
             </div>
-            <div className="flex-1">
-              <label className="text-[11px] font-medium text-muted">Precio ($)</label>
-              <input
-                value={form.price}
-                onChange={(e) => setForm({ ...form, price: e.target.value })}
-                placeholder="0"
-                type="number"
-                className="mt-1 w-full rounded-lg border border-edge bg-elevated px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-              />
+
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={submit}
+                disabled={saving || !form.name || !form.price}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-neon py-3 font-semibold text-bg shadow-neon transition hover:opacity-90 disabled:opacity-60"
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                {editingId ? "Guardar Cambios" : "Crear Plan"}
+              </button>
+              {editingId && (
+                <button
+                  onClick={resetForm}
+                  className="flex items-center justify-center gap-1 rounded-xl border border-edge bg-elevated px-3.5 py-3 text-sm font-medium text-muted transition hover:text-ink"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
           </div>
-          <div>
-            <label className="text-[11px] font-medium text-muted">Promo de captación</label>
-            <select
-              value={form.promo_type}
-              onChange={(e) => setForm({ ...form, promo_type: e.target.value })}
-              className="mt-1 w-full rounded-lg border border-edge bg-elevated px-3 py-2 text-sm text-ink focus:border-neon focus:outline-none"
-            >
-              {PROMOS.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={submit}
-              disabled={saving || !form.name || !form.price}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-neon py-2.5 text-sm font-semibold text-bg shadow-neon disabled:opacity-60"
-            >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-              {editingId ? "Guardar" : "Crear plan"}
-            </button>
-            {editingId && (
-              <button
-                onClick={resetForm}
-                className="flex items-center justify-center gap-1 rounded-xl border border-edge bg-elevated px-3 py-2.5 text-sm font-medium text-muted"
-              >
-                <X className="h-4 w-4" /> Cancelar
-              </button>
-            )}
-          </div>
         </div>
-      </div>
 
-      <div className="mt-5">
-        <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
-          <Receipt className="h-4 w-4 text-neon" /> Planes actuales
-        </p>
-        {plans.length === 0 ? (
-          <p className="mt-3 text-xs text-muted">Todavía no creaste planes.</p>
-        ) : (
-          <div className="mt-3 space-y-2">
-            {plans.map((p) => (
-              <div key={p.id} className="rounded-xl border border-edge bg-card p-3">
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-ink">{p.name}</p>
-                    <p className="text-xs text-muted">
-                      ${p.price} · {monthLabel(p.duration_months)}
+        {/* Lista / Grid de Planes */}
+        <div className="lg:col-span-2 space-y-4 rounded-2xl border border-edge bg-card p-5">
+          <div className="flex items-center justify-between">
+            <p className="flex items-center gap-2 text-base font-bold text-ink">
+              <Receipt className="h-5 w-5 text-neon" /> Planes Habilitados
+            </p>
+            <span className="rounded-full bg-elevated px-3 py-1 text-xs font-bold text-neon border border-neon/20">
+              Total: {plans.length}
+            </span>
+          </div>
+
+          {plans.length === 0 ? (
+            <div className="py-12 text-center text-xs text-muted">
+              Todavía no creaste ningún plan de membresía.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {plans.map((p) => (
+                <div key={p.id} className="rounded-2xl border border-edge bg-bg p-4 flex flex-col justify-between transition hover:border-neon/40">
+                  <div className="space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-bold text-ink text-base">{p.name}</p>
+                      {p.promo_type && (
+                        <span className="rounded-full bg-ember/20 px-2.5 py-0.5 text-[11px] font-bold text-ember border border-ember/30">
+                          {p.promo_type}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-2xl font-black text-neon">
+                      ${p.price.toLocaleString("es-AR")}
+                      <span className="text-xs font-normal text-muted ml-1">/ {monthLabel(p.duration_months)}</span>
                     </p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    {p.promo_type && (
-                      <span className="rounded-full bg-ember/20 px-2 py-0.5 text-[10px] font-bold text-ember">
-                        {p.promo_type}
-                      </span>
-                    )}
-                    <button onClick={() => startEdit(p)} className="rounded-lg p-2 text-muted hover:text-neon">
-                      <Pencil className="h-4 w-4" />
+
+                  <div className="flex items-center justify-end gap-2 pt-4 border-t border-edge/40 mt-4">
+                    <button
+                      onClick={() => startEdit(p)}
+                      className="flex items-center gap-1 rounded-xl border border-edge bg-card px-3 py-1.5 text-xs font-medium text-ink transition hover:border-neon/40 hover:text-neon"
+                    >
+                      <Pencil className="h-3.5 w-3.5" /> Editar
                     </button>
-                    <button onClick={() => removePlan(p.id)} className="rounded-lg p-2 text-muted hover:text-ember">
-                      <Trash2 className="h-4 w-4" />
+                    <button
+                      onClick={() => removePlan(p.id)}
+                      className="flex items-center gap-1 rounded-xl border border-edge bg-card px-2.5 py-1.5 text-xs font-medium text-muted hover:border-ember/40 hover:text-ember transition"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </main>
   );

@@ -145,9 +145,9 @@ export default function GymPantallaPage() {
       if (active) setPresence(inside);
 
       const channel = supabase
-        .channel("kiosk-ingresos")
+        .channel(`kiosk-ingresos-${g.id}`)
         .on(
-          "postgres_changes",
+          "postgres_changes" as const,
           { event: "INSERT", schema: "public", table: "gym_access_logs", filter: `gym_id=eq.${g.id}` },
           async (payload) => {
             const row = payload.new as { user_id: string; type: string; created_at: string };
@@ -180,7 +180,9 @@ export default function GymPantallaPage() {
         )
         .subscribe();
 
-      return () => channel.unsubscribe();
+      return () => {
+        supabase.removeChannel(channel);
+      };
     })();
 
     return () => {

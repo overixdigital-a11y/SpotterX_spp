@@ -48,10 +48,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="es"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full">
+      <body className="min-h-full bg-bg text-ink">
         <ToastProvider>
           <InstallPrompt />
-          <div className="mx-auto min-h-full w-full max-w-md bg-bg">
+          <div className="min-h-full w-full bg-bg">
             {children}
           </div>
         </ToastProvider>

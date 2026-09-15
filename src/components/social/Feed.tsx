@@ -139,7 +139,7 @@ export function Feed() {
   return (
     <div>
       {/* Tabs */}
-      <div className="sticky top-[52px] z-10 flex gap-1 border-b border-edge bg-bg/90 px-4 pt-2 pb-2 backdrop-blur md:top-0">
+      <div className="sticky top-[52px] z-10 flex items-center gap-1 border-b border-edge bg-bg/90 px-4 pt-2 pb-2 backdrop-blur md:top-0">
         {(
           [
             { id: "all", label: "Para vos" },
@@ -149,7 +149,7 @@ export function Feed() {
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+            className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold transition ${
               tab === t.id ? "bg-neon text-bg shadow-neon" : "text-muted hover:text-ink"
             }`}
           >
@@ -159,7 +159,7 @@ export function Feed() {
         <button
           onClick={openStreak}
           disabled={loadingStreak || !userId}
-          className="ml-auto flex shrink-0 items-center gap-1 rounded-full border border-ember/50 bg-ember/10 px-3 py-1.5 text-sm font-semibold text-ember transition active:scale-95 disabled:opacity-50"
+          className="ml-auto flex shrink-0 items-center gap-1 rounded-full border border-ember/50 bg-ember/10 px-2.5 py-1.5 text-xs font-semibold text-ember transition active:scale-95 disabled:opacity-50 sm:px-3 sm:text-sm"
         >
           {loadingStreak ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flame className="h-4 w-4" />}
           Racha

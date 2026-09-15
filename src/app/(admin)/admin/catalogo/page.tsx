@@ -32,7 +32,10 @@ export default function AdminCatalogoPage() {
     const load = async () => {
       const supabase = createClient();
       const [exRes, foodRes] = await Promise.all([
-        supabase.from("exercises").select("id, name, muscle, discipline").order("name"),
+        supabase
+          .from("exercises")
+          .select("id, name, muscle, discipline")
+          .order("name"),
         supabase.from("foods").select("id, name, category, kcal").order("name"),
       ]);
       if (exRes.data) setExercises(exRes.data as Exercise[]);
@@ -62,30 +65,43 @@ export default function AdminCatalogoPage() {
 
   const filteredExercises = exercises.filter((e) => {
     const q = search.toLowerCase();
-    return e.name.toLowerCase().includes(q) || e.muscle?.toLowerCase().includes(q);
+    return (
+      e.name.toLowerCase().includes(q) || e.muscle?.toLowerCase().includes(q)
+    );
   });
 
   const filteredFoods = foods.filter((f) => {
     const q = search.toLowerCase();
-    return f.name.toLowerCase().includes(q) || f.category.toLowerCase().includes(q);
+    return (
+      f.name.toLowerCase().includes(q) || f.category.toLowerCase().includes(q)
+    );
   });
 
   return (
-    <main className="px-4 pt-5 space-y-3">
-      {/* Tab switcher */}
+    <div className="space-y-4">
       <div className="flex gap-2">
         <button
-          onClick={() => { setTab("ejercicios"); setSearch(""); }}
-          className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold ${
-            tab === "ejercicios" ? "bg-neon/15 text-neon" : "text-muted"
+          onClick={() => {
+            setTab("ejercicios");
+            setSearch("");
+          }}
+          className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium ${
+            tab === "ejercicios"
+              ? "bg-[#00e5c7]/10 text-[#00e5c7]"
+              : "text-[#9ca3af] hover:bg-[#1a1f2e]"
           }`}
         >
           <Dumbbell className="h-3.5 w-3.5" /> Ejercicios ({exercises.length})
         </button>
         <button
-          onClick={() => { setTab("alimentos"); setSearch(""); }}
-          className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold ${
-            tab === "alimentos" ? "bg-ember/15 text-ember" : "text-muted"
+          onClick={() => {
+            setTab("alimentos");
+            setSearch("");
+          }}
+          className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium ${
+            tab === "alimentos"
+              ? "bg-[#f97316]/10 text-[#f97316]"
+              : "text-[#9ca3af] hover:bg-[#1a1f2e]"
           }`}
         >
           <UtensilsCrossed className="h-3.5 w-3.5" /> Alimentos ({foods.length})
@@ -96,50 +112,126 @@ export default function AdminCatalogoPage() {
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder={`Buscar ${tab}...`}
-        className="w-full rounded-xl border border-edge bg-bg py-2 px-3 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+        className="w-full rounded-lg border border-[#1e2530] bg-[#121722] px-3 py-2.5 text-sm text-[#e4e8ee] placeholder:text-[#6b7280] focus:border-[#00e5c7]/50 focus:outline-none"
       />
 
       {loading ? (
-        <div className="py-12 text-center">
-          <Loader2 className="mx-auto h-6 w-6 animate-spin text-neon" />
+        <div className="py-16 text-center">
+          <Loader2 className="mx-auto h-6 w-6 animate-spin text-[#00e5c7]" />
         </div>
       ) : tab === "ejercicios" ? (
-        <div className="space-y-2">
-          {filteredExercises.map((e) => (
-            <div key={e.id} className="flex items-center justify-between rounded-xl border border-edge bg-card p-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-ink">{e.name}</p>
-                <p className="text-[10px] text-muted">{e.muscle ?? "—"} · {e.discipline ?? "—"}</p>
-              </div>
-              <button
-                onClick={() => deleteExercise(e.id)}
-                disabled={busy === e.id}
-                className="rounded-lg border border-edge p-1.5 text-muted hover:border-ember hover:text-ember"
-              >
-                {busy === e.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
-              </button>
-            </div>
-          ))}
+        <div className="overflow-hidden rounded-lg border border-[#1e2530]">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-[#1e2530] bg-[#0c1017]">
+                <th className="px-4 py-2.5 text-xs font-medium text-[#9ca3af]">
+                  Nombre
+                </th>
+                <th className="hidden px-4 py-2.5 text-xs font-medium text-[#9ca3af] sm:table-cell">
+                  Grupo
+                </th>
+                <th className="hidden px-4 py-2.5 text-xs font-medium text-[#9ca3af] sm:table-cell">
+                  Disciplina
+                </th>
+                <th className="px-4 py-2.5 text-xs font-medium text-[#9ca3af]">
+                  Acción
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredExercises.map((e) => (
+                <tr
+                  key={e.id}
+                  className="border-b border-[#1e2530]/50 last:border-0 hover:bg-[#121722]/50"
+                >
+                  <td className="px-4 py-2.5 text-sm font-medium text-[#e4e8ee]">
+                    {e.name}
+                  </td>
+                  <td className="hidden px-4 py-2.5 sm:table-cell">
+                    <span className="rounded-md bg-[#1a1f2e] px-2 py-0.5 text-[11px] text-[#9ca3af]">
+                      {e.muscle ?? "—"}
+                    </span>
+                  </td>
+                  <td className="hidden px-4 py-2.5 sm:table-cell">
+                    <span className="text-xs text-[#9ca3af]">
+                      {e.discipline ?? "—"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <button
+                      onClick={() => deleteExercise(e.id)}
+                      disabled={busy === e.id}
+                      className="rounded-md p-1.5 text-[#9ca3af] hover:bg-[#ef4444]/10 hover:text-[#ef4444]"
+                    >
+                      {busy === e.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3 w-3" />
+                      )}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : (
-        <div className="space-y-2">
-          {filteredFoods.map((f) => (
-            <div key={f.id} className="flex items-center justify-between rounded-xl border border-edge bg-card p-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-ink">{f.name}</p>
-                <p className="text-[10px] text-muted">{f.category} · {f.kcal ?? "—"} kcal/100g</p>
-              </div>
-              <button
-                onClick={() => deleteFood(f.id)}
-                disabled={busy === f.id}
-                className="rounded-lg border border-edge p-1.5 text-muted hover:border-ember hover:text-ember"
-              >
-                {busy === f.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
-              </button>
-            </div>
-          ))}
+        <div className="overflow-hidden rounded-lg border border-[#1e2530]">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-[#1e2530] bg-[#0c1017]">
+                <th className="px-4 py-2.5 text-xs font-medium text-[#9ca3af]">
+                  Nombre
+                </th>
+                <th className="hidden px-4 py-2.5 text-xs font-medium text-[#9ca3af] sm:table-cell">
+                  Categoría
+                </th>
+                <th className="hidden px-4 py-2.5 text-xs font-medium text-[#9ca3af] sm:table-cell">
+                  Kcal
+                </th>
+                <th className="px-4 py-2.5 text-xs font-medium text-[#9ca3af]">
+                  Acción
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredFoods.map((f) => (
+                <tr
+                  key={f.id}
+                  className="border-b border-[#1e2530]/50 last:border-0 hover:bg-[#121722]/50"
+                >
+                  <td className="px-4 py-2.5 text-sm font-medium text-[#e4e8ee]">
+                    {f.name}
+                  </td>
+                  <td className="hidden px-4 py-2.5 sm:table-cell">
+                    <span className="rounded-md bg-[#1a1f2e] px-2 py-0.5 text-[11px] text-[#9ca3af]">
+                      {f.category}
+                    </span>
+                  </td>
+                  <td className="hidden px-4 py-2.5 sm:table-cell">
+                    <span className="text-xs text-[#9ca3af]">
+                      {f.kcal ?? "—"} kcal/100g
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <button
+                      onClick={() => deleteFood(f.id)}
+                      disabled={busy === f.id}
+                      className="rounded-md p-1.5 text-[#9ca3af] hover:bg-[#ef4444]/10 hover:text-[#ef4444]"
+                    >
+                      {busy === f.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3 w-3" />
+                      )}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
-    </main>
+    </div>
   );
 }

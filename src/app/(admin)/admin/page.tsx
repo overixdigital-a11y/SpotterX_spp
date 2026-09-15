@@ -44,75 +44,98 @@ export default function AdminDashboardPage() {
 
   if (loading) {
     return (
-      <main className="animate-pulse px-4 pt-5 space-y-4">
-        <div className="grid grid-cols-2 gap-2">
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="h-20 rounded-2xl bg-card" />
+            <div key={i} className="h-24 animate-pulse rounded-lg bg-[#121722]" />
           ))}
         </div>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="px-4 pt-5 space-y-4">
-      <h2 className="text-sm font-semibold text-ink">Resumen global</h2>
+    <div className="space-y-6">
+      <h2 className="text-sm font-semibold text-[#e4e8ee]">Resumen global</h2>
 
-      <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-2xl border border-edge bg-card p-4">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-muted">
-            <Users className="h-3.5 w-3.5 text-neon" /> Usuarios
-          </p>
-          <p className="mt-1 text-3xl font-extrabold text-ink">{stats?.users_total ?? 0}</p>
-          <p className="text-[10px] text-muted">
-            {stats?.users_alumno ?? 0} alumnos · {stats?.users_profesor ?? 0} profes · {stats?.users_gym ?? 0} gyms
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-edge bg-card p-4">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-muted">
-            <Dumbbell className="h-3.5 w-3.5 text-ember" /> Gyms
-          </p>
-          <p className="mt-1 text-3xl font-extrabold text-ink">{stats?.gyms_total ?? 0}</p>
-        </div>
-
-        <div className="rounded-2xl border border-edge bg-card p-4">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-muted">
-            <GraduationCap className="h-3.5 w-3.5 text-neon" /> Profes
-          </p>
-          <p className="mt-1 text-3xl font-extrabold text-ink">{stats?.trainers ?? 0}</p>
-          <p className="text-[10px] text-muted">{stats?.students_active ?? 0} alumnos activos</p>
-        </div>
-
-        <div className="rounded-2xl border border-edge bg-card p-4">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-muted">
-            <FileText className="h-3.5 w-3.5 text-green-400" /> Posts
-          </p>
-          <p className="mt-1 text-3xl font-extrabold text-ink">{stats?.posts_total ?? 0}</p>
-        </div>
-
-        <div className="rounded-2xl border border-edge bg-card p-4">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-muted">
-            <ShoppingBag className="h-3.5 w-3.5 text-ember" /> Órdenes
-          </p>
-          <p className="mt-1 text-3xl font-extrabold text-ink">{stats?.orders_total ?? 0}</p>
-          <p className="text-[10px] text-muted">{stats?.orders_month ?? 0} este mes</p>
-        </div>
-
-        <div className="rounded-2xl border border-edge bg-card p-4">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-muted">
-            <TrendingUp className="h-3.5 w-3.5 text-green-400" /> Ventas mes
-          </p>
-          <p className="mt-1 text-xl font-extrabold text-ink">{formatPrice(stats?.sales_month ?? 0)}</p>
-        </div>
-
-        <div className="rounded-2xl border border-neon/30 bg-neon/5 p-4">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-muted">
-            <DollarSign className="h-3.5 w-3.5 text-neon" /> Comisión mes
-          </p>
-          <p className="mt-1 text-xl font-extrabold text-neon">{formatPrice(stats?.commission_month ?? 0)}</p>
-        </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <StatCard
+          icon={<Users className="h-4 w-4 text-[#00e5c7]" />}
+          label="Usuarios"
+          value={stats?.users_total ?? 0}
+          detail={`${stats?.users_alumno ?? 0} alumnos · ${stats?.users_profesor ?? 0} profes · ${stats?.users_gym ?? 0} gyms`}
+        />
+        <StatCard
+          icon={<Dumbbell className="h-4 w-4 text-[#f97316]" />}
+          label="Gyms"
+          value={stats?.gyms_total ?? 0}
+        />
+        <StatCard
+          icon={<GraduationCap className="h-4 w-4 text-[#00e5c7]" />}
+          label="Profes"
+          value={stats?.trainers ?? 0}
+          detail={`${stats?.students_active ?? 0} alumnos activos`}
+        />
+        <StatCard
+          icon={<FileText className="h-4 w-4 text-[#22c55e]" />}
+          label="Posts"
+          value={stats?.posts_total ?? 0}
+        />
+        <StatCard
+          icon={<ShoppingBag className="h-4 w-4 text-[#f97316]" />}
+          label="Órdenes"
+          value={stats?.orders_total ?? 0}
+          detail={`${stats?.orders_month ?? 0} este mes`}
+        />
+        <StatCard
+          icon={<TrendingUp className="h-4 w-4 text-[#22c55e]" />}
+          label="Ventas mes"
+          value={formatPrice(stats?.sales_month ?? 0)}
+        />
+        <StatCard
+          icon={<DollarSign className="h-4 w-4 text-[#00e5c7]" />}
+          label="Comisión mes"
+          value={formatPrice(stats?.commission_month ?? 0)}
+          accent
+        />
       </div>
-    </main>
+    </div>
+  );
+}
+
+function StatCard({
+  icon,
+  label,
+  value,
+  detail,
+  accent,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number | string;
+  detail?: string;
+  accent?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-lg border p-4 ${
+        accent
+          ? "border-[#00e5c7]/20 bg-[#00e5c7]/5"
+          : "border-[#1e2530] bg-[#121722]"
+      }`}
+    >
+      <p className="flex items-center gap-1.5 text-xs font-medium text-[#9ca3af]">
+        {icon}
+        {label}
+      </p>
+      <p
+        className={`mt-1 text-2xl font-extrabold ${
+          accent ? "text-[#00e5c7]" : "text-[#e4e8ee]"
+        }`}
+      >
+        {value}
+      </p>
+      {detail && <p className="mt-0.5 text-[11px] text-[#6b7280]">{detail}</p>}
+    </div>
   );
 }

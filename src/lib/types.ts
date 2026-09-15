@@ -1,4 +1,4 @@
-export type AppRole = "gym" | "profesor" | "alumno";
+export type AppRole = "gym" | "profesor" | "alumno" | "admin";
 
 export interface ProfileSettings {
   notif_comment?: boolean;

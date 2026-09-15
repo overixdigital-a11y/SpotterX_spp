@@ -21,7 +21,6 @@ export default function AdminProfesPage() {
     const load = async () => {
       const supabase = createClient();
 
-      // Get authorized trainers from gym_staff
       const { data: staff } = await supabase
         .from("gym_staff")
         .select("user_id")
@@ -35,13 +34,11 @@ export default function AdminProfesPage() {
 
       const trainerIds = [...new Set(staff.map((s) => s.user_id))];
 
-      // Get profiles
       const { data: profiles } = await supabase
         .from("profiles")
         .select("id, username, full_name, email, avatar_url")
         .in("id", trainerIds);
 
-      // Get student counts
       const { data: students } = await supabase
         .from("trainer_students")
         .select("trainer_id")
@@ -68,39 +65,74 @@ export default function AdminProfesPage() {
 
   if (loading) {
     return (
-      <main className="animate-pulse px-4 pt-5 space-y-3">
+      <div className="space-y-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-16 rounded-xl bg-card" />
+          <div key={i} className="h-16 animate-pulse rounded-lg bg-[#121722]" />
         ))}
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="px-4 pt-5 space-y-3">
-      <p className="text-xs text-muted">{trainers.length} profesor{trainers.length !== 1 ? "es" : ""}</p>
+    <div className="space-y-4">
+      <p className="text-xs text-[#6b7280]">
+        {trainers.length} profesor{trainers.length !== 1 ? "es" : ""}
+      </p>
 
       {trainers.length === 0 ? (
-        <div className="py-12 text-center">
-          <GraduationCap className="mx-auto mb-3 h-8 w-8 text-muted" />
-          <p className="text-sm text-muted">No hay profes registrados</p>
+        <div className="py-16 text-center">
+          <GraduationCap className="mx-auto mb-3 h-8 w-8 text-[#6b7280]" />
+          <p className="text-sm text-[#6b7280]">No hay profes registrados</p>
         </div>
       ) : (
-        trainers.map((t) => (
-          <div key={t.id} className="flex items-center gap-3 rounded-xl border border-edge bg-card p-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-neon/15">
-              <GraduationCap className="h-5 w-5 text-neon" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-ink">{t.full_name ?? t.username}</p>
-              <p className="text-xs text-muted">@{t.username}</p>
-            </div>
-            <span className="flex shrink-0 items-center gap-1 rounded-full bg-neon/15 px-2.5 py-1 text-xs font-bold text-neon">
-              <Users className="h-3 w-3" /> {t.student_count}
-            </span>
-          </div>
-        ))
+        <div className="overflow-hidden rounded-lg border border-[#1e2530]">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-[#1e2530] bg-[#0c1017]">
+                <th className="px-4 py-2.5 text-xs font-medium text-[#9ca3af]">
+                  Profesor
+                </th>
+                <th className="hidden px-4 py-2.5 text-xs font-medium text-[#9ca3af] sm:table-cell">
+                  Email
+                </th>
+                <th className="px-4 py-2.5 text-xs font-medium text-[#9ca3af]">
+                  Alumnos
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {trainers.map((t) => (
+                <tr
+                  key={t.id}
+                  className="border-b border-[#1e2530]/50 last:border-0 hover:bg-[#121722]/50"
+                >
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#00e5c7]/10">
+                        <GraduationCap className="h-4 w-4 text-[#00e5c7]" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-[#e4e8ee]">
+                          {t.full_name ?? t.username}
+                        </p>
+                        <p className="text-xs text-[#6b7280]">@{t.username}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="hidden px-4 py-3 sm:table-cell">
+                    <span className="text-xs text-[#9ca3af]">{t.email}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="inline-flex items-center gap-1 rounded-md bg-[#00e5c7]/10 px-2.5 py-1 text-xs font-bold text-[#00e5c7]">
+                      <Users className="h-3 w-3" /> {t.student_count}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
-    </main>
+    </div>
   );
 }

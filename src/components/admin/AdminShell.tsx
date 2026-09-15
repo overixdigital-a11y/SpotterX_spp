@@ -2,7 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Users, Shield, Dumbbell, GraduationCap, Package, Store, ArrowLeft } from "lucide-react";
+import {
+  BarChart3,
+  Users,
+  Shield,
+  Dumbbell,
+  GraduationCap,
+  Package,
+  Store,
+  LogOut,
+  Menu,
+  X,
+} from "lucide-react";
+import { useState } from "react";
 
 const NAV_ITEMS = [
   { href: "/admin", label: "Dashboard", icon: BarChart3 },
@@ -16,45 +28,142 @@ const NAV_ITEMS = [
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="mx-auto min-h-screen max-w-md bg-bg">
-      {/* Header */}
-      <div className="sticky top-0 z-40 border-b border-edge bg-bg/90 backdrop-blur">
-        <div className="flex items-center gap-3 px-4 py-3">
-          <Link href="/market" className="text-muted">
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-          <h1 className="text-lg font-bold text-ink">
-            <Shield className="mr-1 inline h-4 w-4 text-ember" />
-            Admin Panel
-          </h1>
+    <div
+      className="fixed inset-0 z-50 flex overflow-hidden"
+      style={{ background: "#070a0f" }}
+    >
+      {/* Desktop sidebar */}
+      <aside className="hidden w-64 shrink-0 border-r border-[#1e2530] bg-[#0c1017] lg:flex lg:flex-col">
+        <div className="flex h-14 items-center gap-2 border-b border-[#1e2530] px-4">
+          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#00e5c7]/10">
+            <Shield className="h-4 w-4 text-[#00e5c7]" />
+          </div>
+          <span className="text-sm font-bold text-[#e4e8ee]">
+            SpotterX<span className="ml-1 text-[10px] font-medium text-[#6b7280]">Consola</span>
+          </span>
         </div>
 
-        {/* Nav tabs */}
-        <div className="flex gap-1 overflow-x-auto px-4 pb-2 no-scrollbar">
+        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-3">
           {NAV_ITEMS.map((item) => {
-            const active = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href));
+            const active =
+              pathname === item.href ||
+              (item.href !== "/admin" && pathname.startsWith(item.href));
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
+                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition ${
                   active
-                    ? "bg-ember/15 text-ember"
-                    : "text-muted hover:bg-card"
+                    ? "bg-[#00e5c7]/10 text-[#00e5c7]"
+                    : "text-[#9ca3af] hover:bg-[#1a1f2e] hover:text-[#d1d5db]"
                 }`}
               >
-                <item.icon className="h-3 w-3" />
+                <item.icon className="h-4 w-4 shrink-0" />
                 {item.label}
               </Link>
             );
           })}
-        </div>
-      </div>
+        </nav>
 
-      {/* Content */}
-      <div className="pb-24">{children}</div>
+        <div className="border-t border-[#1e2530] px-3 py-3">
+          <Link
+            href="/home"
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-[#9ca3af] hover:bg-[#1a1f2e] hover:text-[#d1d5db]"
+          >
+            <LogOut className="h-4 w-4 shrink-0" />
+            Volver a la app
+          </Link>
+        </div>
+      </aside>
+
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* Mobile sidebar */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-64 border-r border-[#1e2530] bg-[#0c1017] transition-transform duration-200 lg:hidden ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex h-14 items-center justify-between border-b border-[#1e2530] px-4">
+          <div className="flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#00e5c7]/10">
+              <Shield className="h-4 w-4 text-[#00e5c7]" />
+            </div>
+            <span className="text-sm font-bold text-[#e4e8ee]">Consola</span>
+          </div>
+          <button
+            onClick={() => setMobileOpen(false)}
+            className="rounded-lg p-1 text-[#6b7280] hover:text-[#d1d5db]"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-3">
+          {NAV_ITEMS.map((item) => {
+            const active =
+              pathname === item.href ||
+              (item.href !== "/admin" && pathname.startsWith(item.href));
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMobileOpen(false)}
+                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition ${
+                  active
+                    ? "bg-[#00e5c7]/10 text-[#00e5c7]"
+                    : "text-[#9ca3af] hover:bg-[#1a1f2e] hover:text-[#d1d5db]"
+                }`}
+              >
+                <item.icon className="h-4 w-4 shrink-0" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="border-t border-[#1e2530] px-3 py-3">
+          <Link
+            href="/home"
+            onClick={() => setMobileOpen(false)}
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-[#9ca3af] hover:bg-[#1a1f2e] hover:text-[#d1d5db]"
+          >
+            <LogOut className="h-4 w-4 shrink-0" />
+            Volver a la app
+          </Link>
+        </div>
+      </aside>
+
+      {/* Main area */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Mobile top bar */}
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-[#1e2530] bg-[#0c1017] px-4 lg:hidden">
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="rounded-lg p-1.5 text-[#9ca3af] hover:bg-[#1a1f2e] hover:text-[#d1d5db]"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[#00e5c7]/10">
+              <Shield className="h-3.5 w-3.5 text-[#00e5c7]" />
+            </div>
+            <span className="text-sm font-bold text-[#e4e8ee]">Consola Admin</span>
+          </div>
+        </header>
+
+        {/* Page content */}
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6">{children}</main>
+      </div>
     </div>
   );
 }

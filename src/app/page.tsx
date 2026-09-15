@@ -19,6 +19,9 @@ export default async function RootPage() {
   const role = (profile?.role as AppRole) ?? "alumno";
 
   switch (role) {
+    case "admin":
+      redirect("/admin");
+      break;
     case "profesor":
       redirect("/entrenamiento");
       break;

@@ -8,6 +8,7 @@ const homeByRole: Record<AppRole, string> = {
   alumno: "/home",
   profesor: "/entrenamiento",
   gym: "/gimnasio",
+  admin: "/admin",
 };
 
 export function useAuth() {

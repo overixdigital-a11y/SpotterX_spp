@@ -66,65 +66,85 @@ export default function AdminMarketPage() {
 
   if (loading) {
     return (
-      <main className="animate-pulse px-4 pt-5 space-y-3">
+      <div className="space-y-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-16 rounded-xl bg-card" />
+          <div key={i} className="h-16 animate-pulse rounded-lg bg-[#121722]" />
         ))}
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="px-4 pt-5 space-y-4">
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-2xl border border-edge bg-card p-4">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-muted">
-            <ShoppingBag className="h-3.5 w-3.5 text-ember" /> Órdenes totales
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="rounded-lg border border-[#1e2530] bg-[#121722] p-4">
+          <p className="flex items-center gap-1.5 text-xs font-medium text-[#9ca3af]">
+            <ShoppingBag className="h-3.5 w-3.5 text-[#f97316]" /> Órdenes
           </p>
-          <p className="mt-1 text-3xl font-extrabold text-ink">{orders.length}</p>
+          <p className="mt-1 text-2xl font-extrabold text-[#e4e8ee]">{orders.length}</p>
         </div>
-        <div className="rounded-2xl border border-edge bg-card p-4">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-muted">
-            <TrendingUp className="h-3.5 w-3.5 text-green-400" /> Ventas totales
+        <div className="rounded-lg border border-[#1e2530] bg-[#121722] p-4">
+          <p className="flex items-center gap-1.5 text-xs font-medium text-[#9ca3af]">
+            <TrendingUp className="h-3.5 w-3.5 text-[#22c55e]" /> Ventas totales
           </p>
-          <p className="mt-1 text-xl font-extrabold text-ink">{formatPrice(totalSales)}</p>
+          <p className="mt-1 text-xl font-extrabold text-[#e4e8ee]">
+            {formatPrice(totalSales)}
+          </p>
         </div>
-        <div className="rounded-2xl border border-neon/30 bg-neon/5 p-4">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-muted">
-            <DollarSign className="h-3.5 w-3.5 text-neon" /> Comisión total
+        <div className="rounded-lg border border-[#00e5c7]/20 bg-[#00e5c7]/5 p-4">
+          <p className="flex items-center gap-1.5 text-xs font-medium text-[#9ca3af]">
+            <DollarSign className="h-3.5 w-3.5 text-[#00e5c7]" /> Comisión total
           </p>
-          <p className="mt-1 text-xl font-extrabold text-neon">{formatPrice(totalCommission)}</p>
+          <p className="mt-1 text-xl font-extrabold text-[#00e5c7]">
+            {formatPrice(totalCommission)}
+          </p>
         </div>
         <button
           onClick={exportCSV}
-          className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-edge bg-card p-4 text-xs font-semibold text-ink"
+          className="flex flex-col items-center justify-center gap-1 rounded-lg border border-[#1e2530] bg-[#121722] p-4 text-xs font-medium text-[#e4e8ee] hover:border-[#00e5c7]/50"
         >
-          <Download className="h-5 w-5 text-neon" />
+          <Download className="h-5 w-5 text-[#00e5c7]" />
           Exportar CSV
         </button>
       </div>
 
-      {/* Orders list */}
       <div>
-        <h3 className="mb-2 text-sm font-semibold text-ink">Últimas órdenes</h3>
-        <div className="space-y-2">
-          {orders.slice(0, 50).map((o) => (
-            <div key={o.id} className="flex items-center justify-between rounded-xl border border-edge bg-card p-3">
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-ink">#{o.id.slice(0, 8)}</p>
-                <p className="text-[10px] text-muted">
-                  {new Date(o.created_at).toLocaleDateString("es-AR")} · {o.delivery_type}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-bold text-ink">{formatPrice(o.total)}</p>
-                <p className="text-[10px] text-neon">com: {formatPrice(o.platform_fee)}</p>
-              </div>
-            </div>
-          ))}
+        <h3 className="mb-3 text-sm font-semibold text-[#e4e8ee]">Últimas órdenes</h3>
+        <div className="overflow-hidden rounded-lg border border-[#1e2530]">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-[#1e2530] bg-[#0c1017]">
+                <th className="px-4 py-2.5 text-xs font-medium text-[#9ca3af]">ID</th>
+                <th className="px-4 py-2.5 text-xs font-medium text-[#9ca3af]">Fecha</th>
+                <th className="hidden px-4 py-2.5 text-xs font-medium text-[#9ca3af] sm:table-cell">Entrega</th>
+                <th className="px-4 py-2.5 text-xs font-medium text-[#9ca3af]">Total</th>
+                <th className="px-4 py-2.5 text-xs font-medium text-[#9ca3af]">Comisión</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.slice(0, 50).map((o) => (
+                <tr key={o.id} className="border-b border-[#1e2530]/50 last:border-0 hover:bg-[#121722]/50">
+                  <td className="px-4 py-2.5 text-xs font-medium text-[#e4e8ee]">
+                    #{o.id.slice(0, 8)}
+                  </td>
+                  <td className="px-4 py-2.5 text-xs text-[#9ca3af]">
+                    {new Date(o.created_at).toLocaleDateString("es-AR")}
+                  </td>
+                  <td className="hidden px-4 py-2.5 text-xs text-[#9ca3af] sm:table-cell">
+                    {o.delivery_type}
+                  </td>
+                  <td className="px-4 py-2.5 text-xs font-medium text-[#e4e8ee]">
+                    {formatPrice(o.total)}
+                  </td>
+                  <td className="px-4 py-2.5 text-xs font-medium text-[#00e5c7]">
+                    {formatPrice(o.platform_fee)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

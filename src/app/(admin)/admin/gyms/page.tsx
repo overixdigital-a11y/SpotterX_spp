@@ -16,6 +16,8 @@ interface GymRow {
   owner_id: string;
   created_at: string;
   member_count?: number;
+  owner_name?: string | null;
+  owner_username?: string | null;
 }
 
 interface ImportResult {
@@ -48,19 +50,36 @@ export default function AdminGymsPage() {
       }
 
       const gymIds = data.map((g) => g.id);
-      const { data: memberships } = await supabase
-        .from("gym_memberships")
-        .select("gym_id")
-        .eq("status", "activa")
-        .in("gym_id", gymIds);
+      const ownerIds = [...new Set(data.map((g) => g.owner_id))];
+
+      const [{ data: memberships }, { data: owners }] = await Promise.all([
+        supabase
+          .from("gym_memberships")
+          .select("gym_id")
+          .eq("status", "activa")
+          .in("gym_id", gymIds),
+        supabase
+          .from("profiles")
+          .select("id, full_name, username")
+          .in("id", ownerIds),
+      ]);
 
       const countMap = new Map<string, number>();
       memberships?.forEach((m) => {
         countMap.set(m.gym_id, (countMap.get(m.gym_id) ?? 0) + 1);
       });
+      const ownerMap = new Map<string, { full_name: string | null; username: string | null }>();
+      owners?.forEach((o) => {
+        ownerMap.set(o.id, { full_name: o.full_name, username: o.username });
+      });
 
       setGyms(
-        data.map((g) => ({ ...g, member_count: countMap.get(g.id) ?? 0 }))
+        data.map((g) => ({
+          ...g,
+          member_count: countMap.get(g.id) ?? 0,
+          owner_name: ownerMap.get(g.owner_id)?.full_name ?? null,
+          owner_username: ownerMap.get(g.owner_id)?.username ?? null,
+        }))
       );
       setLoading(false);
     };
@@ -159,6 +178,9 @@ export default function AdminGymsPage() {
                   Ubicación
                 </th>
                 <th className="hidden px-4 py-2.5 text-xs font-medium text-[#9ca3af] sm:table-cell">
+                  Dueño
+                </th>
+                <th className="hidden px-4 py-2.5 text-xs font-medium text-[#9ca3af] sm:table-cell">
                   Miembros
                 </th>
                 <th className="px-4 py-2.5 text-xs font-medium text-[#9ca3af]">
@@ -188,6 +210,14 @@ export default function AdminGymsPage() {
                         <MapPin className="h-3 w-3" /> {g.city}
                       </span>
                     )}
+                  </td>
+                  <td className="hidden px-4 py-3 sm:table-cell">
+                    <div>
+                      <p className="text-xs text-[#e4e8ee]">{g.owner_name ?? "—"}</p>
+                      {g.owner_username && (
+                        <p className="text-[11px] text-[#6b7280]">@{g.owner_username}</p>
+                      )}
+                    </div>
                   </td>
                   <td className="hidden px-4 py-3 sm:table-cell">
                     <span className="flex items-center gap-1 text-xs text-[#9ca3af]">

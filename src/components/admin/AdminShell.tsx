@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   BarChart3,
   Users,
@@ -10,11 +10,13 @@ import {
   GraduationCap,
   Package,
   Store,
+  ArrowLeft,
   LogOut,
   Menu,
   X,
 } from "lucide-react";
 import { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 const NAV_ITEMS = [
   { href: "/admin", label: "Dashboard", icon: BarChart3 },
@@ -28,7 +30,14 @@ const NAV_ITEMS = [
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const signOut = async () => {
+    await createClient().auth.signOut();
+    router.refresh();
+    router.push("/login");
+  };
 
   return (
     <div
@@ -68,14 +77,21 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="border-t border-[#1e2530] px-3 py-3">
+        <div className="border-t border-[#1e2530] px-3 py-3 space-y-0.5">
           <Link
             href="/home"
             className="flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-[#9ca3af] hover:bg-[#1a1f2e] hover:text-[#d1d5db]"
           >
-            <LogOut className="h-4 w-4 shrink-0" />
+            <ArrowLeft className="h-4 w-4 shrink-0" />
             Volver a la app
           </Link>
+          <button
+            onClick={signOut}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-[#ef4444]/70 hover:bg-[#1a1f2e] hover:text-[#ef4444]"
+          >
+            <LogOut className="h-4 w-4 shrink-0" />
+            Cerrar sesión
+          </button>
         </div>
       </aside>
 
@@ -131,15 +147,22 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="border-t border-[#1e2530] px-3 py-3">
+        <div className="border-t border-[#1e2530] px-3 py-3 space-y-0.5">
           <Link
             href="/home"
             onClick={() => setMobileOpen(false)}
             className="flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-[#9ca3af] hover:bg-[#1a1f2e] hover:text-[#d1d5db]"
           >
-            <LogOut className="h-4 w-4 shrink-0" />
+            <ArrowLeft className="h-4 w-4 shrink-0" />
             Volver a la app
           </Link>
+          <button
+            onClick={() => { setMobileOpen(false); signOut(); }}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-[#ef4444]/70 hover:bg-[#1a1f2e] hover:text-[#ef4444]"
+          >
+            <LogOut className="h-4 w-4 shrink-0" />
+            Cerrar sesión
+          </button>
         </div>
       </aside>
 

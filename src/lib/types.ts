@@ -27,6 +27,11 @@ export interface Profile {
   privacy: "publico" | "solo_seguidores";
   settings: ProfileSettings | null;
   disciplines: string[] | null;
+  certifications: { name: string; issuer: string; year: number | string }[] | null;
+  hourly_rate: number | null;
+  specialties: string[] | null;
+  years_experience: number | null;
+  availability: Record<string, string[]> | null;
   created_at: string;
   updated_at?: string | null;
 }

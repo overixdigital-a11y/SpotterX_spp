@@ -534,7 +534,7 @@ export default function MiEntrenamientoPage() {
 
   if (trainers.length === 0) {
     return (
-      <main className="mx-auto max-w-md px-4 pt-5 pb-24">
+      <main className="mx-auto max-w-full px-4 pt-5 pb-24">
         <h1 className="text-xl font-bold text-ink">Mi entrenamiento</h1>
         <div className="mt-6 rounded-xl border border-edge bg-card p-6 text-center">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-neon/20">
@@ -558,7 +558,7 @@ export default function MiEntrenamientoPage() {
   const trainer = trainers.find((t) => t.id === trainerId) ?? trainers[0];
 
   return (
-    <main className="mx-auto max-w-md px-4 pt-5 pb-24">
+    <main className="mx-auto max-w-full px-4 pt-5 pb-24">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-ink">Mi entrenamiento</h1>
         <Link

@@ -296,7 +296,7 @@ export default function MemberDetailPage() {
   const payOk = membership?.pay_status === "pagado" || membership?.pay_status === "promo";
 
   return (
-    <main className="mx-auto max-w-md">
+    <main className="mx-auto max-w-2xl">
       <div className="flex items-center gap-3 px-4 pt-4">
         <Link href="/gimnasio/miembros" className="text-muted hover:text-ink">
           <ArrowLeft className="h-5 w-5" />

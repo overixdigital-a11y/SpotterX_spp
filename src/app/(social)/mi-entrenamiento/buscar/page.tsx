@@ -145,7 +145,7 @@ export default function BuscarProfePage() {
   }
 
   return (
-    <main className="mx-auto mb-4 max-w-md px-4 pt-5">
+    <main className="mx-auto mb-4 max-w-full px-4 pt-5">
       <div className="flex items-center gap-3">
         <button
           onClick={() => router.back()}

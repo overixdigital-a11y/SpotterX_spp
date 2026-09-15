@@ -67,7 +67,7 @@ export default function MarketPage() {
   };
 
   return (
-    <main className="mx-auto max-w-md pb-24">
+    <main className="mx-auto max-w-md md:max-w-2xl lg:max-w-4xl pb-24">
       <div className="sticky top-0 z-30 border-b border-edge bg-bg/90 backdrop-blur">
         <div className="flex items-center gap-3 px-4 py-3">
           <Store className="h-5 w-5 text-ember" />
@@ -128,7 +128,7 @@ export default function MarketPage() {
 
       <div className="p-4">
         {loading ? (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="animate-pulse rounded-xl border border-edge bg-card">
                 <div className="aspect-square bg-bg" />
@@ -149,7 +149,7 @@ export default function MarketPage() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               {products.map((p) => (
                 <ProductCard key={p.id} product={p} />
               ))}

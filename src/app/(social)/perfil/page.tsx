@@ -53,7 +53,7 @@ export default function PerfilPage() {
         </div>
       )}
 
-      <div className="mt-5 grid grid-cols-3 divide-x divide-edge border-b border-t border-edge text-center">
+      <div className="mt-5 grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 divide-x divide-edge border-b border-t border-edge text-center">
         {[
           ["12", "Posts"],
           ["1.2k", "Seguidores"],
@@ -66,7 +66,7 @@ export default function PerfilPage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-3 gap-1 p-1">
+      <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1 p-1">
         {Array.from({ length: 9 }).map((_, i) => (
           <div key={i} className="aspect-square rounded-lg bg-card">
             <Zap className="h-full w-full p-4 text-muted/40" />

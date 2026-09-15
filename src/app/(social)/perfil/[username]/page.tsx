@@ -156,7 +156,7 @@ export default function PublicProfilePage() {
         </div>
       )}
 
-      <div className="mt-5 grid grid-cols-3 divide-x divide-edge border-b border-t border-edge text-center">
+      <div className="mt-5 grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 divide-x divide-edge border-b border-t border-edge text-center">
         {[
           [String(posts.length), "Posts"],
           ["0", "Seguidores"],
@@ -169,7 +169,7 @@ export default function PublicProfilePage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-3 gap-1 p-1">
+      <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1 p-1">
         {posts.length === 0 && (
           <div className="col-span-3 py-10 text-center text-sm text-muted">
             Sin publicaciones todavía

@@ -139,7 +139,7 @@ export function Feed() {
   return (
     <div>
       {/* Tabs */}
-      <div className="sticky top-0 z-10 flex gap-1 border-b border-edge bg-bg/90 px-4 pt-2 pb-2 backdrop-blur">
+      <div className="sticky top-[52px] z-10 flex gap-1 border-b border-edge bg-bg/90 px-4 pt-2 pb-2 backdrop-blur md:top-0">
         {(
           [
             { id: "all", label: "Para vos" },

@@ -155,7 +155,7 @@ export default function ChatPage() {
 
   return (
     <main className="mx-auto flex h-full max-w-full flex-col">
-      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-edge bg-bg/90 px-4 py-3 backdrop-blur">
+      <div className="sticky top-[52px] z-10 flex items-center gap-3 border-b border-edge bg-bg/90 px-4 py-3 backdrop-blur md:top-0">
         <Link href="/home" className="text-muted transition hover:text-ink">
           <ArrowLeft className="h-5 w-5" />
         </Link>

@@ -58,3 +58,11 @@ body {
 @utility shadow-ember {
   box-shadow: 0 0 18px rgba(255, 94, 54, 0.35);
 }
+
+@utility no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}

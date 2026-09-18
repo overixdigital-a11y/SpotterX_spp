@@ -169,7 +169,7 @@ export default function ZonaPage() {
   }
 
   return (
-    <main className="mx-auto max-w-full px-4 pt-5">
+    <main className="mx-auto max-w-xl px-4 pt-5 md:max-w-2xl lg:max-w-3xl">
       <h1 className="text-xl font-bold text-ink">Mi zona</h1>
       <p className="mt-1 text-sm text-muted">
         Postulate a gimnasios o sumá los lugares donde trabajás para que los alumnos te encuentren por zona.

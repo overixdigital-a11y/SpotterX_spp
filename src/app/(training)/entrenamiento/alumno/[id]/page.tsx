@@ -841,7 +841,7 @@ export default function AlumnoPage() {
   }
 
   return (
-    <main className="mx-auto max-w-full px-4 pt-5">
+    <main className="mx-auto max-w-xl px-4 pt-5 md:max-w-2xl lg:max-w-3xl">
       <div className="flex items-center gap-3">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-neon/20 text-base font-bold text-neon">
           {(student?.full_name || student?.username || "U").slice(0, 2).toUpperCase()}

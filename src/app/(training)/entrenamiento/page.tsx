@@ -85,7 +85,7 @@ export default function EntrenamientoPage() {
   }
 
   return (
-    <main className="mx-auto max-w-full px-4 pt-5">
+    <main className="mx-auto max-w-xl px-4 pt-5 md:max-w-2xl lg:max-w-3xl">
       <h1 className="text-xl font-bold text-ink">Mis alumnos</h1>
 
       {/* Tabs */}

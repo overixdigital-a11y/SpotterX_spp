@@ -208,6 +208,19 @@ Orden de etapas para pulir/completar la app, módulo por módulo. Cada etapa ter
 - Iconos en `public/`: `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`, `apple-touch-icon.png` (traídos de la copia Antigravity, textos corregidos — la copia tenía mojibake "Entrenǭ").
 - **Merge con GitHub**: resueltos conflictos con commits del remote (invite-member API route, GymShell fixes, responsive layout, kiosk fixes). Se tomó la versión remota para archivos no modificados por nosotros.
 
+**Lote 6 — Shells responsivos: Training + Market (18/09/2026, commits `3278bce` + `a0a50d1`):**
+- **`TrainingShell` responsivo** (commit `3278bce`): **El área "Mis alumnos" ya no pierde la barra lateral en la web.**
+  - **`DesktopSidebar`** (`hidden md:flex`, fija izq. `w-64`, mismo estilo/iconos que SocialShell): brand + badge "Profesor", nav (Alumnos · Mi zona · Market · Perfil) con active = href más específico, sección "Mi Espacio" (**Red social** `/home` · **Editar perfil**), **Cerrar sesión**.
+  - Header y pill del profe → `md:hidden` (solo mobile).
+  - Root: `<div className="flex min-h-screen bg-bg">` + sidebar + `<div className="flex-1 md:pl-64">{children}</div>`.
+  - Los 3 mains del training (`/entrenamiento`, `zona`, `alumno/[id]`) de `max-w-full` → `mx-auto max-w-xl md:max-w-2xl lg:max-w-3xl`.
+- **`MarketShell` responsivo** (commit `a0a50d1`): mismo patrón para todo el market.
+  - **`DesktopSidebar`** (`hidden md:flex`, `w-64`): nav (Productos · Crear [highlight neón] · Mis ventas · Mis compras · Billetera · Carrito) + **Admin** (solo `is_admin`) + sección "Mi Espacio" (**Red social** `/home`) + **Cerrar sesión**.
+  - **Pill inferior** (`md:hidden`) en market móvil: Productos · **Crear** (+) · Mis ventas · Mis compras · Carrito.
+  - Root: same flex pattern con `md:pl-64`; **quitado `pb-24`** de los mains (el shell maneja el espaciado).
+  - `(market)/layout.tsx`: auth check server-side (`redirect("/login")`) + `<MarketShell>` (wrap AuthProvider) — ahora el market **exige iniciar sesión**.
+  - Los 8 mains del market **ensanchados**: storefront `max-w-md` → `md:max-w-2xl lg:max-w-4xl`; páginas internas → `md:max-w-2xl lg:max-w-3xl`.
+
 ### 🟦 Etapa 6 — Empaquetado app (bonus, final del roadmap)
 - Capacitor → APK/iOS, escaneo QR nativo, push reales.
 

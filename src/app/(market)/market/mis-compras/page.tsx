@@ -67,7 +67,7 @@ export default function MisComprasPage() {
   }
 
   return (
-    <main className="mx-auto max-w-md pb-24">
+    <main className="mx-auto max-w-md md:max-w-2xl lg:max-w-3xl">
       <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-edge bg-bg/90 px-4 py-3 backdrop-blur">
         <Link href="/market" className="text-muted">
           <ArrowLeft className="h-5 w-5" />

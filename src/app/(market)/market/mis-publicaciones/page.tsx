@@ -66,7 +66,7 @@ export default function MisPublicacionesPage() {
   }
 
   return (
-    <main className="mx-auto max-w-md pb-24">
+    <main className="mx-auto max-w-md md:max-w-2xl lg:max-w-3xl">
       <div className="sticky top-0 z-30 border-b border-edge bg-bg/90 backdrop-blur">
         <div className="flex items-center gap-3 px-4 py-3">
           <Link href="/market" className="text-muted">

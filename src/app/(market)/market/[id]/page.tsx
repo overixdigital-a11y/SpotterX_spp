@@ -118,7 +118,7 @@ export default function MarketProductPage() {
   }
 
   return (
-    <main className="mx-auto max-w-md pb-24">
+    <main className="mx-auto max-w-md md:max-w-2xl lg:max-w-3xl">
       {/* Header */}
       <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-edge bg-bg/90 px-4 py-3 backdrop-blur">
         <button onClick={() => router.back()} className="text-muted">

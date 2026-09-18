@@ -67,7 +67,7 @@ export default function MarketPage() {
   };
 
   return (
-    <main className="mx-auto max-w-md md:max-w-2xl lg:max-w-4xl pb-24">
+    <main className="mx-auto max-w-md md:max-w-2xl lg:max-w-4xl">
       <div className="sticky top-0 z-30 border-b border-edge bg-bg/90 backdrop-blur">
         <div className="flex items-center gap-3 px-4 py-3">
           <Store className="h-5 w-5 text-ember" />

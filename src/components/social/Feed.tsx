@@ -214,7 +214,7 @@ export function Feed() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-xl overflow-x-clip" ref={feedRef}>
+    <div className="mx-auto w-full max-w-[92vw] overflow-x-clip" ref={feedRef}>
       {/* Tabs */}
       <div className="sticky top-[52px] z-10 flex items-center gap-1 border-b border-edge bg-bg/90 px-4 pt-2 pb-2 backdrop-blur md:top-0">
         {(
@@ -336,7 +336,7 @@ export function Feed() {
       {/* Marcador v9 (Lote 9 commit 3951d95) - SOLO ASCII: marca inequivoca de bundle nuevo para test de cache (v8 no puede imprimir esto) */}
       <div className="pointer-events-none fixed inset-x-0 bottom-16 z-[60] flex justify-center md:bottom-2" data-med="1">
         <span className="max-w-[92vw] truncate rounded-full border border-neon bg-card/95 px-2 py-0.5 text-[9px] font-bold tracking-wider text-neon shadow-lg">
-          v10-L10-ASCII | {diag ? renderDiag(diag) : "midiendo."}
+          v11-L11-92VW | {diag ? renderDiag(diag) : "midiendo."}
         </span>
       </div>
     </div>

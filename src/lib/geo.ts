@@ -58,9 +58,8 @@ export function getDirectionsUrl(lat: number, lng: number): string {
  * de Esri World Dark Gray Canvas (no requiere API key) y su atribución.
  */
 export const DARK_MAP_TILES = {
-  url: "https://{s}.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+  url: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
   attribution:
     'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
-  subdomains: "abcd",
   maxZoom: 19,
 };

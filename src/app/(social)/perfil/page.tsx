@@ -1,11 +1,37 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useAuthState } from "@/lib/auth-context";
+import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
-import { MapPin, Zap, ChevronRight, Dumbbell, ShoppingBag, Users } from "lucide-react";
+import { MapPin, Zap, ChevronRight, Dumbbell, ShoppingBag, Users, GraduationCap, UserRound } from "lucide-react";
 
 export default function PerfilPage() {
-  const { profile } = useAuthState();
+  const { userId, profile } = useAuthState();
+  const [profeUsername, setProfeUsername] = useState<string | null>(null);
+  const [profeName, setProfeName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (profile?.role !== "alumno" || !userId) return;
+    const loadProfe = async () => {
+      const { data: ts } = await createClient()
+        .from("trainer_students")
+        .select("trainer_id")
+        .eq("student_id", userId);
+      const ids = (ts as { trainer_id: string }[] | null)?.map((t) => t.trainer_id) ?? [];
+      if (ids.length === 0) return;
+      const { data: ps } = await createClient()
+        .from("profiles")
+        .select("username, full_name")
+        .in("id", ids);
+      const profe = (ps as { username: string; full_name: string | null }[] | null)?.[0];
+      if (profe) {
+        setProfeUsername(profe.username);
+        setProfeName(profe.full_name || profe.username);
+      }
+    };
+    loadProfe();
+  }, [profile?.role, userId]);
 
   const initial =
     (profile?.full_name || profile?.username || "U").slice(0, 2).toUpperCase();
@@ -41,6 +67,31 @@ export default function PerfilPage() {
             Mi gimnasio
           </p>
           <ChevronRight className="h-4 w-4 text-neon" />
+        </Link>
+      )}
+
+      {profile?.role === "alumno" && (
+        <Link
+          href="/mi-entrenamiento"
+          className="mx-4 mt-4 flex items-center justify-between rounded-2xl border border-neon/30 bg-neon/10 p-3.5"
+        >
+          <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <span className="rounded-full bg-neon/20 p-1.5 text-neon">
+              <GraduationCap className="h-4 w-4" />
+            </span>
+            Ver a mi profesor
+          </p>
+          <ChevronRight className="h-4 w-4 text-neon" />
+        </Link>
+      )}
+
+      {profile?.role === "alumno" && profeUsername && (
+        <Link
+          href={`/perfil/${profeUsername}`}
+          className="mx-4 mt-2 flex items-center gap-1.5 pl-3.5 text-xs text-muted transition hover:text-neon"
+        >
+          <UserRound className="h-3.5 w-3.5" />
+          Ver perfil de {profeName ?? profeUsername}
         </Link>
       )}
 

@@ -248,6 +248,13 @@ export function Feed() {
           category="#CrossFit"
         />
       )}
+
+      {/* Marcador de versión — ayuda a confirmar si el celular sirve el bundle actual (diagnóstico de caché) */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-20 z-[60] flex justify-center md:bottom-6">
+        <span className="rounded-full border border-edge bg-card/95 px-2 py-0.5 text-[9px] font-bold tracking-wider text-muted shadow-lg">
+          v7 · SpotterX
+        </span>
+      </div>
     </div>
   );
 }

@@ -221,6 +221,12 @@ Orden de etapas para pulir/completar la app, módulo por módulo. Cada etapa ter
   - `(market)/layout.tsx`: auth check server-side (`redirect("/login")`) + `<MarketShell>` (wrap AuthProvider) — ahora el market **exige iniciar sesión**.
   - Los 8 mains del market **ensanchados**: storefront `max-w-md` → `md:max-w-2xl lg:max-w-4xl`; páginas internas → `md:max-w-2xl lg:max-w-3xl`.
 
+**Lote 8 — Marcador v7 para diagnosticar caché (18/09/2026, commit `a2547f4`):**
+- El usuario seguía viendo el feed cortado/racha invisible en el celular **después** de los fixes reales del Lote 7 (build OK). Hipótesis fuerte: **bundle/caché viejo** en el teléfono (Next/Vercel firma `_next/static/*` con `immutable` + cache largo; sin service worker en el repo, no es PWA-offline).
+- **`Feed.tsx`** (al final, líneas 253-255): badge **`v7 · SpotterX`** `pointer-events-none fixed inset-x-0 bottom-20 z-[60] flex justify-center ... md:bottom-6` (autocontenido, no genera overflow).
+- **Cómo verificar**: abrir la app en el celular → si **NO** aparece el badge `v7` → es caché/bundle viejo → recarga forzada / cerrar app / si está instalada como PWA, **desinstalar y reinstalar** / abrir en navegador. Si **SÍ** aparece y el feed sigue cortado → recién ahí es CSS real → diagnosticar con medición del DOM.
+- **Atención docs**: AGENTS.md + journal tenían mojibake (PowerShell corrompe UTF-8 con `Get-Content`). Anclar en texto ASCII puro + reads vía herramienta `read`.
+
 **Lote 7 — Racha visible + feed sin overflow (18/09/2026, commit `Racha-feed-overflow`):**
 - En el celular, el feed desbordaba por su lateral derecho: `overflow-x-hidden` del body recortaba el excedente �?"" en vez de desplazarlo �?"" y el bot��n **Racha** (que cuelga con `ml-auto` al borde derecho de la barra sticky de tabs) quedaba fuera de pantalla e invisible.
 - **`Feed.tsx`**: root `w-full` ��' `mx-auto w-full max-w-xl overflow-x-clip` (clipea el desbordamiento UNA capa antes que el body + enmarca el contenido en una columna centrada angosta en mobile).

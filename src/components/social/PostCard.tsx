@@ -246,7 +246,7 @@ export function PostCard({
       </div>
 
       {caption && (
-        <Link href={`/posts/${post.id}`} className="block px-3 pb-3 text-sm text-ink">
+        <Link href={`/posts/${post.id}`} className="block break-words px-3 pb-3 text-sm text-ink">
           {renderCaption()}
         </Link>
       )}

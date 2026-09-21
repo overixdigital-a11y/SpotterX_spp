@@ -221,6 +221,13 @@ Orden de etapas para pulir/completar la app, módulo por módulo. Cada etapa ter
   - `(market)/layout.tsx`: auth check server-side (`redirect("/login")`) + `<MarketShell>` (wrap AuthProvider) — ahora el market **exige iniciar sesión**.
   - Los 8 mains del market **ensanchados**: storefront `max-w-md` → `md:max-w-2xl lg:max-w-4xl`; páginas internas → `md:max-w-2xl lg:max-w-3xl`.
 
+**Lote 7 — Racha visible + feed sin overflow (18/09/2026, commit `Racha-feed-overflow`):**
+- En el celular, el feed desbordaba por su lateral derecho: `overflow-x-hidden` del body recortaba el excedente �?"" en vez de desplazarlo �?"" y el bot��n **Racha** (que cuelga con `ml-auto` al borde derecho de la barra sticky de tabs) quedaba fuera de pantalla e invisible.
+- **`Feed.tsx`**: root `w-full` ��' `mx-auto w-full max-w-xl overflow-x-clip` (clipea el desbordamiento UNA capa antes que el body + enmarca el contenido en una columna centrada angosta en mobile).
+- **Barra de tabs + Racha** (`Feed.tsx`): tabs `shrink-0`, Racha `ml-auto flex shrink-0 px-2.5 ... sm:px-3 sm:text-sm` �?"" cabe junto a "Para vos / Siguiendo" en pantallas angostas.
+- **`PostCard.tsx`**: caption ��' `break-words` (URLs/palabras largas ya no empujan el ancho de la columna, causa t��pica del corte por derecha).
+- Verificado: lint 0 errores + build ✓ (44 rutas).
+
 ### 🟦 Etapa 6 — Empaquetado app (bonus, final del roadmap)
 - Capacitor → APK/iOS, escaneo QR nativo, push reales.
 

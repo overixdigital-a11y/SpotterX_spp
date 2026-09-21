@@ -3,6 +3,8 @@
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { DARK_MAP_TILES, getDirectionsUrl } from "@/lib/geo";
+import { Navigation } from "lucide-react";
 
 // Fix de iconos por defecto de leaflet en bundlers
 const icon = L.icon({
@@ -31,14 +33,27 @@ export default function GymMap({
       center={pos}
       zoom={15}
       scrollWheelZoom={false}
-      style={{ height: "180px", width: "100%", borderRadius: 12 }}
+      style={{ height: "180px", width: "100%", borderRadius: 12, backgroundColor: "#0c1017" }}
     >
       <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution={DARK_MAP_TILES.attribution}
+        url={DARK_MAP_TILES.url}
       />
       <Marker position={pos} icon={icon}>
-        <Popup>{name ?? "Gimnasio"}</Popup>
+        <Popup>
+          <div className="min-w-[150px] p-0.5 text-sm">
+            <p className="font-bold text-[#111]">{name ?? "Gimnasio"}</p>
+            <a
+              href={getDirectionsUrl(latitude, longitude)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 flex items-center justify-center gap-1.5 rounded-lg bg-[#00f2fe] px-2.5 py-1 text-xs font-semibold text-[#05070a] transition hover:brightness-110"
+            >
+              <Navigation className="h-3 w-3" />
+              Cómo llegar
+            </a>
+          </div>
+        </Popup>
       </Marker>
     </MapContainer>
   );

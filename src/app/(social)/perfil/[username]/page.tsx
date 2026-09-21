@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { MapPin, Zap, UserPlus, Check, Loader2, Award, DollarSign, MessageCircle, ExternalLink, Clock, Store } from "lucide-react";
+import { MapPin, Zap, UserPlus, Check, Loader2, Award, DollarSign, MessageCircle, ExternalLink, Clock, Store, Navigation } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { Avatar } from "@/components/core/Avatar";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { DARK_MAP_TILES, getDirectionsUrl } from "@/lib/geo";
 
 const gymIcon = L.icon({
   iconUrl: "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="30" height="46"><path fill="#00f2fe" stroke="#05070a" stroke-width="1.5" d="M15 0C6.7 0 0 6.7 0 15c0 9.7 15 31 15 31s15-21.3 15-31C30 6.7 23.3 0 15 0z"/><circle cx="15" cy="15" r="6" fill="#05070a"/></svg>`),
@@ -436,16 +437,51 @@ export default function PublicProfilePage() {
                   <>
                     {withCoords.length > 0 && (
                       <div className="overflow-hidden rounded-2xl border border-edge">
-                        <MapContainer center={[withCoords[0].lat!, withCoords[0].lng!]} zoom={12} scrollWheelZoom={false} style={{ height: "220px", width: "100%" }}>
-                          <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                        <MapContainer
+                          center={[withCoords[0].lat!, withCoords[0].lng!]}
+                          zoom={12}
+                          scrollWheelZoom={false}
+                          style={{ height: "220px", width: "100%", backgroundColor: "#0c1017" }}
+                        >
+                          <TileLayer
+                            attribution={DARK_MAP_TILES.attribution}
+                            url={DARK_MAP_TILES.url}
+                          />
                           {workplaces.gyms.filter((g) => typeof g.latitude === "number" && typeof g.longitude === "number").map((g) => (
                             <Marker key={`gym-${g.gym_id}`} position={[g.latitude!, g.longitude!]} icon={gymIcon}>
-                              <Popup><div className="min-w-[140px] text-sm"><p className="font-bold text-[#111]">{g.name}</p><p className="text-xs text-[#555]">{g.city}{g.address ? ` · ${g.address}` : ""}</p></div></Popup>
+                              <Popup>
+                                <div className="min-w-[150px] p-0.5 text-sm">
+                                  <p className="font-bold text-[#111]">{g.name}</p>
+                                  <p className="text-xs text-[#555]">{g.city}{g.address ? ` · ${g.address}` : ""}</p>
+                                  <a
+                                    href={getDirectionsUrl(g.latitude!, g.longitude!)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="mt-2 flex items-center justify-center gap-1 rounded-lg bg-[#00f2fe] px-2 py-1 text-[11px] font-semibold text-[#05070a]"
+                                  >
+                                    <Navigation className="h-3 w-3" /> Cómo llegar
+                                  </a>
+                                </div>
+                              </Popup>
                             </Marker>
                           ))}
                           {workplaces.zonas.filter((z) => typeof z.latitude === "number" && typeof z.longitude === "number").map((z) => (
                             <Marker key={`zona-${z.id}`} position={[z.latitude!, z.longitude!]} icon={zonaIcon}>
-                              <Popup><div className="min-w-[140px] text-sm"><p className="font-bold text-[#111]">{z.name}</p><p className="text-xs text-[#555]">{z.city}{z.address ? ` · ${z.address}` : ""}</p>{z.availability && <p className="mt-0.5 text-xs text-[#0a6]">Horarios: {z.availability}</p>}</div></Popup>
+                              <Popup>
+                                <div className="min-w-[150px] p-0.5 text-sm">
+                                  <p className="font-bold text-[#111]">{z.name}</p>
+                                  <p className="text-xs text-[#555]">{z.city}{z.address ? ` · ${z.address}` : ""}</p>
+                                  {z.availability && <p className="mt-0.5 text-xs text-[#0a6]">Horarios: {z.availability}</p>}
+                                  <a
+                                    href={getDirectionsUrl(z.latitude!, z.longitude!)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="mt-2 flex items-center justify-center gap-1 rounded-lg bg-[#ff5e36] px-2 py-1 text-[11px] font-semibold text-white"
+                                  >
+                                    <Navigation className="h-3 w-3" /> Cómo llegar
+                                  </a>
+                                </div>
+                              </Popup>
                             </Marker>
                           ))}
                         </MapContainer>
@@ -453,14 +489,28 @@ export default function PublicProfilePage() {
                     )}
                     <div className="space-y-2">
                       {allPlaces.map((p, idx) => (
-                        <div key={idx} className="flex items-center gap-2.5 rounded-xl border border-edge bg-card px-3.5 py-2.5">
-                          <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${p.isGym ? "bg-neon/20 text-neon" : "bg-ember/20 text-ember"}`}>
-                            {p.isGym ? <Store className="h-4 w-4" /> : <MapPin className="h-4 w-4" />}
-                          </span>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium text-ink">{p.name}</p>
-                            <p className="truncate text-xs text-muted">{p.city}{p.address ? ` · ${p.address}` : ""}</p>
+                        <div key={idx} className="flex items-center justify-between gap-2.5 rounded-xl border border-edge bg-card px-3.5 py-2.5">
+                          <div className="flex min-w-0 items-center gap-2.5">
+                            <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${p.isGym ? "bg-neon/20 text-neon" : "bg-ember/20 text-ember"}`}>
+                              {p.isGym ? <Store className="h-4 w-4" /> : <MapPin className="h-4 w-4" />}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium text-ink">{p.name}</p>
+                              <p className="truncate text-xs text-muted">{p.city}{p.address ? ` · ${p.address}` : ""}</p>
+                            </div>
                           </div>
+                          {typeof p.lat === "number" && typeof p.lng === "number" && (
+                            <a
+                              href={getDirectionsUrl(p.lat, p.lng)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex shrink-0 items-center gap-1 rounded-lg border border-edge bg-subtle px-2 py-1 text-xs font-semibold text-ink transition hover:border-neon hover:text-neon"
+                              title="Cómo llegar"
+                            >
+                              <Navigation className="h-3 w-3" />
+                              Llegar
+                            </a>
+                          )}
                         </div>
                       ))}
                     </div>

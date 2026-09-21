@@ -10,6 +10,7 @@ import { Avatar } from "@/components/core/Avatar";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { DARK_MAP_TILES, haversineDistance, formatDistance, getDirectionsUrl } from "@/lib/geo";
 
 const icon = L.icon({
   iconUrl:
@@ -20,6 +21,17 @@ const icon = L.icon({
   iconSize: [30, 46],
   iconAnchor: [15, 46],
   popupAnchor: [0, -40],
+});
+
+const userIcon = L.icon({
+  iconUrl:
+    "data:image/svg+xml," +
+    encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" fill="#00f2fe" fill-opacity="0.25"/><circle cx="18" cy="18" r="8" fill="#00f2fe" stroke="#05070a" stroke-width="2"/><circle cx="18" cy="18" r="3" fill="#ffffff"/></svg>`
+    ),
+  iconSize: [36, 36],
+  iconAnchor: [18, 18],
+  popupAnchor: [0, -18],
 });
 
 const ARG_CENTER: [number, number] = [-38.6, -63.6];
@@ -51,6 +63,8 @@ export default function BuscarProfePage() {
   const [linked, setLinked] = useState<Set<string>>(new Set());
   const [q, setQ] = useState("");
   const [center, setCenter] = useState<[number, number]>(ARG_CENTER);
+  const [zoom, setZoom] = useState<number>(5);
+  const [userCoords, setUserCoords] = useState<[number, number] | null>(null);
   const [locating, setLocating] = useState(false);
 
   useEffect(() => {
@@ -101,7 +115,10 @@ export default function BuscarProfePage() {
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setCenter([pos.coords.latitude, pos.coords.longitude]);
+        const coords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+        setUserCoords(coords);
+        setCenter(coords);
+        setZoom(13);
         setLocating(false);
       },
       () => setLocating(false),
@@ -131,10 +148,29 @@ export default function BuscarProfePage() {
     visible.reduce((acc, z) => {
       const prof = profiles.get(z.trainer_id);
       if (!prof) return acc;
-      if (!acc.has(z.trainer_id)) acc.set(z.trainer_id, { prof, zone: z });
+      const distance =
+        userCoords && typeof z.latitude === "number" && typeof z.longitude === "number"
+          ? haversineDistance(userCoords[0], userCoords[1], z.latitude, z.longitude)
+          : null;
+      if (!acc.has(z.trainer_id)) {
+        acc.set(z.trainer_id, { prof, zone: z, distance });
+      } else {
+        const existing = acc.get(z.trainer_id)!;
+        if (distance !== null && (existing.distance === null || distance < existing.distance)) {
+          acc.set(z.trainer_id, { prof, zone: z, distance });
+        }
+      }
       return acc;
-    }, new Map<string, { prof: TrainerProfile; zone: Zone }>()).values()
+    }, new Map<string, { prof: TrainerProfile; zone: Zone; distance: number | null }>()).values()
   );
+
+  if (userCoords) {
+    trainers.sort((a, b) => {
+      if (a.distance === null) return 1;
+      if (b.distance === null) return -1;
+      return a.distance - b.distance;
+    });
+  }
 
   if (loading) {
     return (
@@ -161,10 +197,14 @@ export default function BuscarProfePage() {
         <button
           onClick={locate}
           disabled={locating}
-          className="flex shrink-0 items-center gap-1 rounded-full border border-neon/40 bg-neon/10 px-3 py-1.5 text-xs font-semibold text-neon"
+          className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+            userCoords
+              ? "border-neon bg-neon text-[#05070a] shadow-sm shadow-neon/30"
+              : "border-neon/40 bg-neon/10 text-neon"
+          }`}
         >
           {locating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Navigation className="h-3.5 w-3.5" />}
-          Mi zona
+          {userCoords ? "Ubicación activa" : "Mi zona"}
         </button>
       </div>
 
@@ -178,22 +218,47 @@ export default function BuscarProfePage() {
         />
       </div>
 
+      {userCoords && (
+        <p className="mt-2 flex items-center gap-1.5 text-xs text-neon">
+          <Navigation className="h-3.5 w-3.5" />
+          Profes ordenados por cercanía a tu ubicación
+        </p>
+      )}
+
       {mapZones.length > 0 ? (
         <div className="mt-3 overflow-hidden rounded-2xl border border-edge">
           <MapContainer
-            key={center.join(",")}
+            key={`${center.join(",")}-${zoom}`}
             center={center}
-            zoom={5}
+            zoom={zoom}
             scrollWheelZoom={false}
-            style={{ height: "280px", width: "100%" }}
+            style={{ height: "280px", width: "100%", backgroundColor: "#0c1017" }}
           >
             <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution={DARK_MAP_TILES.attribution}
+              url={DARK_MAP_TILES.url}
             />
+            {userCoords && (
+              <Marker position={userCoords} icon={userIcon}>
+                <Popup>
+                  <div className="p-0.5 text-center text-xs font-bold text-[#111]">
+                    📍 Tu ubicación actual
+                  </div>
+                </Popup>
+              </Marker>
+            )}
             {mapZones.map((z) => {
               const prof = profiles.get(z.trainer_id);
               if (!prof) return null;
+              const dist =
+                userCoords && typeof z.latitude === "number" && typeof z.longitude === "number"
+                  ? haversineDistance(userCoords[0], userCoords[1], z.latitude, z.longitude)
+                  : null;
+              const directionsUrl =
+                typeof z.latitude === "number" && typeof z.longitude === "number"
+                  ? getDirectionsUrl(z.latitude, z.longitude)
+                  : null;
+
               return (
                 <Marker key={z.id} position={[z.latitude as number, z.longitude as number]} icon={icon}>
                   <Popup>
@@ -206,6 +271,11 @@ export default function BuscarProfePage() {
                         {z.city ? ` · ${z.city}` : ""}
                         {z.address ? ` · ${z.address}` : ""}
                       </p>
+                      {dist !== null && (
+                        <p className="mt-0.5 text-xs font-semibold text-[#008ba3]">
+                          A {formatDistance(dist)} de vos
+                        </p>
+                      )}
                       {z.availability && (
                         <p className="mt-0.5 flex items-center gap-1 text-xs text-[#0a6]">
                           <Clock3 className="h-3 w-3 shrink-0" /> {z.availability}
@@ -216,7 +286,7 @@ export default function BuscarProfePage() {
                           Ya te entrena
                         </span>
                       )}
-                      <div className="mt-2 flex gap-2">
+                      <div className="mt-2 flex flex-wrap gap-1.5">
                         <Link
                           href={`/perfil/${prof.username}`}
                           className="flex items-center gap-1 rounded-lg bg-[#111] px-2.5 py-1 text-[11px] font-semibold text-white"
@@ -227,8 +297,18 @@ export default function BuscarProfePage() {
                           href={`/chat/${prof.id}`}
                           className="flex items-center gap-1 rounded-lg bg-[#ff5e36] px-2.5 py-1 text-[11px] font-semibold text-white"
                         >
-                          <MessageCircle className="h-3 w-3" /> Mensaje
+                          <MessageCircle className="h-3 w-3" /> Chat
                         </Link>
+                        {directionsUrl && (
+                          <a
+                            href={directionsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 rounded-lg bg-[#00f2fe] px-2.5 py-1 text-[11px] font-semibold text-[#05070a]"
+                          >
+                            <Navigation className="h-3 w-3" /> Cómo llegar
+                          </a>
+                        )}
                       </div>
                     </div>
                   </Popup>
@@ -250,42 +330,67 @@ export default function BuscarProfePage() {
         {trainers.length === 0 && (
           <p className="py-8 text-center text-sm text-muted">No se encontró ningún profe.</p>
         )}
-        {trainers.map(({ prof, zone }) => (
-          <div key={prof.id} className="mb-2 flex items-center gap-3 rounded-xl border border-edge bg-card p-3.5">
-            <Avatar src={prof.avatar_url} name={prof.full_name} username={prof.username} size="md" />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-ink">{prof.full_name || prof.username}</p>
-              <p className="truncate text-xs text-muted">
-                @{prof.username} · {zone.name}
-                {zone.city ? ` · ${zone.city}` : ""}
-              </p>
-              {zone.availability && (
-                <p className="flex items-center gap-1 text-xs text-neon">
-                  <Clock3 className="h-3 w-3" /> {zone.availability}
+        {trainers.map(({ prof, zone, distance }) => {
+          const directionsUrl =
+            typeof zone.latitude === "number" && typeof zone.longitude === "number"
+              ? getDirectionsUrl(zone.latitude, zone.longitude)
+              : null;
+
+          return (
+            <div key={prof.id} className="mb-2 flex items-center gap-3 rounded-xl border border-edge bg-card p-3.5">
+              <Avatar src={prof.avatar_url} name={prof.full_name} username={prof.username} size="md" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="truncate text-sm font-semibold text-ink">{prof.full_name || prof.username}</p>
+                  {distance !== null && (
+                    <span className="shrink-0 rounded-full border border-neon/40 bg-neon/10 px-2 py-0.5 text-[10px] font-semibold text-neon">
+                      A {formatDistance(distance)}
+                    </span>
+                  )}
+                </div>
+                <p className="truncate text-xs text-muted">
+                  @{prof.username} · {zone.name}
+                  {zone.city ? ` · ${zone.city}` : ""}
                 </p>
-              )}
-              {linked.has(prof.id) && (
-                <span className="mt-1 inline-block rounded-full border border-neon/40 bg-neon/10 px-2.5 py-0.5 text-[11px] font-semibold text-neon">
-                  Ya te entrena
-                </span>
-              )}
+                {zone.availability && (
+                  <p className="flex items-center gap-1 text-xs text-neon">
+                    <Clock3 className="h-3 w-3" /> {zone.availability}
+                  </p>
+                )}
+                {linked.has(prof.id) && (
+                  <span className="mt-1 inline-block rounded-full border border-neon/40 bg-neon/10 px-2.5 py-0.5 text-[11px] font-semibold text-neon">
+                    Ya te entrena
+                  </span>
+                )}
+              </div>
+              <div className="flex shrink-0 flex-col gap-1.5">
+                <Link
+                  href={`/perfil/${prof.username}`}
+                  className="flex items-center justify-center gap-1 rounded-lg border border-edge px-2.5 py-1.5 text-xs font-semibold text-ink"
+                >
+                  <User className="h-3.5 w-3.5" /> Ver
+                </Link>
+                <Link
+                  href={`/chat/${prof.id}`}
+                  className="flex items-center justify-center gap-1 rounded-lg bg-ember px-2.5 py-1.5 text-xs font-semibold text-bg"
+                >
+                  <MessageCircle className="h-3.5 w-3.5" /> Mensaje
+                </Link>
+                {directionsUrl && (
+                  <a
+                    href={directionsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-1 rounded-lg border border-neon/30 bg-neon/10 px-2.5 py-1 text-xs font-semibold text-neon transition hover:bg-neon/20"
+                    title="Cómo llegar"
+                  >
+                    <Navigation className="h-3.5 w-3.5" /> Llegar
+                  </a>
+                )}
+              </div>
             </div>
-            <div className="flex shrink-0 flex-col gap-1.5">
-              <Link
-                href={`/perfil/${prof.username}`}
-                className="flex items-center justify-center gap-1 rounded-lg border border-edge px-2.5 py-1.5 text-xs font-semibold text-ink"
-              >
-                <User className="h-3.5 w-3.5" /> Ver
-              </Link>
-              <Link
-                href={`/chat/${prof.id}`}
-                className="flex items-center justify-center gap-1 rounded-lg bg-ember px-2.5 py-1.5 text-xs font-semibold text-bg"
-              >
-                <MessageCircle className="h-3.5 w-3.5" /> Mensaje
-              </Link>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </main>
   );

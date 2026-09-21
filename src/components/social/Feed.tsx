@@ -39,27 +39,31 @@ function measureDiag(feedEl: HTMLElement | null): FeedDiag {
   const doc = document.documentElement;
   const offenders: { tag: string; cls: string; delta: number }[] = [];
   const seen = new Set<string>();
-  for (const el of Array.from(document.querySelectorAll<HTMLElement>("*"))) {
-    if (el === feedEl) continue;
-    const delta = el.scrollWidth - el.clientWidth;
-    if (delta > 0) {
-      const tag = el.tagName.toLowerCase();
-      const cls = String(el.className || "").split(/\s+/).filter(Boolean).slice(0, 2).join(".");
-      const key = tag + "|" + cls;
+  const viwW = doc.clientWidth;
+      for (const el of Array.from(document.querySelectorAll<HTMLElement>("*"))) {
+        if (el === feedEl) continue;
+        const t = el.tagName.toLowerCase();
+        if (t === "html" || t === "body") continue;
+        const delta = el.scrollWidth - el.clientWidth;
+        if (delta > 0) {
+          const tag = el.tagName.toLowerCase();
+          const cls = String(el.className || "").split(/\s+/).filter(Boolean).join("_");
+          const key = tag + "|" + cls;
       if (!seen.has(key)) {
         seen.add(key);
         offenders.push({ tag, cls, delta });
       }
-      if (offenders.length >= 3) break;
+      if (offenders.length >= 6) break;
     }
   }
   offenders.sort((a, b) => b.delta - a.delta);
+  const offendersFull = offenders.filter((o) => o.delta > 0 && o.cls.length > 0).slice(0, 60);
   return {
     docSW: doc.scrollWidth,
     docCW: doc.clientWidth,
     feedSW: feedEl?.scrollWidth ?? 0,
     feedCW: feedEl?.clientWidth ?? 0,
-    offenders,
+    offenders: offendersFull,
   };
 }
 

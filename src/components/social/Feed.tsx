@@ -42,6 +42,7 @@ function measureDiag(feedEl: HTMLElement | null): FeedDiag {
   const viwW = doc.clientWidth;
       for (const el of Array.from(document.querySelectorAll<HTMLElement>("*"))) {
         if (el === feedEl) continue;
+        if (el.closest("[data-med]")) continue;
         const t = el.tagName.toLowerCase();
         if (t === "html" || t === "body") continue;
         const delta = el.scrollWidth - el.clientWidth;
@@ -326,16 +327,16 @@ export function Feed() {
       )}
 
       {/* Marcador v8 — MEDIDOR: reporta en el propio celular qué desborda (scrollWidth vs clientWidth) */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-20 z-[60] flex justify-center md:bottom-6">
+      <div className="pointer-events-none fixed inset-x-0 bottom-20 z-[60] flex justify-center md:bottom-6" data-med="1">
         <span className="max-w-[92vw] truncate rounded-full border border-edge bg-card/95 px-2 py-0.5 text-[9px] font-bold tracking-wider text-muted shadow-lg">
           v8 · {diag ? renderDiag(diag) : "midiendo…"}
         </span>
       </div>
 
       {/* Marcador v9 (Lote 9 commit 3951d95) - SOLO ASCII: marca inequivoca de bundle nuevo para test de cache (v8 no puede imprimir esto) */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-16 z-[60] flex justify-center md:bottom-2">
+      <div className="pointer-events-none fixed inset-x-0 bottom-16 z-[60] flex justify-center md:bottom-2" data-med="1">
         <span className="max-w-[92vw] truncate rounded-full border border-neon bg-card/95 px-2 py-0.5 text-[9px] font-bold tracking-wider text-neon shadow-lg">
-          v9-3951d95-ASCII | {diag ? renderDiag(diag) : "midiendo."}
+          v10-L10-ASCII | {diag ? renderDiag(diag) : "midiendo."}
         </span>
       </div>
     </div>

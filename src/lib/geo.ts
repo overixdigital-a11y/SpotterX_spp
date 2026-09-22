@@ -63,3 +63,33 @@ export const DARK_MAP_TILES = {
     'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
   maxZoom: 19,
 };
+
+/**
+ * Geocodifica una dirección usando Nominatim (OpenStreetMap, gratis, sin API key).
+ * Retorna null si no encuentra resultados o falla la petición.
+ */
+export async function geocodeAddress(
+  query: string
+): Promise<{ lat: number; lng: number; displayName: string } | null> {
+  try {
+    const q = encodeURIComponent(query);
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${q}`,
+      { headers: { "User-Agent": "SpotterXApp/1.0 (spotterx fitness app)" } }
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      lat: string;
+      lon: string;
+      display_name: string;
+    }[];
+    if (!data || data.length === 0) return null;
+    return {
+      lat: Number(data[0].lat),
+      lng: Number(data[0].lon),
+      displayName: data[0].display_name,
+    };
+  } catch {
+    return null;
+  }
+}

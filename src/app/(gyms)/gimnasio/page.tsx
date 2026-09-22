@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { Loader2, MapPin, Pencil, Check, Save } from "lucide-react";
+import { Loader2, MapPin, Search, Pencil, Check, Save } from "lucide-react";
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
+import { geocodeAddress } from "@/lib/geo";
 import { useAuthState } from "@/lib/auth-context";
 
 const GymMap = dynamic(() => import("@/components/gyms/GymMap"), { ssr: false });
@@ -27,6 +28,10 @@ export default function GymPanelPage() {
   const [editing, setEditing] = useState(false);
   const [locating, setLocating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [geocoding, setGeocoding] = useState(false);
+  const [gpsOverride, setGpsOverride] = useState(false);
+  const [geoMsg, setGeoMsg] = useState<string | null>(null);
+  const [previewCoords, setPreviewCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   const [form, setForm] = useState({
     name: "",
@@ -65,7 +70,7 @@ export default function GymPanelPage() {
     if (!userId) return;
     setSaving(true);
     const supabase = createClient();
-    const payload = {
+    const payload: Record<string, unknown> = {
       owner_id: userId,
       name: form.name.trim(),
       address: form.address.trim() || null,
@@ -73,6 +78,15 @@ export default function GymPanelPage() {
       capacity: form.capacity ? Number(form.capacity) : null,
       qr_code: gym?.qr_code ?? `SPX-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
     };
+    if (!gpsOverride && form.address.trim()) {
+      const query = [form.city.trim(), form.address.trim()].filter(Boolean).join(", ");
+      const geo = await geocodeAddress(query);
+      if (geo) {
+        payload.latitude = geo.lat;
+        payload.longitude = geo.lng;
+        setPreviewCoords({ lat: geo.lat, lng: geo.lng });
+      }
+    }
     if (gym) {
       const { data } = await supabase.from("gyms").update(payload).eq("id", gym.id).select().single();
       if (data) setGym(data as Gym);
@@ -84,6 +98,32 @@ export default function GymPanelPage() {
     setSaving(false);
   };
 
+  const geocodeForm = async () => {
+    if (!form.address.trim() && !form.city.trim()) return;
+    setGeocoding(true);
+    setGeoMsg(null);
+    try {
+      const query = [form.city.trim(), form.address.trim()].filter(Boolean).join(", ");
+      const geo = await geocodeAddress(query);
+      if (geo) {
+        setPreviewCoords({ lat: geo.lat, lng: geo.lng });
+        if (gym) {
+          await createClient()
+            .from("gyms")
+            .update({ latitude: geo.lat, longitude: geo.lng })
+            .eq("id", gym.id);
+          setGym((prev) => (prev ? { ...prev, latitude: geo.lat, longitude: geo.lng } : prev));
+        }
+        setGeoMsg(`Pin ubicado en ${geo.lat.toFixed(5)}, ${geo.lng.toFixed(5)}`);
+      } else {
+        setGeoMsg("No encontramos esa dirección. Probá con más datos (calle y número, ciudad) o usá GPS.");
+      }
+    } catch {
+      setGeoMsg("Error al buscar la dirección. Probá de nuevo.");
+    }
+    setGeocoding(false);
+  };
+
   const locate = () => {
     if (!("geolocation" in navigator)) return alert("Tu dispositivo no soporta geolocalización");
     setLocating(true);
@@ -92,6 +132,9 @@ export default function GymPanelPage() {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
         setGym((prev) => (prev ? { ...prev, latitude: lat, longitude: lng } : prev));
+        setGpsOverride(true);
+        setPreviewCoords({ lat, lng });
+        setGeoMsg(null);
         if (gym) {
           await createClient().from("gyms").update({ latitude: lat, longitude: lng }).eq("id", gym.id);
         }
@@ -112,6 +155,12 @@ export default function GymPanelPage() {
       </main>
     );
   }
+
+  const mapCoords =
+    previewCoords ??
+    (gym?.latitude != null && gym?.longitude != null
+      ? { lat: gym.latitude, lng: gym.longitude }
+      : null);
 
   return (
     <main className="mx-auto max-w-5xl px-4 pt-2 md:pt-4">
@@ -195,6 +244,17 @@ export default function GymPanelPage() {
                 {locating ? "Obteniendo ubicación…" : "Obtener mi ubicación (GPS)"}
               </button>
 
+              <button
+                onClick={geocodeForm}
+                disabled={geocoding}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-edge bg-elevated py-2.5 text-sm font-medium text-ink transition hover:border-neon/40 hover:text-neon disabled:opacity-60"
+              >
+                {geocoding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                {geocoding ? "Buscando dirección…" : "Buscar dirección en el mapa"}
+              </button>
+
+              {geoMsg && <p className="text-xs text-neon">{geoMsg}</p>}
+
               {gym?.latitude && gym?.longitude && (
                 <p className="text-xs text-muted">
                   📍 Ubicación guardada: {gym.latitude.toFixed(5)}, {gym.longitude.toFixed(5)}
@@ -216,15 +276,16 @@ export default function GymPanelPage() {
         </div>
 
         {/* Columna Derecha: Mapa & Pase QR */}
-        <div className="space-y-6">
+<div className="space-y-6">
           {/* Leaflet Map Card */}
           <div className="rounded-2xl border border-edge bg-card p-5">
             <h2 className="mb-3 text-base font-bold text-ink">Mapa de Ubicación</h2>
-            {gym?.latitude && gym?.longitude ? (
-              <GymMap latitude={gym.latitude} longitude={gym.longitude} name={gym.name} />
+            {mapCoords ? (
+              <GymMap latitude={mapCoords.lat} longitude={mapCoords.lng} name={gym?.name} />
             ) : (
               <p className="rounded-xl border border-dashed border-edge bg-bg p-8 text-center text-xs text-muted">
-                Usá &quot;Obtener mi ubicación (GPS)&quot; para desplegar tu gimnasio en el mapa interactivo.
+                Usá &quot;Buscar dirección en el mapa&quot; o &quot;Obtener mi ubicación (GPS)&quot;
+                para desplegar tu gimnasio en el mapa interactivo.
               </p>
             )}
           </div>

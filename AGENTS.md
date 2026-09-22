@@ -542,4 +542,11 @@ Orden de etapas para pulir/completar la app, módulo por módulo. Cada etapa ter
 - **`/gimnasio`**: form con Calle / Altura / CP / Provincia / Ciudad (+ Aforo). Guardar persiste los 5 campos + computa `address`. Geocode con campos divididos. GPS y "Buscar direccion en el mapa" intactos.
 - **`/entrenamiento/zona` (profe)**: mismo form dividido en "Agregar gimnasio manual" + boton **"Buscar direccion en el mapa"** (antes solo GPS). Las **multiples zonas ya existian** (`trainer_gyms` = 1 fila por lugar; cada "Agregar gimnasio manual" agrega otr). `address` autocomputado para la lista y el buscador del alumno.
 - Geocoder estructurado verificado por HTTP de antemano + CORS OK (`Access-Control-Allow-Origin: *`).
-- Docs journal `docs/journal/2026-09-22.md`"
+- Docs journal `docs/journal/2026-09-22.md`.
+
+**Lote 18 - Profe: editar ubicaciones + caracteristicas por ubicacion (22/09/2026, commit `6d25128`, lint 0 errores, build OK, deploy automatico):**
+- **Edicion de ubicaciones** en `/entrenamiento/zona`: el icono lapiz de una zona en "Mis lugares" la carga en el form (nombre, 5 campos, horarios, coords) -> "Guardar cambios" hace `update` por id; boton "Cancelar edicion" (el X sigue para borrar).
+- **Caracteristicas por ubicacion** (`trainer_gyms`, migracion `00034_trainer_gyms_features.sql` PENDIENTE de correr): columnas `disciplines text[]`, `description text`, `notes text`. Form "Agregar gimnasio manual" con chips multiselect de disciplinas (labels de `DISCIPLINES` en `src/lib/disciplines.ts`), textarea "Descripcion" y textarea "Notas/condiciones". Los cards de "Mis lugares" muestran chips + descripcion + notas (📌).
+- **Perfil publico** (`perfil/[username]`): RPC `get_trainer_workplaces` (00034) ahora devuelve `disciplines`/`description`/`notes` de las zonas; los popups del mapa y los cards de "Lugares donde trabaja" los muestran.
+- **Buscador de profes** (`mi-entrenamiento/buscar`): select ampliado + popup y card muestran nombre + chips de disciplinas + descripcion + notas de cada zona.
+- El nombre de la ubicacion ya se mostraba en las 3 vistas (Lote 17); este lote agrega editar + caracteristicas.

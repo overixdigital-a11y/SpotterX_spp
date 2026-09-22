@@ -534,3 +534,12 @@ Orden de etapas para pulir/completar la app, módulo por módulo. Cada etapa ter
 - **Precedencia (decision)**: GPS de la sesion gana sobre la geocodificacion al guardar; sin GPS en la sesion, la direccion geocodifica sola en cada guardado.
 - **Nota**: el token de la API de Vercel expiro (expira ~24h); `npx vercel whoami` lo refresca antes de verificar deployments por API.
 - 3 consumidores de `gyms.latitude/longitude` (panel, checkin, perfil publico) se benefician sin cambios: el fix del panel actualiza las coords en la DB.
+
+**Lote 17 - Direccion dividida (calle/altura/CP/provincia/ciudad) + fix del mapa que no se movia (22/09/2026, commit `a3ecce3`, lint 0 errores, build OK, deploy automatico):**
+- **Fix raiz de "sigue sin funcionar"**: en react-leaflet el prop `center` de `MapContainer` solo vale al montar; cambiar las coords movia el marker pero NO la vista del mapa (quedaba fuera de pantalla -> parecia que el pin no se movia). Nuevo `MapController` interno (`useMap()` + `useEffect` en `[latitude,longitude]`) que hace `map.setView([lat,lng], max(zoom,14))` en `GymMap.tsx`. Aplica a panel del gym y perfil publico.
+- **Campos divididos**: migracion `00033_gyms_address_split.sql` (PENDIENTE de correr en SQL Editor) agrega `street`, `street_number`, `postal_code`, `province` (text) a `gyms` y `trainer_gyms`. Se conservan `address`/`city`: **no se rompe** checkin, mi-gimnasio ni perfil publico (leen `address`).
+- **`src/lib/geo.ts`**: `geocodeAddress(parts | string)` ahora usa parametros **estructurados** de Nominatim (`street`=calle+altura, `city`, `state`=provincia, `postalcode`, `countrycodes=ar`) mucho mas preciso que texto libre; cae a `q=` si no hay calle. Nuevo `formatAddress(parts)` que autocompleta `address` = "Calle Altura, Ciudad, Provincia, CP".
+- **`/gimnasio`**: form con Calle / Altura / CP / Provincia / Ciudad (+ Aforo). Guardar persiste los 5 campos + computa `address`. Geocode con campos divididos. GPS y "Buscar direccion en el mapa" intactos.
+- **`/entrenamiento/zona` (profe)**: mismo form dividido en "Agregar gimnasio manual" + boton **"Buscar direccion en el mapa"** (antes solo GPS). Las **multiples zonas ya existian** (`trainer_gyms` = 1 fila por lugar; cada "Agregar gimnasio manual" agrega otr). `address` autocomputado para la lista y el buscador del alumno.
+- Geocoder estructurado verificado por HTTP de antemano + CORS OK (`Access-Control-Allow-Origin: *`).
+- Docs journal `docs/journal/2026-09-22.md`"

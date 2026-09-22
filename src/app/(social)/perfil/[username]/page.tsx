@@ -64,6 +64,9 @@ interface WorkplaceZona {
   city: string | null;
   address: string | null;
   availability: string | null;
+  disciplines: string[] | null;
+  description: string | null;
+  notes: string | null;
   latitude: number | null;
   longitude: number | null;
 }
@@ -429,8 +432,8 @@ export default function PublicProfilePage() {
               </p>
               {(() => {
                 const allPlaces = [
-                  ...workplaces.gyms.map((g) => ({ name: g.name, city: g.city, address: g.address, lat: g.latitude, lng: g.longitude, isGym: true })),
-                  ...workplaces.zonas.map((z) => ({ name: z.name, city: z.city, address: z.address, lat: z.latitude, lng: z.longitude, isGym: false })),
+                  ...workplaces.gyms.map((g) => ({ name: g.name, city: g.city, address: g.address, lat: g.latitude, lng: g.longitude, isGym: true, disciplines: null as string[] | null, description: null, notes: null })),
+                  ...workplaces.zonas.map((z) => ({ name: z.name, city: z.city, address: z.address, lat: z.latitude, lng: z.longitude, isGym: false, disciplines: z.disciplines, description: z.description, notes: z.notes })),
                 ];
                 const withCoords = allPlaces.filter((p) => typeof p.lat === "number" && typeof p.lng === "number");
                 return (
@@ -472,6 +475,17 @@ export default function PublicProfilePage() {
                                   <p className="font-bold text-[#111]">{z.name}</p>
                                   <p className="text-xs text-[#555]">{z.city}{z.address ? ` · ${z.address}` : ""}</p>
                                   {z.availability && <p className="mt-0.5 text-xs text-[#0a6]">Horarios: {z.availability}</p>}
+                                  {z.disciplines && z.disciplines.length > 0 && (
+                                    <div className="mt-1 flex flex-wrap gap-1">
+                                      {z.disciplines.map((d) => (
+                                        <span key={d} className="rounded-full bg-[#ff5e36]/15 px-1.5 py-0.5 text-[10px] font-semibold text-[#c4401c]">
+                                          {d}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {z.description && <p className="mt-1 text-xs text-[#333]">{z.description}</p>}
+                                  {z.notes && <p className="mt-1 text-xs text-[#333]">📌 {z.notes}</p>}
                                   <a
                                     href={getDirectionsUrl(z.latitude!, z.longitude!)}
                                     target="_blank"
@@ -497,6 +511,17 @@ export default function PublicProfilePage() {
                             <div className="min-w-0">
                               <p className="truncate text-sm font-medium text-ink">{p.name}</p>
                               <p className="truncate text-xs text-muted">{p.city}{p.address ? ` · ${p.address}` : ""}</p>
+                              {p.disciplines && p.disciplines.length > 0 && (
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                  {p.disciplines.map((d) => (
+                                    <span key={d} className="rounded-full border border-neon/40 bg-neon/10 px-2 py-0.5 text-[10px] font-semibold text-neon">
+                                      {d}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              {p.description && <p className="mt-1 text-xs text-muted">{p.description}</p>}
+                              {p.notes && <p className="mt-1 text-xs text-muted">📌 {p.notes}</p>}
                             </div>
                           </div>
                           {typeof p.lat === "number" && typeof p.lng === "number" && (

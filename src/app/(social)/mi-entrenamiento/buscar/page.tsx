@@ -43,6 +43,9 @@ interface Zone {
   city: string | null;
   address: string | null;
   availability: string | null;
+  disciplines: string[] | null;
+  description: string | null;
+  notes: string | null;
   latitude: number | null;
   longitude: number | null;
 }
@@ -74,7 +77,7 @@ export default function BuscarProfePage() {
     const load = async () => {
       const { data: z } = await supabase
         .from("trainer_gyms")
-        .select("id, trainer_id, name, city, address, availability, latitude, longitude")
+        .select("id, trainer_id, name, city, address, availability, disciplines, description, notes, latitude, longitude")
         .order("name", { ascending: true });
       if (!active) return;
       const zoneList = (z as Zone[]) ?? [];
@@ -271,6 +274,17 @@ export default function BuscarProfePage() {
                         {z.city ? ` · ${z.city}` : ""}
                         {z.address ? ` · ${z.address}` : ""}
                       </p>
+                      {z.disciplines && z.disciplines.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {z.disciplines.map((d) => (
+                            <span key={d} className="rounded-full bg-[#00f2fe]/15 px-2 py-0.5 text-[10px] font-semibold text-[#0286a0]">
+                              {d}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {z.description && <p className="mt-1 text-xs text-[#333]">{z.description}</p>}
+                      {z.notes && <p className="mt-1 text-xs text-[#333]">📌 {z.notes}</p>}
                       {dist !== null && (
                         <p className="mt-0.5 text-xs font-semibold text-[#008ba3]">
                           A {formatDistance(dist)} de vos
@@ -357,6 +371,17 @@ export default function BuscarProfePage() {
                     <Clock3 className="h-3 w-3" /> {zone.availability}
                   </p>
                 )}
+                {zone.disciplines && zone.disciplines.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {zone.disciplines.map((d) => (
+                      <span key={d} className="rounded-full border border-neon/40 bg-neon/10 px-2 py-0.5 text-[10px] font-semibold text-neon">
+                        {d}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {zone.description && <p className="mt-1 text-xs text-muted">{zone.description}</p>}
+                {zone.notes && <p className="mt-1 text-xs text-muted">📌 {zone.notes}</p>}
                 {linked.has(prof.id) && (
                   <span className="mt-1 inline-block rounded-full border border-neon/40 bg-neon/10 px-2.5 py-0.5 text-[11px] font-semibold text-neon">
                     Ya te entrena

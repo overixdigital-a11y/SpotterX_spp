@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, MapPin, Plus, X, Search, Building2, Navigation, Clock3, UserPlus } from "lucide-react";
+import { Loader2, MapPin, Plus, X, Search, Building2, Navigation, Clock3, UserPlus, Pencil } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { geocodeAddress, formatAddress } from "@/lib/geo";
+import { DISCIPLINES } from "@/lib/disciplines";
 import { timeAgo } from "@/lib/format";
+
+const DISCIPLINE_LABELS = DISCIPLINES.map((d) => d.label);
 
 interface TrainerGym {
   id: string;
@@ -18,6 +21,9 @@ interface TrainerGym {
   postal_code: string | null;
   province: string | null;
   availability: string | null;
+  disciplines: string[] | null;
+  description: string | null;
+  notes: string | null;
   latitude: number | null;
   longitude: number | null;
   created_at: string;
@@ -53,6 +59,7 @@ export default function ZonaPage() {
   const [requests, setRequests] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
   const [geoMsg, setGeoMsg] = useState<string | null>(null);
@@ -64,6 +71,9 @@ export default function ZonaPage() {
     province: "",
     city: "",
     availability: "",
+    disciplines: [] as string[],
+    description: "",
+    notes: "",
     latitude: null as number | null,
     longitude: null as number | null,
   });
@@ -152,30 +162,93 @@ export default function ZonaPage() {
     city: form.city.trim(),
   });
 
-  const addZone = async () => {
+  const emptyForm = () => ({
+    name: "",
+    street: "",
+    streetNumber: "",
+    postalCode: "",
+    province: "",
+    city: "",
+    availability: "",
+    disciplines: [] as string[],
+    description: "",
+    notes: "",
+    latitude: null as number | null,
+    longitude: null as number | null,
+  });
+
+  const startEdit = (z: TrainerGym) => {
+    setForm({
+      name: z.name ?? "",
+      street: z.street ?? "",
+      streetNumber: z.street_number ?? "",
+      postalCode: z.postal_code ?? "",
+      province: z.province ?? "",
+      city: z.city ?? "",
+      availability: z.availability ?? "",
+      disciplines: z.disciplines ?? [],
+      description: z.description ?? "",
+      notes: z.notes ?? "",
+      latitude: z.latitude,
+      longitude: z.longitude,
+    });
+    setEditingId(z.id);
+    setAdding(true);
+    setGeoMsg(null);
+  };
+
+  const cancelEdit = () => {
+    setForm(emptyForm());
+    setEditingId(null);
+    setAdding(false);
+    setGeoMsg(null);
+  };
+
+  const toggleDiscipline = (label: string) => {
+    setForm((v) => ({
+      ...v,
+      disciplines: v.disciplines.includes(label)
+        ? v.disciplines.filter((d) => d !== label)
+        : [...v.disciplines, label],
+    }));
+  };
+
+  const saveZone = async () => {
     if (!userId || !form.name.trim()) return;
     const supabase = createClient();
     const parts = formParts();
-    const { data, error } = await supabase
-      .from("trainer_gyms")
-      .insert({
-        trainer_id: userId,
-        name: form.name.trim(),
-        city: parts.city || null,
-        address: formatAddress(parts) || null,
-        street: parts.street || null,
-        street_number: parts.streetNumber || null,
-        postal_code: parts.postalCode || null,
-        province: parts.province || null,
-        availability: form.availability.trim() || null,
-        latitude: form.latitude,
-        longitude: form.longitude,
-      })
-      .select()
-      .maybeSingle();
-    if (!error && data) setZones((prev) => [data as TrainerGym, ...prev]);
-    setForm({ name: "", street: "", streetNumber: "", postalCode: "", province: "", city: "", availability: "", latitude: null, longitude: null });
+    const payload = {
+      trainer_id: userId,
+      name: form.name.trim(),
+      city: parts.city || null,
+      address: formatAddress(parts) || null,
+      street: parts.street || null,
+      street_number: parts.streetNumber || null,
+      postal_code: parts.postalCode || null,
+      province: parts.province || null,
+      availability: form.availability.trim() || null,
+      disciplines: form.disciplines.length > 0 ? form.disciplines : null,
+      description: form.description.trim() || null,
+      notes: form.notes.trim() || null,
+      latitude: form.latitude,
+      longitude: form.longitude,
+    };
+    if (editingId) {
+      const { error } = await supabase.from("trainer_gyms").update(payload).eq("id", editingId);
+      if (!error) {
+        setZones((prev) => prev.map((z) => (z.id === editingId ? { ...z, ...payload } : z)));
+      }
+    } else {
+      const { data, error } = await supabase
+        .from("trainer_gyms")
+        .insert(payload)
+        .select()
+        .maybeSingle();
+      if (!error && data) setZones((prev) => [data as TrainerGym, ...prev]);
+    }
+    setForm(emptyForm());
     setGeoMsg(null);
+    setEditingId(null);
     setAdding(false);
   };
 
@@ -268,7 +341,10 @@ export default function ZonaPage() {
         </div>
 
         <button
-          onClick={() => setAdding((v) => !v)}
+          onClick={() => {
+            if (adding) cancelEdit();
+            else setAdding(true);
+          }}
           className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-edge bg-card py-3 text-sm font-medium text-ember"
         >
           <Plus className="h-4 w-4" /> Agregar gimnasio manual
@@ -276,6 +352,11 @@ export default function ZonaPage() {
 
         {adding && (
           <div className="space-y-2 rounded-xl border border-edge bg-card p-3">
+            {editingId && (
+              <p className="flex items-center gap-1 text-xs font-semibold text-neon">
+                <Pencil className="h-3 w-3" /> Editando ubicación
+              </p>
+            )}
             <input
               value={form.name}
               onChange={(e) => setForm((v) => ({ ...v, name: e.target.value }))}
@@ -349,13 +430,59 @@ export default function ZonaPage() {
                 Ubicación: {form.latitude.toFixed(5)}, {form.longitude?.toFixed(5)}
               </p>
             )}
+            <div className="pt-1">
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                Disciplinas que se entrenan
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {DISCIPLINE_LABELS.map((label) => {
+                  const on = form.disciplines.includes(label);
+                  return (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => toggleDiscipline(label)}
+                      className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
+                        on
+                          ? "border-neon/60 bg-neon/15 text-neon"
+                          : "border-edge bg-bg text-muted hover:border-neon/40 hover:text-ink"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <textarea
+              value={form.description}
+              onChange={(e) => setForm((v) => ({ ...v, description: e.target.value }))}
+              placeholder="Descripción (ej: Entrenamiento personalizado de fuerza 1 a 1)"
+              rows={2}
+              className="w-full resize-none rounded-lg border border-edge bg-bg px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+            />
+            <textarea
+              value={form.notes}
+              onChange={(e) => setForm((v) => ({ ...v, notes: e.target.value }))}
+              placeholder="Notas / condiciones (ej: Boxeo disponible, no hay ducha)"
+              rows={2}
+              className="w-full resize-none rounded-lg border border-edge bg-bg px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+            />
             <button
-              onClick={addZone}
+              onClick={saveZone}
               disabled={!form.name.trim()}
               className="w-full rounded-lg bg-neon py-2.5 text-sm font-semibold text-bg shadow-neon disabled:opacity-50"
             >
-              Guardar
+              {editingId ? "Guardar cambios" : "Guardar"}
             </button>
+            {editingId && (
+              <button
+                onClick={cancelEdit}
+                className="w-full rounded-lg border border-edge bg-bg py-2.5 text-sm font-medium text-muted transition hover:border-ember/40 hover:text-ember"
+              >
+                Cancelar edición
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -382,9 +509,27 @@ export default function ZonaPage() {
                   <Clock3 className="h-3 w-3" /> {z.availability}
                 </p>
               )}
-              {z.created_at && <p className="text-[11px] text-muted">Agregado {timeAgo(z.created_at)}</p>}
+              {z.disciplines && z.disciplines.length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {z.disciplines.map((d) => (
+                    <span key={d} className="rounded-full border border-neon/40 bg-neon/10 px-2 py-0.5 text-[10px] font-semibold text-neon">
+                      {d}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {z.description && <p className="mt-1 text-xs text-muted">{z.description}</p>}
+              {z.notes && <p className="mt-1 text-xs text-muted">📌 {z.notes}</p>}
+              {z.created_at && <p className="mt-0.5 text-[11px] text-muted">Agregado {timeAgo(z.created_at)}</p>}
             </div>
-            <button onClick={() => removeZone(z.id)} className="shrink-0 text-muted hover:text-ember">
+            <button
+              onClick={() => startEdit(z)}
+              className="shrink-0 text-muted transition hover:text-neon"
+              title="Editar"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+            <button onClick={() => removeZone(z.id)} className="shrink-0 text-muted hover:text-ember" title="Eliminar">
               <X className="h-4 w-4" />
             </button>
           </div>

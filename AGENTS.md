@@ -524,3 +524,13 @@ Orden de etapas para pulir/completar la app, módulo por módulo. Cada etapa ter
 - **Fix**: en `src/lib/geo.ts`, `DARK_MAP_TILES.url` pasa a `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}` (sin `{s}.`) y se elimina `subdomains: "abcd"` (Leaflet solo lo usa si la URL trae `{s}`). Los 3 mapas (`GymMap.tsx`, `buscar/page.tsx`, `perfil/[username]/page.tsx`) quedan corregidos con solo este cambio.
 - **Lección**: al usar tiles de Esri, NO usar subdominios `{s}` (a diferencia de OSM/Carto). `server.arcgisonline.com` es el único host.
 - Deploy validado por API (sha `96172d0` READY, push automático).
+
+**Lote 16 - Geocodificar la direccion del gym (22/09/2026, commit `a749c3f`, lint 0 errores, build OK, deploy automatico):**
+- **Problema**: el usuario puso la direccion del gym en el panel pero el mapa seguia apuntando a otro lado. Causa: `saveGym` NUNCA tocaba `latitude/longitude`; solo el boton GPS (geolocalizacion del dispositivo) las seteaba. Escribir la direccion guardaba texto plano, sin coordenadas -> el pin quedaba donde se capturo el GPS (PC/IP), no en el comercio.
+- **Helper nuevo** (`src/lib/geo.ts` `geocodeAddress`): geocodifica via **Nominatim** (OpenStreetMap, gratis, SIN api key, header `User-Agent` propio). Verificado: `"Av. Corrientes 1234, Buenos Aires"` -> `-34.6044, -58.3958`. Retorna `{lat,lng,displayName} | null`.
+- **Opcion A - geocodificar al guardar** (`gimnasio/page.tsx` `saveGym`): si NO se uso GPS en la sesion (`gpsOverride`) y hay direccion, geocodea `direccion + ciudad` y agrega `latitude/longitude` al payload del insert/update. Si falla, conserva las coords existentes (no rompe).
+- **Opcion B - boton "Buscar direccion en el mapa"** (`gimnasio/page.tsx` `geocodeForm`): geocodea el form y actualiza el pin AL INSTANTE (persiste si el gym ya existe, preview si no, mensaje de exito/error). `geoMsg` muestra feedback.
+- **Mapa** (`mapCoords`): usa `previewCoords ?? coords del gym`; placeholder actualizado mencionando ambas opciones. El boton GPS setea `gpsOverride` y limpia el preview.
+- **Precedencia (decision)**: GPS de la sesion gana sobre la geocodificacion al guardar; sin GPS en la sesion, la direccion geocodifica sola en cada guardado.
+- **Nota**: el token de la API de Vercel expiro (expira ~24h); `npx vercel whoami` lo refresca antes de verificar deployments por API.
+- 3 consumidores de `gyms.latitude/longitude` (panel, checkin, perfil publico) se benefician sin cambios: el fix del panel actualiza las coords en la DB.

@@ -5,7 +5,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { Loader2, MapPin, Search, Pencil, Check, Save } from "lucide-react";
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
-import { geocodeAddress } from "@/lib/geo";
+import { geocodeAddress, formatAddress } from "@/lib/geo";
 import { useAuthState } from "@/lib/auth-context";
 
 const GymMap = dynamic(() => import("@/components/gyms/GymMap"), { ssr: false });
@@ -15,6 +15,10 @@ interface Gym {
   name: string | null;
   address: string | null;
   city: string | null;
+  street: string | null;
+  street_number: string | null;
+  postal_code: string | null;
+  province: string | null;
   capacity: number | null;
   latitude: number | null;
   longitude: number | null;
@@ -35,7 +39,10 @@ export default function GymPanelPage() {
 
   const [form, setForm] = useState({
     name: "",
-    address: "",
+    street: "",
+    streetNumber: "",
+    postalCode: "",
+    province: "",
     city: "",
     capacity: "",
   });
@@ -54,7 +61,10 @@ export default function GymPanelPage() {
         setGym(data as Gym);
         setForm({
           name: data.name ?? "",
-          address: data.address ?? "",
+          street: data.street ?? "",
+          streetNumber: data.street_number ?? "",
+          postalCode: data.postal_code ?? "",
+          province: data.province ?? "",
           city: data.city ?? "",
           capacity: data.capacity != null ? String(data.capacity) : "",
         });
@@ -66,21 +76,33 @@ export default function GymPanelPage() {
     };
   }, [userId]);
 
+  const formParts = () => ({
+    street: form.street.trim(),
+    streetNumber: form.streetNumber.trim(),
+    postalCode: form.postalCode.trim(),
+    province: form.province.trim(),
+    city: form.city.trim(),
+  });
+
   const saveGym = async () => {
     if (!userId) return;
     setSaving(true);
     const supabase = createClient();
+    const parts = formParts();
     const payload: Record<string, unknown> = {
       owner_id: userId,
       name: form.name.trim(),
-      address: form.address.trim() || null,
-      city: form.city.trim() || null,
+      address: formatAddress(parts) || null,
+      city: parts.city || null,
+      street: parts.street || null,
+      street_number: parts.streetNumber || null,
+      postal_code: parts.postalCode || null,
+      province: parts.province || null,
       capacity: form.capacity ? Number(form.capacity) : null,
       qr_code: gym?.qr_code ?? `SPX-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
     };
-    if (!gpsOverride && form.address.trim()) {
-      const query = [form.city.trim(), form.address.trim()].filter(Boolean).join(", ");
-      const geo = await geocodeAddress(query);
+    if (!gpsOverride && (parts.street || parts.city)) {
+      const geo = await geocodeAddress(parts);
       if (geo) {
         payload.latitude = geo.lat;
         payload.longitude = geo.lng;
@@ -99,24 +121,26 @@ export default function GymPanelPage() {
   };
 
   const geocodeForm = async () => {
-    if (!form.address.trim() && !form.city.trim()) return;
+    const parts = formParts();
+    if (!parts.street && !parts.city) return;
     setGeocoding(true);
     setGeoMsg(null);
     try {
-      const query = [form.city.trim(), form.address.trim()].filter(Boolean).join(", ");
-      const geo = await geocodeAddress(query);
+      const geo = await geocodeAddress(parts);
       if (geo) {
         setPreviewCoords({ lat: geo.lat, lng: geo.lng });
+        const upd = {
+          latitude: geo.lat,
+          longitude: geo.lng,
+          address: formatAddress(parts) || null,
+        };
         if (gym) {
-          await createClient()
-            .from("gyms")
-            .update({ latitude: geo.lat, longitude: geo.lng })
-            .eq("id", gym.id);
-          setGym((prev) => (prev ? { ...prev, latitude: geo.lat, longitude: geo.lng } : prev));
+          await createClient().from("gyms").update(upd).eq("id", gym.id);
+          setGym((prev) => (prev ? { ...prev, ...upd } : prev));
         }
-        setGeoMsg(`Pin ubicado en ${geo.lat.toFixed(5)}, ${geo.lng.toFixed(5)}`);
+        setGeoMsg(`Pin ubicado: ${geo.displayName}`);
       } else {
-        setGeoMsg("No encontramos esa dirección. Probá con más datos (calle y número, ciudad) o usá GPS.");
+        setGeoMsg("No encontramos esa dirección. Revisá calle, altura, código postal, provincia y ciudad.");
       }
     } catch {
       setGeoMsg("Error al buscar la dirección. Probá de nuevo.");
@@ -205,15 +229,44 @@ export default function GymPanelPage() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-muted">Dirección Completa</label>
+                <label className="mb-1 block text-xs font-semibold text-muted">Calle</label>
                 <input
-                  value={form.address}
-                  onChange={(e) => setForm({ ...form, address: e.target.value })}
-                  placeholder="Ej: Av. Corrientes 1234"
+                  value={form.street}
+                  onChange={(e) => setForm({ ...form, street: e.target.value })}
+                  placeholder="Ej: Av. Corrientes"
                   className="w-full rounded-xl border border-edge bg-bg px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-muted">Altura</label>
+                  <input
+                    value={form.streetNumber}
+                    onChange={(e) => setForm({ ...form, streetNumber: e.target.value })}
+                    placeholder="Ej: 1234"
+                    className="w-full rounded-xl border border-edge bg-bg px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-muted">Código Postal</label>
+                  <input
+                    value={form.postalCode}
+                    onChange={(e) => setForm({ ...form, postalCode: e.target.value })}
+                    placeholder="Ej: C1043"
+                    className="w-full rounded-xl border border-edge bg-bg px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-muted">Provincia</label>
+                  <input
+                    value={form.province}
+                    onChange={(e) => setForm({ ...form, province: e.target.value })}
+                    placeholder="Ej: Buenos Aires"
+                    className="w-full rounded-xl border border-edge bg-bg px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                  />
+                </div>
                 <div>
                   <label className="mb-1 block text-xs font-semibold text-muted">Ciudad / Barrio</label>
                   <input
@@ -223,16 +276,16 @@ export default function GymPanelPage() {
                     className="w-full rounded-xl border border-edge bg-bg px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
                   />
                 </div>
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-muted">Aforo Máximo</label>
-                  <input
-                    value={form.capacity}
-                    onChange={(e) => setForm({ ...form, capacity: e.target.value })}
-                    placeholder="Ej: 100 personas"
-                    type="number"
-                    className="w-full rounded-xl border border-edge bg-bg px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-                  />
-                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-muted">Aforo Máximo</label>
+                <input
+                  value={form.capacity}
+                  onChange={(e) => setForm({ ...form, capacity: e.target.value })}
+                  placeholder="Ej: 100 personas"
+                  type="number"
+                  className="w-full rounded-xl border border-edge bg-bg px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                />
               </div>
 
               <button

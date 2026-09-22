@@ -65,18 +65,59 @@ export const DARK_MAP_TILES = {
 };
 
 /**
+ * Datos estructurados de una dirección para geocodificar.
+ */
+export interface AddressParts {
+  street?: string;
+  streetNumber?: string;
+  city?: string;
+  province?: string;
+  postalCode?: string;
+}
+
+/**
+ * Concatena los datos estructurados en una dirección legible ("Calle Altura").
+ */
+export function formatAddress(parts: AddressParts | null | undefined): string {
+  if (!parts) return "";
+  const street = [parts.street, parts.streetNumber].filter(Boolean).join(" ").trim();
+  const rest = [parts.city, parts.province, parts.postalCode].filter(Boolean).join(", ").trim();
+  return [street, rest].filter(Boolean).join(", ");
+}
+
+/**
  * Geocodifica una dirección usando Nominatim (OpenStreetMap, gratis, sin API key).
+ * Prefiere los parámetros estructurados (street/city/state/postalcode, país AR)
+ * que son más precisos que el texto libre; cae a `q=` si no hay campo street.
  * Retorna null si no encuentra resultados o falla la petición.
  */
 export async function geocodeAddress(
-  query: string
+  parts: AddressParts | string
 ): Promise<{ lat: number; lng: number; displayName: string } | null> {
   try {
-    const q = encodeURIComponent(query);
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${q}`,
-      { headers: { "User-Agent": "SpotterXApp/1.0 (spotterx fitness app)" } }
-    );
+    const params = new URLSearchParams({ format: "json", limit: "1" });
+    if (typeof parts === "string") {
+      params.set("q", parts);
+    } else {
+      params.set("countrycodes", "ar");
+      params.set("city", parts.city ?? "");
+      params.set("state", parts.province ?? "");
+      params.set("postalcode", parts.postalCode ?? "");
+      const street = [parts.street ?? "", parts.streetNumber ?? ""]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+      if (street) {
+        params.set("street", street);
+      } else {
+        params.delete("city");
+        params.delete("state");
+        params.delete("postalcode");
+        params.set("q", [parts.city, parts.province, parts.postalCode].filter(Boolean).join(", "));
+      }
+    }
+    const url = `https://nominatim.openstreetmap.org/search?${params.toString()}`;
+    const res = await fetch(url, { headers: { "User-Agent": "SpotterXApp/1.0 (spotterx fitness app)" } });
     if (!res.ok) return null;
     const data = (await res.json()) as {
       lat: string;

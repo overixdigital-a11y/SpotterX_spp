@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Loader2, MapPin, Plus, X, Search, Building2, Navigation, Clock3, UserPlus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
+import { geocodeAddress, formatAddress } from "@/lib/geo";
 import { timeAgo } from "@/lib/format";
 
 interface TrainerGym {
@@ -12,6 +13,10 @@ interface TrainerGym {
   name: string | null;
   city: string | null;
   address: string | null;
+  street: string | null;
+  street_number: string | null;
+  postal_code: string | null;
+  province: string | null;
   availability: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -49,10 +54,15 @@ export default function ZonaPage() {
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [geocoding, setGeocoding] = useState(false);
+  const [geoMsg, setGeoMsg] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
+    street: "",
+    streetNumber: "",
+    postalCode: "",
+    province: "",
     city: "",
-    address: "",
     availability: "",
     latitude: null as number | null,
     longitude: null as number | null,
@@ -134,16 +144,29 @@ export default function ZonaPage() {
     );
   };
 
+  const formParts = () => ({
+    street: form.street.trim(),
+    streetNumber: form.streetNumber.trim(),
+    postalCode: form.postalCode.trim(),
+    province: form.province.trim(),
+    city: form.city.trim(),
+  });
+
   const addZone = async () => {
     if (!userId || !form.name.trim()) return;
     const supabase = createClient();
+    const parts = formParts();
     const { data, error } = await supabase
       .from("trainer_gyms")
       .insert({
         trainer_id: userId,
         name: form.name.trim(),
-        city: form.city.trim() || null,
-        address: form.address.trim() || null,
+        city: parts.city || null,
+        address: formatAddress(parts) || null,
+        street: parts.street || null,
+        street_number: parts.streetNumber || null,
+        postal_code: parts.postalCode || null,
+        province: parts.province || null,
         availability: form.availability.trim() || null,
         latitude: form.latitude,
         longitude: form.longitude,
@@ -151,8 +174,28 @@ export default function ZonaPage() {
       .select()
       .maybeSingle();
     if (!error && data) setZones((prev) => [data as TrainerGym, ...prev]);
-    setForm({ name: "", city: "", address: "", availability: "", latitude: null, longitude: null });
+    setForm({ name: "", street: "", streetNumber: "", postalCode: "", province: "", city: "", availability: "", latitude: null, longitude: null });
+    setGeoMsg(null);
     setAdding(false);
+  };
+
+  const geocodeForm = async () => {
+    const parts = formParts();
+    if (!parts.street && !parts.city) return;
+    setGeocoding(true);
+    setGeoMsg(null);
+    try {
+      const geo = await geocodeAddress(parts);
+      if (geo) {
+        setForm((v) => ({ ...v, latitude: geo.lat, longitude: geo.lng }));
+        setGeoMsg(`Pin ubicado: ${geo.displayName}`);
+      } else {
+        setGeoMsg("No encontramos esa dirección. Revisá calle, altura, código postal, provincia y ciudad.");
+      }
+    } catch {
+      setGeoMsg("Error al buscar la dirección. Probá de nuevo.");
+    }
+    setGeocoding(false);
   };
 
   const removeZone = async (id: string) => {
@@ -240,17 +283,39 @@ export default function ZonaPage() {
               className="w-full rounded-lg border border-edge bg-bg px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
             />
             <input
-              value={form.city}
-              onChange={(e) => setForm((v) => ({ ...v, city: e.target.value }))}
-              placeholder="Ciudad / barrio (ej: Córdoba, Centro)"
+              value={form.street}
+              onChange={(e) => setForm((v) => ({ ...v, street: e.target.value }))}
+              placeholder="Calle (ej: Bv. San Juan)"
               className="w-full rounded-lg border border-edge bg-bg px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
             />
-            <input
-              value={form.address}
-              onChange={(e) => setForm((v) => ({ ...v, address: e.target.value }))}
-              placeholder="Dirección (opcional)"
-              className="w-full rounded-lg border border-edge bg-bg px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-            />
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                value={form.streetNumber}
+                onChange={(e) => setForm((v) => ({ ...v, streetNumber: e.target.value }))}
+                placeholder="Altura"
+                className="w-full rounded-lg border border-edge bg-bg px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+              />
+              <input
+                value={form.postalCode}
+                onChange={(e) => setForm((v) => ({ ...v, postalCode: e.target.value }))}
+                placeholder="Código postal"
+                className="w-full rounded-lg border border-edge bg-bg px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                value={form.province}
+                onChange={(e) => setForm((v) => ({ ...v, province: e.target.value }))}
+                placeholder="Provincia (ej: Córdoba)"
+                className="w-full rounded-lg border border-edge bg-bg px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+              />
+              <input
+                value={form.city}
+                onChange={(e) => setForm((v) => ({ ...v, city: e.target.value }))}
+                placeholder="Ciudad / barrio (ej: Córdoba, Centro)"
+                className="w-full rounded-lg border border-edge bg-bg px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+              />
+            </div>
             <div className="flex items-center gap-2">
               <div className="flex grow items-center gap-2 rounded-lg border border-edge bg-bg px-3 py-2">
                 <Clock3 className="h-3.5 w-3.5 text-muted" />
@@ -267,9 +332,18 @@ export default function ZonaPage() {
                 className="flex shrink-0 items-center gap-1 rounded-lg border border-neon/40 bg-neon/10 px-3 py-2 text-xs font-semibold text-neon"
               >
                 {locating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Navigation className="h-3.5 w-3.5" />}
-                Ubicación
+                GPS
               </button>
             </div>
+            <button
+              onClick={geocodeForm}
+              disabled={geocoding}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-edge bg-elevated px-3 py-2 text-sm font-medium text-ink transition hover:border-neon/40 hover:text-neon disabled:opacity-60"
+            >
+              {geocoding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+              {geocoding ? "Buscando dirección…" : "Buscar dirección en el mapa"}
+            </button>
+            {geoMsg && <p className="text-xs text-neon">{geoMsg}</p>}
             {form.latitude != null && (
               <p className="text-xs text-muted">
                 Ubicación: {form.latitude.toFixed(5)}, {form.longitude?.toFixed(5)}

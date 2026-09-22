@@ -1,6 +1,7 @@
 "use client";
 
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { useEffect } from "react";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { DARK_MAP_TILES, getDirectionsUrl } from "@/lib/geo";
@@ -17,6 +18,16 @@ const icon = L.icon({
   iconAnchor: [15, 46],
   popupAnchor: [0, -40],
 });
+
+// El prop center de MapContainer solo vale al montar; este control sigue la
+// coordenada prop y mueve la vista (setView) cada vez que cambia el pin.
+function MapController({ latitude, longitude }: { latitude: number; longitude: number }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView([latitude, longitude], Math.max(map.getZoom(), 14));
+  }, [map, latitude, longitude]);
+  return null;
+}
 
 export default function GymMap({
   latitude,
@@ -35,6 +46,7 @@ export default function GymMap({
       scrollWheelZoom={false}
       style={{ height: "180px", width: "100%", borderRadius: 12, backgroundColor: "#0c1017" }}
     >
+      <MapController latitude={latitude} longitude={longitude} />
       <TileLayer
         attribution={DARK_MAP_TILES.attribution}
         url={DARK_MAP_TILES.url}

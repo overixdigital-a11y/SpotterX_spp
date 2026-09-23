@@ -550,3 +550,8 @@ Orden de etapas para pulir/completar la app, módulo por módulo. Cada etapa ter
 - **Perfil publico** (`perfil/[username]`): RPC `get_trainer_workplaces` (00034) ahora devuelve `disciplines`/`description`/`notes` de las zonas; los popups del mapa y los cards de "Lugares donde trabaja" los muestran.
 - **Buscador de profes** (`mi-entrenamiento/buscar`): select ampliado + popup y card muestran nombre + chips de disciplinas + descripcion + notas de cada zona.
 - El nombre de la ubicacion ya se mostraba en las 3 vistas (Lote 17); este lote agrega editar + caracteristicas.
+
+**Lote 18b - Perfil del profe: entrada a "Mis lugares" + gym contratante visible (22/09/2026, commit `f4393ed`, lint 0 errores, build OK, deploy automatico):**
+- El usuario no encontraba el lapiz porque vivia dentro de `/entrenamiento/zona` (escondido en el menu), y el perfil propio no mostraba el gym que lo contrato.
+- **`/perfil` (profesor/admin)**: card **"Mis lugares de trabajo"** (icono MapPin, ember) → `/entrenamiento/zona`; seccion **"Lugares donde trabajo"** que lista el gym que lo contrato (icono Store neon, via RPC `get_trainer_workplaces` con `p_trainer_id: userId`) y sus zonas personalizadas (icono MapPin ember), cada fila con lapiz → `/entrenamiento/zona`; empty state "Agrega tu primer lugar" si no hay ninguno. Link **"Ver mi perfil publico"** → `/perfil/<username>`.
+- Sin migracion: se reutiliza la RPC existente (funciona aunque 00034 aun no se corrio; solo muestra nombre/ciudad).

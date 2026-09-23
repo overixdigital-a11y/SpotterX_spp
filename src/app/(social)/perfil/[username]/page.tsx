@@ -458,7 +458,7 @@ export default function PublicProfilePage() {
                 return (
                   <>
                     {withCoords.length > 0 && (
-                      <div className="relative overflow-hidden rounded-2xl border border-edge">
+                      <div className="relative z-0 w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-edge">
                         <MapContainer
                           center={[withCoords[0].lat!, withCoords[0].lng!]}
                           zoom={12}

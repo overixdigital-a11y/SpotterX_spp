@@ -11,6 +11,7 @@ import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { DARK_MAP_TILES, haversineDistance, formatDistance, getDirectionsUrl } from "@/lib/geo";
+import ZoomToPoint from "@/components/gyms/ZoomToPoint";
 
 const icon = L.icon({
   iconUrl:
@@ -313,6 +314,11 @@ export default function BuscarProfePage() {
                         >
                           <MessageCircle className="h-3 w-3" /> Chat
                         </Link>
+                        <ZoomToPoint
+                          lat={z.latitude as number}
+                          lng={z.longitude as number}
+                          className="flex items-center gap-1 rounded-lg border border-[#00f2fe]/50 bg-[#00f2fe]/10 px-2.5 py-1 text-[11px] font-semibold text-[#0286a0]"
+                        />
                         {directionsUrl && (
                           <a
                             href={directionsUrl}

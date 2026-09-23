@@ -205,33 +205,50 @@ export default function PublicProfilePage() {
 
   useEffect(() => {
     const run = () => {
-      const over = document.documentElement.scrollWidth - document.documentElement.clientWidth;
-      let culprit = "";
-      let worst = 0;
-      document.querySelectorAll("body *").forEach((el) => {
-        if (!(el instanceof HTMLElement)) return;
-        const r = el.getBoundingClientRect();
-        const w = r.right - window.innerWidth;
-        if (w > worst && el.offsetParent !== null) {
-          worst = w;
-          culprit = `${el.tagName.toLowerCase()}${el.className && typeof el.className === "string" ? "." + el.className.split(" ").slice(0, 3).join(".") : ""}`;
-        }
-      });
-      setMeas(
-        over > 0
-          ? `OVERFLOW ${over}px (${Math.round(worst)}px → ${culprit})`
-          : "OK"
-      );
+      try {
+        const vw = window.innerWidth;
+        const docOver = document.documentElement.scrollWidth - vw;
+        let clipBy = 0;
+        let clipLabel = "";
+        let offBy = 0;
+        let offLabel = "";
+        const lbl = (el: HTMLElement) =>
+          `${el.tagName.toLowerCase()}.${typeof el.className === "string" ? el.className.split(" ").slice(0, 3).join(".") : ""}`;
+        document.querySelectorAll("body *").forEach((el) => {
+          if (!(el instanceof HTMLElement)) return;
+          if (el.getBoundingClientRect().width === 0) return;
+          const rightBy = el.getBoundingClientRect().right - vw;
+          if (rightBy > offBy) {
+            offBy = rightBy;
+            offLabel = lbl(el);
+          }
+          const sw = el.scrollWidth - el.clientWidth;
+          const ox = window.getComputedStyle(el).overflowX;
+          if (sw > clipBy && (ox === "hidden" || ox === "clip")) {
+            clipBy = sw;
+            clipLabel = lbl(el);
+          }
+        });
+        setMeas(
+          `doc:${docOver}px | clip:${clipBy > 0 ? Math.round(clipBy) + "px " + clipLabel : "no"} | right:${offBy > 1 ? Math.round(offBy) + "px " + offLabel : "no"}`
+        );
+      } catch {
+        setMeas("ERR");
+      }
     };
     const t1 = window.setTimeout(run, 1500);
-    const t2 = window.setTimeout(() => setMeas(null), 16000);
-    const t3 = window.setTimeout(run, 3500);
+    const t2 = window.setTimeout(run, 4000);
+    const t3 = window.setTimeout(() => setMeas(null), 22000);
+    const t4 = window.setTimeout(run, 8000);
     window.addEventListener("resize", run);
+    window.addEventListener("scroll", run, { passive: true });
     return () => {
       window.clearTimeout(t1);
       window.clearTimeout(t2);
       window.clearTimeout(t3);
+      window.clearTimeout(t4);
       window.removeEventListener("resize", run);
+      window.removeEventListener("scroll", run);
     };
   }, [profile?.role]);
 

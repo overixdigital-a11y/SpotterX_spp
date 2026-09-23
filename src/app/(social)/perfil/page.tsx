@@ -4,12 +4,38 @@ import { useEffect, useState } from "react";
 import { useAuthState } from "@/lib/auth-context";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
-import { MapPin, Zap, ChevronRight, Dumbbell, ShoppingBag, Users, GraduationCap, UserRound } from "lucide-react";
+import { MapPin, Zap, ChevronRight, Dumbbell, ShoppingBag, Users, GraduationCap, UserRound, Pencil, Store } from "lucide-react";
+
+interface WorkplaceGym {
+  gym_id: string;
+  name: string | null;
+  city: string | null;
+}
+
+interface WorkplaceZona {
+  id: string;
+  name: string | null;
+  city: string | null;
+}
 
 export default function PerfilPage() {
   const { userId, profile } = useAuthState();
   const [profeUsername, setProfeUsername] = useState<string | null>(null);
   const [profeName, setProfeName] = useState<string | null>(null);
+  const [workplaces, setWorkplaces] = useState<{ gyms: WorkplaceGym[]; zonas: WorkplaceZona[] }>({ gyms: [], zonas: [] });
+
+  useEffect(() => {
+    if ((profile?.role !== "profesor" && profile?.role !== "admin") || !userId) return;
+    let active = true;
+    const load = async () => {
+      const { data } = await createClient().rpc("get_trainer_workplaces", { p_trainer_id: userId });
+      if (active && data) setWorkplaces(data as { gyms: WorkplaceGym[]; zonas: WorkplaceZona[] });
+    };
+    load();
+    return () => {
+      active = false;
+    };
+  }, [profile?.role, userId]);
 
   useEffect(() => {
     if (profile?.role !== "alumno" || !userId) return;
@@ -123,6 +149,78 @@ export default function PerfilPage() {
           </p>
           <ChevronRight className="h-4 w-4 text-ember" />
         </Link>
+      )}
+
+      {(profile?.role === "profesor" || profile?.role === "admin") && (
+        <div className="mx-4 mt-5">
+          <Link
+            href="/entrenamiento/zona"
+            className="flex items-center justify-between rounded-xl border border-ember/30 bg-ember/10 p-3.5"
+          >
+            <p className="flex items-center gap-2 text-sm font-semibold text-ember">
+              <span className="rounded-full bg-ember/20 p-1.5">
+                <MapPin className="h-4 w-4" />
+              </span>
+              Mis lugares de trabajo
+            </p>
+            <ChevronRight className="h-4 w-4 text-ember" />
+          </Link>
+
+          <p className="mt-4 px-1 text-xs font-semibold uppercase tracking-wide text-muted">
+            Lugares donde trabajo
+          </p>
+          <div className="mt-2 divide-y divide-edge rounded-xl border border-edge bg-card">
+            {workplaces.gyms.map((g) => (
+              <Link
+                key={`gym-${g.gym_id}`}
+                href="/entrenamiento/zona"
+                className="flex items-center gap-3 p-3"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neon/20 text-neon">
+                  <Store className="h-4 w-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-ink">{g.name || "Gimnasio"}</p>
+                  <p className="truncate text-xs text-muted">{g.city || "—"}</p>
+                </div>
+                <Pencil className="h-3.5 w-3.5 text-ember" />
+              </Link>
+            ))}
+            {workplaces.zonas.map((z) => (
+              <Link
+                key={`zona-${z.id}`}
+                href="/entrenamiento/zona"
+                className="flex items-center gap-3 p-3"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ember/20 text-ember">
+                  <MapPin className="h-4 w-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-ink">{z.name || "Mi zona"}</p>
+                  <p className="truncate text-xs text-muted">{z.city || "—"}</p>
+                </div>
+                <Pencil className="h-3.5 w-3.5 text-ember" />
+              </Link>
+            ))}
+            {workplaces.gyms.length === 0 && workplaces.zonas.length === 0 && (
+              <Link
+                href="/entrenamiento/zona"
+                className="flex items-center justify-between p-3"
+              >
+                <p className="text-sm text-muted">Todavía no cargaste lugares. Agregá tu primer lugar →</p>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted" />
+              </Link>
+            )}
+          </div>
+
+          <Link
+            href={`/perfil/${profile?.username}`}
+            className="mt-3 ml-1 inline-flex items-center gap-1.5 text-xs text-muted transition hover:text-neon"
+          >
+            <UserRound className="h-3.5 w-3.5" />
+            Ver mi perfil público
+          </Link>
+        </div>
       )}
 
       <Link

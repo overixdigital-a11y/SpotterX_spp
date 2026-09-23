@@ -562,3 +562,9 @@ Orden de etapas para pulir/completar la app, módulo por módulo. Cada etapa ter
 - Aplicado en **`/entrenamiento/zona`** (reemplaza el grid provincia/ciudad del form, con/editar) y **`/gimnasio`** (con labels; el pick devuelve coords y setea `previewCoords`).
 - **Fix de visibilidad del error en `saveZone`** (`zona/page.tsx`): si la base rechaza el guardado (antes se limpiaba el form en silencio) ahora muestra `No se pudo guardar: <mensaje>` en rojo (`saveError`), no limpia el form ni cierra.
 - **Sigue pendiente correr `00034`** en SQL Editor: sin las columnas `disciplines/description/notes` en `trainer_gyms` el guardado de lugares falla (con el fix, ahora se ve el error real).
+
+**Lote 19b - Buscador de gimnasios de internet en "Mi zona" (22/09/2026, commit `b00e239`, lint 0 errores, build OK, deploy automatico):**
+- El buscador de "Postulate" solo buscaba gimnasios **registrados en la app** (`gyms`). El usuario pidio encontrar gimnasios que existan de verdad en internet.
+- **`src/lib/geo.ts`**: `WebGymSuggestion` + `searchGymsWeb(q, city?)` via **Nominatim OSM** (gratis, sin API key): con `city` usa el query estructurado `amenity=gym&city=...&countrycodes=ar&limit=50` (probado: 37 gimnasios reales en Cordoba) y filtra por nombre sin importar mayusculas; sin city cae a `q=` libre filtrando por tipos (`fitness_centre`, `sports_centre`, `gym`...) o nombre con gym/fitness/crossfit/club. Errores -> `[]`.
+- **`/entrenamiento/zona`**: nueva tarjeta **"Buscar gimnasios en internet"** (borde neon, icono Globe, input con debounce 400ms + spinner). Resultados con nombre + ciudad y boton **"Usar"** (`applyWebGym`) que abre el form "Agregar gimnasio manual" **precargado** (nombre + ciudad del resultado + lat/lng del pin). Nota: usa `form.city` (la del form manual) para acotar la busqueda; nota al pie "Datos de OpenStreetMap - revisalos antes de guardar".
+- Sin migracion y sin tocar el buscador de "Postulate" ni `/gimnasio`.

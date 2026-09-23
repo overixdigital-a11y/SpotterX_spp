@@ -173,6 +173,95 @@ export async function autocompleteCity(q: string): Promise<CitySuggestion[]> {
 }
 
 /**
+ * Sugerencia de gimnasio real (OpenStreetMap) para el buscador web.
+ */
+export interface WebGymSuggestion {
+  name: string;
+  city: string | null;
+  lat: number;
+  lng: number;
+  label: string;
+}
+
+const GYM_TYPES = new Set([
+  "fitness_centre",
+  "sports_centre",
+  "sports_hall",
+  "gym",
+  "gymnasium",
+]);
+
+/**
+ * Busca gimnasios reales en OpenStreetMap (Nominatim, gratis, sin API key).
+ * - Si hay `city`, lista los gimnasios de esa ciudad (amenity=gym) y filtra
+ *   por el texto escrito (sin importar mayúsculas).
+ * - Sin ciudad, cae a búsqueda libre filtrando resultados con pinta de gimnasio.
+ * Retorna [] si no hay resultados o falla la petición.
+ */
+export async function searchGymsWeb(
+  q: string,
+  city?: string
+): Promise<WebGymSuggestion[]> {
+  try {
+    if (city && city.trim()) {
+      const params = new URLSearchParams({
+        format: "json",
+        countrycodes: "ar",
+        amenity: "gym",
+        city: city.trim(),
+        limit: "50",
+        "accept-language": "es",
+      });
+      const url = `https://nominatim.openstreetmap.org/search?${params.toString()}`;
+      const res = await fetch(url, { headers: { "User-Agent": NOMINATIM_UA } });
+      if (res.ok) {
+        const data = (await res.json()) as {
+          name: string;
+          lat: string;
+          lon: string;
+          display_name: string;
+        }[];
+        const needle = q.trim().toLowerCase();
+        return data
+          .filter((d) => !needle || d.name.toLowerCase().includes(needle))
+          .slice(0, 10)
+          .map((d) => ({
+            name: d.name,
+            city: city.trim(),
+            lat: Number(d.lat),
+            lng: Number(d.lon),
+            label: d.display_name,
+          }));
+      }
+    }
+
+    const params = new URLSearchParams({ format: "json", q, limit: "10", "accept-language": "es" });
+    const url = `https://nominatim.openstreetmap.org/search?${params.toString()}`;
+    const res = await fetch(url, { headers: { "User-Agent": NOMINATIM_UA } });
+    if (!res.ok) return [];
+    const data = (await res.json()) as {
+      name: string;
+      type: string;
+      class: string;
+      lat: string;
+      lon: string;
+      display_name: string;
+    }[];
+    return data
+      .filter((d) => GYM_TYPES.has(d.type) || /gym|fitness|crossfit|club/i.test(d.name))
+      .map((d) => ({
+        name: d.name,
+        city: null,
+        lat: Number(d.lat),
+        lng: Number(d.lon),
+        label: d.display_name,
+      }));
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Concatena los datos estructurados en una dirección legible ("Calle Altura").
  */
 export function formatAddress(parts: AddressParts | null | undefined): string {

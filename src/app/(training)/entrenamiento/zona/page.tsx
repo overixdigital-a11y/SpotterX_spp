@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, MapPin, Plus, X, Search, Building2, Navigation, Clock3, UserPlus, Pencil } from "lucide-react";
+import { Loader2, MapPin, Plus, X, Search, Building2, Navigation, Clock3, UserPlus, Pencil, Globe } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
-import { geocodeAddress, formatAddress } from "@/lib/geo";
+import { geocodeAddress, formatAddress, searchGymsWeb, WebGymSuggestion } from "@/lib/geo";
 import { DISCIPLINES } from "@/lib/disciplines";
 import { timeAgo } from "@/lib/format";
 import ProvinceCityFields from "@/components/gyms/ProvinceCityFields";
@@ -84,6 +84,28 @@ export default function ZonaPage() {
   const [results, setResults] = useState<GymRow[]>([]);
   const [asking, setAsking] = useState<string | null>(null);
 
+  const [webQ, setWebQ] = useState("");
+  const [webResults, setWebResults] = useState<WebGymSuggestion[]>([]);
+  const [webSearching, setWebSearching] = useState(false);
+
+  useEffect(() => {
+    const t = webQ.trim();
+    if (t.length < 2) {
+      const id = setTimeout(() => {
+        setWebResults([]);
+        setWebSearching(false);
+      }, 0);
+      return () => clearTimeout(id);
+    }
+    const id = setTimeout(async () => {
+      setWebSearching(true);
+      const list = await searchGymsWeb(t, form.city);
+      setWebResults(list);
+      setWebSearching(false);
+    }, 400);
+    return () => clearTimeout(id);
+  }, [webQ, form.city]);
+
   useEffect(() => {
     if (!userId) return;
     const supabase = createClient();
@@ -138,6 +160,21 @@ export default function ZonaPage() {
       .upsert({ trainer_id: userId, gym_id: g.id }, { onConflict: "trainer_id,gym_id", ignoreDuplicates: true });
     setRequests((prev) => ({ ...prev, [g.id]: "pending" }));
     setAsking(null);
+  };
+
+  const applyWebGym = (s: WebGymSuggestion) => {
+    const base = emptyForm();
+    setForm({
+      ...base,
+      name: s.name,
+      city: s.city ?? "",
+      latitude: s.lat,
+      longitude: s.lng,
+    });
+    setAdding(true);
+    setEditingId(null);
+    setGeoMsg(null);
+    setSaveError(null);
   };
 
   const locate = () => {
@@ -347,6 +384,52 @@ export default function ZonaPage() {
           {q.trim().length > 0 && results.length === 0 && (
             <p className="py-3 text-center text-sm text-muted">No se encontró ningún gimnasio.</p>
           )}
+        </div>
+
+        <div className="rounded-xl border border-neon/30 bg-neon/5 p-3">
+          <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wide text-neon">
+            Buscar gimnasios en internet
+          </p>
+          <p className="mb-2 text-xs text-muted">
+            Encontrá un gimnasio real y usalo para llenar el form.
+          </p>
+          <div className="flex items-center gap-2 rounded-lg border border-edge bg-bg px-3 py-2">
+            <Globe className="h-4 w-4 text-neon" />
+            <input
+              value={webQ}
+              onChange={(e) => setWebQ(e.target.value)}
+              placeholder="Ej: crossfit, mega gym…"
+              className="w-full bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none"
+            />
+            {webSearching && <Loader2 className="h-3.5 w-3.5 animate-spin text-neon" />}
+          </div>
+          <p className="mt-1 text-[11px] text-muted">
+            Usa la ciudad del form manual. {form.city ? `Ciudad actual: ${form.city}.` : "Completala abajo si querés resultados de esa ciudad."}
+          </p>
+          {webResults.length > 0 && (
+            <div className="mt-2 divide-y divide-edge">
+              {webResults.map((s, i) => (
+                <div key={`${s.name}-${i}`} className="flex items-center justify-between gap-2 py-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-ink">{s.name}</p>
+                    <p className="truncate text-xs text-muted">{s.city ? `Ciudad: ${s.city}` : s.label}</p>
+                  </div>
+                  <button
+                    onClick={() => applyWebGym(s)}
+                    className="flex shrink-0 items-center gap-1 rounded-lg bg-neon px-3 py-1.5 text-xs font-semibold text-bg"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Usar
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {webQ.trim().length >= 2 && !webSearching && webResults.length === 0 && (
+            <p className="py-3 text-center text-sm text-muted">
+              Sin resultados. Probá otra palabra o agregá la ciudad primero.
+            </p>
+          )}
+          <p className="mt-2 text-[11px] text-muted">Datos de OpenStreetMap — revisalos antes de guardar.</p>
         </div>
 
         <button

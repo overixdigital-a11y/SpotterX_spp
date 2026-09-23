@@ -546,7 +546,7 @@ Orden de etapas para pulir/completar la app, módulo por módulo. Cada etapa ter
 
 **Lote 18 - Profe: editar ubicaciones + caracteristicas por ubicacion (22/09/2026, commit `6d25128`, lint 0 errores, build OK, deploy automatico):**
 - **Edicion de ubicaciones** en `/entrenamiento/zona`: el icono lapiz de una zona en "Mis lugares" la carga en el form (nombre, 5 campos, horarios, coords) -> "Guardar cambios" hace `update` por id; boton "Cancelar edicion" (el X sigue para borrar).
-- **Caracteristicas por ubicacion** (`trainer_gyms`, migracion `00034_trainer_gyms_features.sql` PENDIENTE de correr): columnas `disciplines text[]`, `description text`, `notes text`. Form "Agregar gimnasio manual" con chips multiselect de disciplinas (labels de `DISCIPLINES` en `src/lib/disciplines.ts`), textarea "Descripcion" y textarea "Notas/condiciones". Los cards de "Mis lugares" muestran chips + descripcion + notas (📌).
+- **Caracteristicas por ubicacion** (`trainer_gyms`, migracion `00034_trainer_gyms_features.sql` **CORRIDA** 23/09/2026): columnas `disciplines text[]`, `description text`, `notes text`. Form "Agregar gimnasio manual" con chips multiselect de disciplinas (labels de `DISCIPLINES` en `src/lib/disciplines.ts`), textarea "Descripcion" y textarea "Notas/condiciones". Los cards de "Mis lugares" muestran chips + descripcion + notas (📌).
 - **Perfil publico** (`perfil/[username]`): RPC `get_trainer_workplaces` (00034) ahora devuelve `disciplines`/`description`/`notes` de las zonas; los popups del mapa y los cards de "Lugares donde trabaja" los muestran.
 - **Buscador de profes** (`mi-entrenamiento/buscar`): select ampliado + popup y card muestran nombre + chips de disciplinas + descripcion + notas de cada zona.
 - El nombre de la ubicacion ya se mostraba en las 3 vistas (Lote 17); este lote agrega editar + caracteristicas.
@@ -561,7 +561,7 @@ Orden de etapas para pulir/completar la app, módulo por módulo. Cada etapa ter
 - `src/lib/geo.ts`: `ARG_PROVINCIAS` (24), `CitySuggestion`, `autocompleteCity(q)` (limit 6, `accept-language=es`, User-Agent propio `NOMINATIM_UA` reutilizado en `geocodeAddress`).
 - Aplicado en **`/entrenamiento/zona`** (reemplaza el grid provincia/ciudad del form, con/editar) y **`/gimnasio`** (con labels; el pick devuelve coords y setea `previewCoords`).
 - **Fix de visibilidad del error en `saveZone`** (`zona/page.tsx`): si la base rechaza el guardado (antes se limpiaba el form en silencio) ahora muestra `No se pudo guardar: <mensaje>` en rojo (`saveError`), no limpia el form ni cierra.
-- **Sigue pendiente correr `00034`** en SQL Editor: sin las columnas `disciplines/description/notes` en `trainer_gyms` el guardado de lugares falla (con el fix, ahora se ve el error real).
+- **Migracion `00034` CORRIDA** (23/09/2026): el guardado de lugares con disciplinas/descripcion/notas ya funciona y las 3 vistas las muestran (Mis lugares, perfil publico, buscador de profes).
 
 **Lote 19b - Buscador de gimnasios de internet en "Mi zona" (22/09/2026, commit `b00e239`, lint 0 errores, build OK, deploy automatico):**
 - El buscador de "Postulate" solo buscaba gimnasios **registrados en la app** (`gyms`). El usuario pidio encontrar gimnasios que existan de verdad en internet.

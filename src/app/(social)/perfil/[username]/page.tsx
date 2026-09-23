@@ -110,6 +110,7 @@ export default function PublicProfilePage() {
   const [trainerStats, setTrainerStats] = useState<TrainerStats | null>(null);
   const [workplaces, setWorkplaces] = useState<{ gyms: WorkplaceGym[]; zonas: WorkplaceZona[] }>({ gyms: [], zonas: [] });
   const [students, setStudents] = useState<TrainerStudent[]>([]);
+  const [meas, setMeas] = useState<string | null>("…");
 
   useEffect(() => {
     const supabase = createClient();
@@ -201,6 +202,38 @@ export default function PublicProfilePage() {
       active = false;
     };
   }, [username, userId]);
+
+  useEffect(() => {
+    const run = () => {
+      const over = document.documentElement.scrollWidth - document.documentElement.clientWidth;
+      let culprit = "";
+      let worst = 0;
+      document.querySelectorAll("body *").forEach((el) => {
+        if (!(el instanceof HTMLElement)) return;
+        const r = el.getBoundingClientRect();
+        const w = r.right - window.innerWidth;
+        if (w > worst && el.offsetParent !== null) {
+          worst = w;
+          culprit = `${el.tagName.toLowerCase()}${el.className && typeof el.className === "string" ? "." + el.className.split(" ").slice(0, 3).join(".") : ""}`;
+        }
+      });
+      setMeas(
+        over > 0
+          ? `OVERFLOW ${over}px (${Math.round(worst)}px → ${culprit})`
+          : "OK"
+      );
+    };
+    const t1 = window.setTimeout(run, 1500);
+    const t2 = window.setTimeout(() => setMeas(null), 16000);
+    const t3 = window.setTimeout(run, 3500);
+    window.addEventListener("resize", run);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+      window.clearTimeout(t3);
+      window.removeEventListener("resize", run);
+    };
+  }, [profile?.role]);
 
   const toggleFollow = async () => {
     if (!userId || !profile || profile.id === userId) return;
@@ -639,6 +672,13 @@ export default function PublicProfilePage() {
           )
         )}
       </div>
+      {meas && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-16 z-[999] flex justify-center px-4">
+          <span className="rounded-full border border-ember bg-bg/95 px-3 py-1 font-mono text-[11px] font-bold text-ember shadow-lg">
+            {meas}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

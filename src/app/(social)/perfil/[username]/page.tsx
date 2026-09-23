@@ -111,6 +111,55 @@ export default function PublicProfilePage() {
   const [trainerStats, setTrainerStats] = useState<TrainerStats | null>(null);
   const [workplaces, setWorkplaces] = useState<{ gyms: WorkplaceGym[]; zonas: WorkplaceZona[] }>({ gyms: [], zonas: [] });
   const [students, setStudents] = useState<TrainerStudent[]>([]);
+  const [diag, setDiag] = useState<string | null>(null);
+
+  useEffect(() => {
+    const scan = () => {
+      try {
+        const vw = window.innerWidth;
+        const doc = document.documentElement;
+        const body = document.body;
+        let worstEl = "";
+        let worstBy = 0;
+        document.querySelectorAll("body *").forEach((el) => {
+          if (!(el instanceof HTMLElement)) return;
+          if (el.closest("[data-med]")) return;
+          const r = el.getBoundingClientRect();
+          if (r.width === 0) return;
+          const by = r.right - vw;
+          if (by > worstBy) {
+            worstBy = by;
+            worstEl = `${el.tagName.toLowerCase()}.${typeof el.className === "string" ? el.className.split(" ").slice(0, 3).join(".") : ""}`;
+          }
+        });
+        const main = document.querySelector("main");
+        const mapWrap = document.querySelector("[data-mapwrap]");
+        const leaf = document.querySelector(".leaflet-container");
+        const mSt = main ? `m${main.clientWidth}/sw${main.scrollWidth}` : "main?";
+        const wSt = mapWrap instanceof HTMLElement ? `w${mapWrap.clientWidth}/sw${mapWrap.scrollWidth}` : "wrap?";
+        const lSt = leaf instanceof HTMLElement ? `l${leaf.clientWidth}/sw${leaf.scrollWidth}` : "leaf?";
+        setDiag(
+          `D3 ${vw}px d${doc.scrollWidth}/b${body.scrollWidth} ${mSt} ${wSt} ${lSt} out${Math.round(worstBy)}px ${worstEl}`
+        );
+      } catch {
+        setDiag("D3 ERR");
+      }
+    };
+    const t1 = window.setTimeout(scan, 1200);
+    const t2 = window.setTimeout(scan, 4000);
+    const t3 = window.setTimeout(scan, 8000);
+    const t4 = window.setTimeout(() => setDiag(null), 30000);
+    window.addEventListener("resize", scan);
+    window.addEventListener("scroll", scan, { passive: true });
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+      window.clearTimeout(t3);
+      window.clearTimeout(t4);
+      window.removeEventListener("resize", scan);
+      window.removeEventListener("scroll", scan);
+    };
+  }, []);
 
   useEffect(() => {
     const supabase = createClient();
@@ -458,7 +507,7 @@ export default function PublicProfilePage() {
                 return (
                   <>
                     {withCoords.length > 0 && (
-                      <div className="relative z-0 w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-edge">
+                      <div data-mapwrap className="relative z-0 w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-edge">
                         <MapContainer
                           center={[withCoords[0].lat!, withCoords[0].lng!]}
                           zoom={12}
@@ -641,6 +690,13 @@ export default function PublicProfilePage() {
           )
         )}
       </div>
+      {diag && (
+        <div data-med="1" className="pointer-events-none fixed inset-x-0 bottom-14 z-[999] flex justify-center px-2">
+          <span className="max-w-[96vw] truncate rounded-full border border-ember bg-bg/95 px-3 py-1 font-mono text-[10px] font-bold text-ember shadow-lg">
+            {diag}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

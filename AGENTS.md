@@ -581,3 +581,13 @@ Orden de etapas para pulir/completar la app, módulo por módulo. Cada etapa ter
 - **Causa raiz**: `FitAllButton` (usa `useMap()` de react-leaflet) quedo como **hermano de `<MapContainer>`** (afuera), no hijo. `useMap()` lee el contexto `LeafletContext` que SOLO existe debajo de `<MapContainer>`; fuera de el es `null` → TypeError al renderizar (SSR + client) → pagina entera caia.
 - **Lecion**: cualquier componente que use `useMap()`/`useMapEvents()` debe ir SIEMPRE como hijo (descendiente) de `<MapContainer>`, no como hermano. Los `ZoomToPoint` (dentro de `<Popup>`) estaban bien; la leyenda flotante (sin hooks) puede quedar afuera.
 - **Fix**: `<FitAllButton>` movido dentro de `MapContainer` (justo despues de `<TileLayer>`), manteniendo la condicion `withCoords.length > 1`. El resto del Lote 19c intacto. Deploy READY sha `42955e3`.
+
+**Lote 21 - Fix desborde lateral del mapa Leaflet en el celular (23/09/2026, commit `45f6a30`, lint 0 errores, build OK, deploy automatico):**
+- **Diagnostico** (badge temporal v2 en el perfil publico del profe): `doc:0px` (la pagina NO desborda) + `clip:688px div.leaflet-container` (el MAPA quedaba ~688px interno, mas ancho que el telefono) + `right:808px img.leaflet-marker-icon` (los pines a 808px a la derecha, fuera de pantalla). El wrapper `overflow-hidden` recortaba ese excedente -> hacia que "no se vea todo" en las secciones de lugares, sin overflow del documento.
+- **Causa raiz**: leaflet mide su contenedor UNA sola vez al montar; si ese momento el ancho es distinto al real (SSR/layout/transiciones), el mapa queda interno mas ancho y no se re-mide.
+- **Fix**: componente compartido nuevo **`src/components/gyms/LeafletAutoResize.tsx`** (usa `useMap()`, renderiza `null`): llama `map.invalidateSize()` a los 300ms y 900ms de montar y en cada `window.resize`. Se inserto como PRIMER hijo de cada `MapContainer`:
+  - `perfil/[username]` (el que rompia, seccion "Lugares donde trabaja"/"mis lugares").
+  - `mi-entrenamiento/buscar` (mapa de profes).
+  - `GymMap.tsx` (cubre panel gym + checkin, de prevencion).
+- **Badge de diagnostico eliminado** (estado `meas`, efecto de medicion y chip flotante) del perfil publico; el archivo queda limpio.
+- **Leccion**: si un mapa Leaflet se ve recortado/desplazado en mobile (pero la pagina no desborda, `doc:0`), es un problema de tamano interno del mapa -> `invalidateSize()`. Verificar ademas con el marker en el escaneo: `right`>viewport = pines fuera.

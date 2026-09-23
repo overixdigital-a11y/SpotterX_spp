@@ -591,3 +591,12 @@ Orden de etapas para pulir/completar la app, módulo por módulo. Cada etapa ter
   - `GymMap.tsx` (cubre panel gym + checkin, de prevencion).
 - **Badge de diagnostico eliminado** (estado `meas`, efecto de medicion y chip flotante) del perfil publico; el archivo queda limpio.
 - **Leccion**: si un mapa Leaflet se ve recortado/desplazado en mobile (pero la pagina no desborda, `doc:0`), es un problema de tamano interno del mapa -> `invalidateSize()`. Verificar ademas con el marker en el escaneo: `right`>viewport = pines fuera.
+
+**Lote 22 - Blindaje del mapa leaflet (clamp ancho real + ResizeObserver) (23/09/2026, commit `ad89e28`, lint 0 errores, build OK, deploy automatico):**
+- El Lote 21 (`invalidateSize` simple) NO basto: el usuario reporto corte lateral identico en el perfil publico del profe y desde el alumno ("ver mi profesor"). Con layout por bloques el mapa no puede medir 688px si la pagina no desborda => lo mas probable: el mapa se monta/mide antes de que el layout final se asiente (workplaces llegan async), o algun ancestro flex/grid empuja el ancho.
+- **`LeafletAutoResize.tsx` reforzado**:
+  - **Clamp explicito**: `container.style.width = min(parent.clientWidth, innerWidth) + "px"` + `maxWidth:100%` antes de `invalidateSize()` (aferra el mapa al ancho REAL del padre; si en el proximo frame el ancho cambia, fuerza invalidateSize).
+  - **ResizeObserver sobre el padre** -> re-ajusta ante CUALQUIER cambio de layout (sidebar, datos tardios, hint).
+  - Retries escalonados 0/60/300/900/2000/3500ms para pillar el montaje tardio (mapa monta recien cuando `workplaces` resuelve).
+- **Wrapper del mapa** en `perfil/[username]`: `relative overflow-hidden` -> `relative z-0 w-full min-w-0 max-w-full overflow-hidden` (defensivo ante ancestros flex/grid).
+- Si aun asi el celular lo muestra cortado: el paso siguiente es un badge v3 de precision (viewport + main + wrapper + leaflet client/scrollWidth + rect de un marker + zoom + token de version del bundle) para dictar el dato exacto (`Paso 2` del Lote 22).

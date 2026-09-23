@@ -575,3 +575,9 @@ Orden de etapas para pulir/completar la app, módulo por módulo. Cada etapa ter
 - **Overlay sobre el mapa del perfil publico** cuando hay **>1 lugar con coords**: leyenda arriba-centro (no clicable) "Aleja el mapa para ver todos los lugares" + boton **"Ver todos"** arriba-derecha (`FitAllButton` local, `L.latLngBounds(points).pad(0.25)` + `fitBounds` maxZoom 14). El wrapper del mapa paso a `relative`.
 - **Popup del buscador de profes (`/mi-entrenamiento/buscar`)**: mismo boton "Ubicar en el mapa" junto a "Como llegar" en la fila Perfil/Chat/Como llegar (estilo compacto de ese popup).
 - `GymMap` (panel del gym) NO se toca (decision del usuario). Sin migracion.
+
+**Lote 19c hotfix - `useMap` fuera del contexto rompia el perfil publico del profe (22/09/2026, commit `42955e3`, lint 0 errores, build OK, deploy automatico):**
+- **Sintoma**: "This page couldn't load / Reload / Back" en `/perfil/<username>` del profe (Ariel Loquindoli) visto desde el alumno. Evaluaba 500 en produccion (SSR) solo para profes con MAS de 1 lugar con coords. Causado por el Lote 19c.
+- **Causa raiz**: `FitAllButton` (usa `useMap()` de react-leaflet) quedo como **hermano de `<MapContainer>`** (afuera), no hijo. `useMap()` lee el contexto `LeafletContext` que SOLO existe debajo de `<MapContainer>`; fuera de el es `null` → TypeError al renderizar (SSR + client) → pagina entera caia.
+- **Lecion**: cualquier componente que use `useMap()`/`useMapEvents()` debe ir SIEMPRE como hijo (descendiente) de `<MapContainer>`, no como hermano. Los `ZoomToPoint` (dentro de `<Popup>`) estaban bien; la leyenda flotante (sin hooks) puede quedar afuera.
+- **Fix**: `<FitAllButton>` movido dentro de `MapContainer` (justo despues de `<TileLayer>`), manteniendo la condicion `withCoords.length > 1`. El resto del Lote 19c intacto. Deploy READY sha `42955e3`.

@@ -165,9 +165,9 @@ export function TrainingShell({ children }: { children: React.ReactNode }) {
     <AuthProvider>
       <div className="flex min-h-screen bg-bg">
         <DesktopSidebar />
-        <div className="flex-1 md:pl-64">
+        <div className="flex-1 min-w-0 md:pl-64">
           <Header />
-          <div className="min-h-screen pb-24 md:pb-8">{children}</div>
+          <div className="min-h-screen w-full min-w-0 pb-24 md:pb-8">{children}</div>
         </div>
         <ProfeNav />
       </div>

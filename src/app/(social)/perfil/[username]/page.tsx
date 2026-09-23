@@ -339,7 +339,7 @@ export default function PublicProfilePage() {
           rel="noopener noreferrer"
           className="mt-2 flex items-center gap-1.5 px-4 text-xs text-neon hover:underline"
         >
-          <ExternalLink className="h-3 w-3" /> {profile.website.replace(/^https?:\/\//, "")}
+          <ExternalLink className="h-3 w-3 shrink-0" /> <span className="break-all">{profile.website.replace(/^https?:\/\//, "")}</span>
         </a>
       )}
 
@@ -464,7 +464,7 @@ export default function PublicProfilePage() {
                 <Award className="h-3.5 w-3.5" /> Certificaciones
               </div>
               {profile.certifications.map((c, idx) => (
-                <div key={idx} className="flex items-center gap-2 text-sm">
+                <div key={idx} className="flex flex-wrap items-center gap-2 text-sm">
                   <span className="font-medium text-ink">{c.name}</span>
                   {c.issuer && <span className="text-muted">· {c.issuer}</span>}
                   {c.year && <span className="text-muted text-xs">({c.year})</span>}
@@ -482,7 +482,7 @@ export default function PublicProfilePage() {
               <div className="space-y-1">
                 {Object.entries(profile.availability).map(([day, slots]) => (
                   slots.length > 0 && (
-                    <div key={day} className="flex items-center gap-2 text-sm">
+                    <div key={day} className="flex flex-wrap items-center gap-2 text-sm">
                       <span className="w-8 text-xs font-medium text-muted uppercase">{day}</span>
                       <span className="text-ink">{slots.join(", ")}</span>
                     </div>

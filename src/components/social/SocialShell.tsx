@@ -265,9 +265,9 @@ export function SocialShell({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-screen bg-bg">
         <DesktopSidebar />
         
-        <div className="flex-1 md:pl-64 lg:pr-80">
+        <div className="flex-1 min-w-0 md:pl-64 lg:pr-80">
           <TopBar onLogout={onLogout} />
-          <main className="mx-auto min-h-screen max-w-xl px-4 py-4 md:py-6 md:max-w-2xl lg:max-w-3xl pb-24 md:pb-8">
+          <main className="mx-auto min-h-screen w-full min-w-0 max-w-xl px-4 py-4 md:py-6 md:max-w-2xl lg:max-w-3xl pb-24 md:pb-8">
             {children}
           </main>
         </div>

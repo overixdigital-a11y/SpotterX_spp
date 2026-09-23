@@ -180,7 +180,7 @@ export function MarketShell({ children }: { children: React.ReactNode }) {
     <AuthProvider>
       <div className="flex min-h-screen bg-bg">
         <DesktopSidebar />
-        <div className="flex-1 md:pl-64 pb-24 md:pb-8">{children}</div>
+        <div className="flex-1 min-w-0 md:pl-64 pb-24 md:pb-8">{children}</div>
         <MarketPill />
       </div>
     </AuthProvider>

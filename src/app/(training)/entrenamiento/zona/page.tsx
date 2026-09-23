@@ -7,6 +7,7 @@ import { useAuthState } from "@/lib/auth-context";
 import { geocodeAddress, formatAddress } from "@/lib/geo";
 import { DISCIPLINES } from "@/lib/disciplines";
 import { timeAgo } from "@/lib/format";
+import ProvinceCityFields from "@/components/gyms/ProvinceCityFields";
 
 const DISCIPLINE_LABELS = DISCIPLINES.map((d) => d.label);
 
@@ -63,6 +64,7 @@ export default function ZonaPage() {
   const [locating, setLocating] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
   const [geoMsg, setGeoMsg] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     street: "",
@@ -235,17 +237,24 @@ export default function ZonaPage() {
     };
     if (editingId) {
       const { error } = await supabase.from("trainer_gyms").update(payload).eq("id", editingId);
-      if (!error) {
-        setZones((prev) => prev.map((z) => (z.id === editingId ? { ...z, ...payload } : z)));
+      if (error) {
+        setSaveError(error.message);
+        return;
       }
+      setZones((prev) => prev.map((z) => (z.id === editingId ? { ...z, ...payload } : z)));
     } else {
       const { data, error } = await supabase
         .from("trainer_gyms")
         .insert(payload)
         .select()
         .maybeSingle();
-      if (!error && data) setZones((prev) => [data as TrainerGym, ...prev]);
+      if (error) {
+        setSaveError(error.message);
+        return;
+      }
+      if (data) setZones((prev) => [data as TrainerGym, ...prev]);
     }
+    setSaveError(null);
     setForm(emptyForm());
     setGeoMsg(null);
     setEditingId(null);
@@ -383,20 +392,20 @@ export default function ZonaPage() {
                 className="w-full rounded-lg border border-edge bg-bg px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
               />
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                value={form.province}
-                onChange={(e) => setForm((v) => ({ ...v, province: e.target.value }))}
-                placeholder="Provincia (ej: Córdoba)"
-                className="w-full rounded-lg border border-edge bg-bg px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-              />
-              <input
-                value={form.city}
-                onChange={(e) => setForm((v) => ({ ...v, city: e.target.value }))}
-                placeholder="Ciudad / barrio (ej: Córdoba, Centro)"
-                className="w-full rounded-lg border border-edge bg-bg px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-              />
-            </div>
+            <ProvinceCityFields
+              province={form.province}
+              city={form.city}
+              onChange={(patch) =>
+                setForm((v) => ({
+                  ...v,
+                  province: patch.province,
+                  city: patch.city,
+                  postalCode: patch.postalCode ?? v.postalCode,
+                  latitude: patch.latitude ?? v.latitude,
+                  longitude: patch.longitude ?? v.longitude,
+                }))
+              }
+            />
             <div className="flex items-center gap-2">
               <div className="flex grow items-center gap-2 rounded-lg border border-edge bg-bg px-3 py-2">
                 <Clock3 className="h-3.5 w-3.5 text-muted" />
@@ -425,6 +434,7 @@ export default function ZonaPage() {
               {geocoding ? "Buscando dirección…" : "Buscar dirección en el mapa"}
             </button>
             {geoMsg && <p className="text-xs text-neon">{geoMsg}</p>}
+            {saveError && <p className="text-xs text-ember">No se pudo guardar: {saveError}</p>}
             {form.latitude != null && (
               <p className="text-xs text-muted">
                 Ubicación: {form.latitude.toFixed(5)}, {form.longitude?.toFixed(5)}

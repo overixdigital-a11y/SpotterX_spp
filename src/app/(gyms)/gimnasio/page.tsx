@@ -7,6 +7,7 @@ import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
 import { geocodeAddress, formatAddress } from "@/lib/geo";
 import { useAuthState } from "@/lib/auth-context";
+import ProvinceCityFields from "@/components/gyms/ProvinceCityFields";
 
 const GymMap = dynamic(() => import("@/components/gyms/GymMap"), { ssr: false });
 
@@ -257,25 +258,23 @@ export default function GymPanelPage() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-muted">Provincia</label>
-                  <input
-                    value={form.province}
-                    onChange={(e) => setForm({ ...form, province: e.target.value })}
-                    placeholder="Ej: Buenos Aires"
-                    className="w-full rounded-xl border border-edge bg-bg px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-muted">Ciudad / Barrio</label>
-                  <input
-                    value={form.city}
-                    onChange={(e) => setForm({ ...form, city: e.target.value })}
-                    placeholder="Ej: Palermo"
-                    className="w-full rounded-xl border border-edge bg-bg px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-neon focus:outline-none"
-                  />
-                </div>
+              <div>
+                <ProvinceCityFields
+                  province={form.province}
+                  city={form.city}
+                  withLabels
+                  onChange={(patch) => {
+                    setForm({
+                      ...form,
+                      province: patch.province,
+                      city: patch.city,
+                      postalCode: patch.postalCode ?? form.postalCode,
+                    });
+                    if (patch.latitude != null && patch.longitude != null) {
+                      setPreviewCoords({ lat: patch.latitude, lng: patch.longitude });
+                    }
+                  }}
+                />
               </div>
               <div>
                 <label className="mb-1 block text-xs font-semibold text-muted">Aforo Máximo</label>

@@ -76,6 +76,103 @@ export interface AddressParts {
 }
 
 /**
+ * User-Agent propio para los pedidos a Nominatim (OpenStreetMap).
+ * Requerido por la Usage Policy del servicio.
+ */
+const NOMINATIM_UA = "SpotterXApp/1.0 (spotterx fitness app)";
+
+/**
+ * Las 24 provincias de Argentina + CABA, con los nombres que acepta
+ * el geocoder de Nominatim (parámetro `state`).
+ */
+export const ARG_PROVINCIAS: string[] = [
+  "Ciudad de Buenos Aires",
+  "Buenos Aires",
+  "Catamarca",
+  "Chaco",
+  "Chubut",
+  "Córdoba",
+  "Corrientes",
+  "Entre Ríos",
+  "Formosa",
+  "Jujuy",
+  "La Pampa",
+  "La Rioja",
+  "Mendoza",
+  "Misiones",
+  "Neuquén",
+  "Río Negro",
+  "Salta",
+  "San Juan",
+  "San Luis",
+  "Santa Cruz",
+  "Santa Fe",
+  "Santiago del Estero",
+  "Tierra del Fuego",
+  "Tucumán",
+];
+
+/**
+ * Sugerencia de localidad para el buscador de ciudades.
+ */
+export interface CitySuggestion {
+  name: string;
+  province: string | null;
+  postalCode: string | null;
+  lat: number;
+  lng: number;
+  label: string;
+}
+
+/**
+ * Busca localidades de Argentina para el autocompletado de ciudad
+ * usando Nominatim (OSM, gratis, sin API key). Retorna [] si no hay
+ * resultados o falla la petición.
+ */
+export async function autocompleteCity(q: string): Promise<CitySuggestion[]> {
+  try {
+    const params = new URLSearchParams({
+      q,
+      format: "json",
+      countrycodes: "ar",
+      limit: "6",
+      "accept-language": "es",
+    });
+    const url = `https://nominatim.openstreetmap.org/search?${params.toString()}`;
+    const res = await fetch(url, { headers: { "User-Agent": NOMINATIM_UA } });
+    if (!res.ok) return [];
+    const data = (await res.json()) as {
+      lat: string;
+      lon: string;
+      display_name: string;
+      address?: {
+        city?: string;
+        town?: string;
+        village?: string;
+        municipality?: string;
+        state?: string;
+        postcode?: string;
+      };
+    }[];
+    return data.map((d) => ({
+      name:
+        d.address?.city ??
+        d.address?.town ??
+        d.address?.village ??
+        d.address?.municipality ??
+        d.display_name.split(",")[0].trim(),
+      province: d.address?.state ?? null,
+      postalCode: d.address?.postcode ?? null,
+      lat: Number(d.lat),
+      lng: Number(d.lon),
+      label: d.display_name,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Concatena los datos estructurados en una dirección legible ("Calle Altura").
  */
 export function formatAddress(parts: AddressParts | null | undefined): string {
@@ -117,7 +214,7 @@ export async function geocodeAddress(
       }
     }
     const url = `https://nominatim.openstreetmap.org/search?${params.toString()}`;
-    const res = await fetch(url, { headers: { "User-Agent": "SpotterXApp/1.0 (spotterx fitness app)" } });
+    const res = await fetch(url, { headers: { "User-Agent": NOMINATIM_UA } });
     if (!res.ok) return null;
     const data = (await res.json()) as {
       lat: string;

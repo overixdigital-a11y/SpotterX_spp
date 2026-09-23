@@ -12,6 +12,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { DARK_MAP_TILES, getDirectionsUrl } from "@/lib/geo";
 import ZoomToPoint from "@/components/gyms/ZoomToPoint";
+import LeafletAutoResize from "@/components/gyms/LeafletAutoResize";
 
 const gymIcon = L.icon({
   iconUrl: "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="30" height="46"><path fill="#00f2fe" stroke="#05070a" stroke-width="1.5" d="M15 0C6.7 0 0 6.7 0 15c0 9.7 15 31 15 31s15-21.3 15-31C30 6.7 23.3 0 15 0z"/><circle cx="15" cy="15" r="6" fill="#05070a"/></svg>`),
@@ -110,7 +111,6 @@ export default function PublicProfilePage() {
   const [trainerStats, setTrainerStats] = useState<TrainerStats | null>(null);
   const [workplaces, setWorkplaces] = useState<{ gyms: WorkplaceGym[]; zonas: WorkplaceZona[] }>({ gyms: [], zonas: [] });
   const [students, setStudents] = useState<TrainerStudent[]>([]);
-  const [meas, setMeas] = useState<string | null>("…");
 
   useEffect(() => {
     const supabase = createClient();
@@ -202,55 +202,6 @@ export default function PublicProfilePage() {
       active = false;
     };
   }, [username, userId]);
-
-  useEffect(() => {
-    const run = () => {
-      try {
-        const vw = window.innerWidth;
-        const docOver = document.documentElement.scrollWidth - vw;
-        let clipBy = 0;
-        let clipLabel = "";
-        let offBy = 0;
-        let offLabel = "";
-        const lbl = (el: HTMLElement) =>
-          `${el.tagName.toLowerCase()}.${typeof el.className === "string" ? el.className.split(" ").slice(0, 3).join(".") : ""}`;
-        document.querySelectorAll("body *").forEach((el) => {
-          if (!(el instanceof HTMLElement)) return;
-          if (el.getBoundingClientRect().width === 0) return;
-          const rightBy = el.getBoundingClientRect().right - vw;
-          if (rightBy > offBy) {
-            offBy = rightBy;
-            offLabel = lbl(el);
-          }
-          const sw = el.scrollWidth - el.clientWidth;
-          const ox = window.getComputedStyle(el).overflowX;
-          if (sw > clipBy && (ox === "hidden" || ox === "clip")) {
-            clipBy = sw;
-            clipLabel = lbl(el);
-          }
-        });
-        setMeas(
-          `doc:${docOver}px | clip:${clipBy > 0 ? Math.round(clipBy) + "px " + clipLabel : "no"} | right:${offBy > 1 ? Math.round(offBy) + "px " + offLabel : "no"}`
-        );
-      } catch {
-        setMeas("ERR");
-      }
-    };
-    const t1 = window.setTimeout(run, 1500);
-    const t2 = window.setTimeout(run, 4000);
-    const t3 = window.setTimeout(() => setMeas(null), 22000);
-    const t4 = window.setTimeout(run, 8000);
-    window.addEventListener("resize", run);
-    window.addEventListener("scroll", run, { passive: true });
-    return () => {
-      window.clearTimeout(t1);
-      window.clearTimeout(t2);
-      window.clearTimeout(t3);
-      window.clearTimeout(t4);
-      window.removeEventListener("resize", run);
-      window.removeEventListener("scroll", run);
-    };
-  }, [profile?.role]);
 
   const toggleFollow = async () => {
     if (!userId || !profile || profile.id === userId) return;
@@ -514,6 +465,7 @@ export default function PublicProfilePage() {
                           scrollWheelZoom={false}
                           style={{ height: "220px", width: "100%", backgroundColor: "#0c1017" }}
                         >
+                          <LeafletAutoResize />
                           <TileLayer
                             attribution={DARK_MAP_TILES.attribution}
                             url={DARK_MAP_TILES.url}
@@ -689,13 +641,6 @@ export default function PublicProfilePage() {
           )
         )}
       </div>
-      {meas && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-16 z-[999] flex justify-center px-4">
-          <span className="rounded-full border border-ember bg-bg/95 px-3 py-1 font-mono text-[11px] font-bold text-ember shadow-lg">
-            {meas}
-          </span>
-        </div>
-      )}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { DARK_MAP_TILES, getDirectionsUrl } from "@/lib/geo";
 import { Navigation } from "lucide-react";
+import LeafletAutoResize from "@/components/gyms/LeafletAutoResize";
 
 // Fix de iconos por defecto de leaflet en bundlers
 const icon = L.icon({
@@ -47,6 +48,7 @@ export default function GymMap({
       style={{ height: "180px", width: "100%", borderRadius: 12, backgroundColor: "#0c1017" }}
     >
       <MapController latitude={latitude} longitude={longitude} />
+      <LeafletAutoResize />
       <TileLayer
         attribution={DARK_MAP_TILES.attribution}
         url={DARK_MAP_TILES.url}

@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { Avatar } from "@/components/core/Avatar";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import LeafletAutoResize from "@/components/gyms/LeafletAutoResize";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { DARK_MAP_TILES, haversineDistance, formatDistance, getDirectionsUrl } from "@/lib/geo";
@@ -238,6 +239,7 @@ export default function BuscarProfePage() {
             scrollWheelZoom={false}
             style={{ height: "280px", width: "100%", backgroundColor: "#0c1017" }}
           >
+            <LeafletAutoResize />
             <TileLayer
               attribution={DARK_MAP_TILES.attribution}
               url={DARK_MAP_TILES.url}

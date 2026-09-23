@@ -600,3 +600,19 @@ Orden de etapas para pulir/completar la app, módulo por módulo. Cada etapa ter
   - Retries escalonados 0/60/300/900/2000/3500ms para pillar el montaje tardio (mapa monta recien cuando `workplaces` resuelve).
 - **Wrapper del mapa** en `perfil/[username]`: `relative overflow-hidden` -> `relative z-0 w-full min-w-0 max-w-full overflow-hidden` (defensivo ante ancestros flex/grid).
 - Si aun asi el celular lo muestra cortado: el paso siguiente es un badge v3 de precision (viewport + main + wrapper + leaflet client/scrollWidth + rect de un marker + zoom + token de version del bundle) para dictar el dato exacto (`Paso 2` del Lote 22).
+
+**Lote 22 - Badge D3 de precision -> causa raiz (23/09/2026, commit tmp `bb64532`):**
+- Badge v3 en el perfil publico midio: `D3 423px d423/b576 m576/sw576 w510/sw510 l1423/sw1155 out765px`. Dicifrado:
+  - `main` y `body` en 576px (= tope de `max-w-xl`) con viewport de 423 -> **153px de corte a la derecha** (recortado por `overflow-x-hidden` del body). El documento NO desborda (`d423`) por eso `doc:0` de badges v1/v2.
+  - `.leaflet-container` media 1423px (los panes gigantes) -> era el contenido que estiraba todo.
+
+**Lote 23 - Fix raiz del corte lateral: min-width:auto en los shells flex (23/09/2026, commit `1e8f8d8`, lint 0 errores, build OK, deploy automatico, CONFIRMADO por el usuario en el celular):**
+- **Causa raiz**: en los 3 shells (`SocialShell`, `TrainingShell`, `MarketShell`) el contenido vive dentro de `<div className="flex-1 ...">` (flex item con `min-width:auto` por defecto) -> el div NO puede encoger por debajo del ancho minimo de su contenido. El mapa Leaflet (y textos largos) estiraban el div hasta el cap `max-w-xl` del `main` (576) -> 576 en un telefono de 423 = 153px cortados a la derecha.
+- **Fix**:
+  - `flex-1` -> `flex-1 min-w-0` en los 3 shells (`SocialShell.tsx`, `TrainingShell.tsx`, `MarketShell.tsx`).
+  - `main` de `SocialShell`: `mx-auto min-h-screen max-w-xl ...` -> `mx-auto min-h-screen w-full min-w-0 max-w-xl ...` (contenido que ya no puede estirarlo).
+  - `div` de contenido de `TrainingShell` -> `w-full min-w-0`.
+  - Textos largos del perfil publico (certificaciones, disponibilidad) -> `flex flex-wrap`; website -> `break-all`, para que al estrechar a 391px no generen cortes nuevos dentro de las cards.
+- **Leccion**: un flex item con `min-width:auto` (default) NO encoge por debajo del min-content de su contenido; con hijos como mapas Leaflet (panes absolutos de cientos de px) o textos largos, el contenedor se estira y el body `overflow-x-hidden` RECORTA el excedente. En app mobile-first con maps, SIEMPRE poner `min-w-0` en los wrappers `flex-1` + `w-full min-w-0` en el `main`.
+- **Diagnostico rapido**: si una pagina se corta por derecha pero `documentElement.scrollWidth == viewport` (`doc:0`), medir `body.scrollWidth` y `document.querySelector("main").clientWidth`: si `main` == su `max-w-*`, es el bug de `min-width:auto` (no del mapa).
+- Badge D3 eliminado (commit de limpieza `ce07da5`); el fix de `LeafletAutoResize` (Lote 22) queda en el codigo.

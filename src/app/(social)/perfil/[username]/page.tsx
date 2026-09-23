@@ -468,6 +468,9 @@ export default function PublicProfilePage() {
                             attribution={DARK_MAP_TILES.attribution}
                             url={DARK_MAP_TILES.url}
                           />
+                          {withCoords.length > 1 && (
+                            <FitAllButton points={withCoords.map((p) => [p.lat as number, p.lng as number])} />
+                          )}
                           {workplaces.gyms.filter((g) => typeof g.latitude === "number" && typeof g.longitude === "number").map((g) => (
                             <Marker key={`gym-${g.gym_id}`} position={[g.latitude!, g.longitude!]} icon={gymIcon}>
                               <Popup>
@@ -536,7 +539,6 @@ export default function PublicProfilePage() {
                           <div className="pointer-events-none absolute left-1/2 top-2 z-[500] -translate-x-1/2 whitespace-nowrap rounded-full border border-edge bg-[#0c1017]/90 px-3 py-1 text-[11px] font-semibold text-muted">
                             Alejá el mapa para ver todos los lugares
                           </div>
-                          <FitAllButton points={withCoords.map((p) => [p.lat as number, p.lng as number])} />
                         </>
                       )}
                     </div>

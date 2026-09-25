@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Package, TrendingUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -14,28 +14,54 @@ export default function MisPublicacionesPage() {
   const [orders, setOrders] = useState<MarketOrder[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const load = useCallback(async () => {
+    if (!userId) return;
+    const supabase = createClient();
+    const { data: p } = await supabase
+      .from("market_products")
+      .select("*")
+      .eq("seller_id", userId)
+      .order("created_at", { ascending: false });
+    if (p) setProducts(p as MarketProduct[]);
+
+    const { data: o } = await supabase
+      .from("market_orders")
+      .select("*")
+      .eq("seller_id", userId)
+      .order("created_at", { ascending: false });
+    if (o) setOrders(o as MarketOrder[]);
+
+    setLoading(false);
+  }, [userId]);
+
   useEffect(() => {
     if (!userId) return;
     const supabase = createClient();
-    const load = async () => {
-      const { data: p } = await supabase
-        .from("market_products")
-        .select("*")
-        .eq("seller_id", userId)
-        .order("created_at", { ascending: false });
-      if (p) setProducts(p as MarketProduct[]);
-
-      const { data: o } = await supabase
-        .from("market_orders")
-        .select("*")
-        .eq("seller_id", userId)
-        .order("created_at", { ascending: false });
-      if (o) setOrders(o as MarketOrder[]);
-
-      setLoading(false);
+    const channel = supabase
+      .channel("mis-publicaciones-live")
+      .on(
+        "postgres_changes" as const,
+        { event: "*", schema: "public", table: "market_products", filter: `seller_id=eq.${userId}` },
+        () => {
+          void load();
+        }
+      )
+      .on(
+        "postgres_changes" as const,
+        { event: "*", schema: "public", table: "market_orders", filter: `seller_id=eq.${userId}` },
+        () => {
+          void load();
+        }
+      )
+      .subscribe();
+    const t = setTimeout(() => {
+      void load();
+    }, 0);
+    return () => {
+      clearTimeout(t);
+      supabase.removeChannel(channel);
     };
-    load();
-  }, [userId]);
+  }, [userId, load]);
 
   const toggleStatus = async (id: string, current: string) => {
     const newStatus = current === "active" ? "paused" : "active";

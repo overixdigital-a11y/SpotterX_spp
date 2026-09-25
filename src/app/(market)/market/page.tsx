@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Search, ShoppingCart, Store } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -52,6 +52,24 @@ export default function MarketPage() {
     const run = async () => { await load(); };
     void run();
   }, [load]);
+
+  const loadRef = useRef(load);
+  useEffect(() => {
+    loadRef.current = load;
+  }, [load]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel("market-live")
+      .on("postgres_changes" as const, { event: "*", schema: "public", table: "market_products" }, () => {
+        void loadRef.current();
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const loadMore = async () => {
     const supabase = createClient();

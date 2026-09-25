@@ -174,7 +174,29 @@ export default function BilleteraPage() {
 
       setLoading(false);
     };
-    load();
+
+    void load();
+    const supabase = createClient();
+    const channel = supabase
+      .channel("billetera-live")
+      .on(
+        "postgres_changes" as const,
+        { event: "*", schema: "public", table: "market_orders", filter: `seller_id=eq.${userId}` },
+        () => {
+          void load();
+        }
+      )
+      .on(
+        "postgres_changes" as const,
+        { event: "*", schema: "public", table: "market_orders", filter: `buyer_id=eq.${userId}` },
+        () => {
+          void load();
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [userId]);
 
   if (loading) {

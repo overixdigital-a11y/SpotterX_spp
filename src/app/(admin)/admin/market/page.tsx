@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Download,
   TrendingUp,
@@ -197,17 +197,27 @@ export default function AdminMarketPage() {
     run();
   }, []);
 
+  const loadDeposits = useCallback(async () => {
+    const supabase = createClient();
+    const [pend, acc] = await Promise.all([
+      supabase.rpc("admin_list_deposits", { p_status: "pendiente" }),
+      supabase.rpc("admin_list_deposits", { p_status: "acreditado" }),
+    ]);
+    if (pend.data) setDeposits(pend.data as DepositRow[]);
+    if (acc.data) setAccredited((acc.data as DepositRow[]).slice(0, 5));
+    setDepositsLoading(false);
+  }, []);
+
   useEffect(() => {
     const run = async () => {
       const supabase = createClient();
-      const [productRows, pend, acc] = await Promise.all([
-        supabase.from("market_products").select("seller_id, status").limit(500),
-        supabase.rpc("admin_list_deposits", { p_status: "pendiente" }),
-        supabase.rpc("admin_list_deposits", { p_status: "acreditado" }),
-      ]);
-      if (productRows.data) {
+      const { data: productRows } = await supabase
+        .from("market_products")
+        .select("seller_id, status")
+        .limit(500);
+      if (productRows) {
         const per = new Map<string, { active: number; total: number }>();
-        for (const row of productRows.data as { seller_id: string; status: string }[]) {
+        for (const row of productRows as { seller_id: string; status: string }[]) {
           const cur = per.get(row.seller_id) ?? { active: 0, total: 0 };
           cur.total += 1;
           if (row.status === "active" || row.status === "paused") cur.active += 1;
@@ -229,13 +239,39 @@ export default function AdminMarketPage() {
           }
         }
       }
-      if (pend.data) setDeposits(pend.data as DepositRow[]);
-      if (acc.data) setAccredited((acc.data as DepositRow[]).slice(0, 5));
-      setDepositsLoading(false);
       setSellersLoading(false);
+      await loadDeposits();
     };
     run();
-  }, []);
+  }, [loadDeposits]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    const setup = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) return;
+      channel = supabase
+        .channel("admin-market-live")
+        .on(
+          "postgres_changes" as const,
+          { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${data.user.id}` },
+          (payload) => {
+            if ((payload.new as { type?: string } | null)?.type === "pago_publicacion") {
+              void loadDeposits();
+            }
+          }
+        )
+        .on("postgres_changes" as const, { event: "UPDATE", schema: "public", table: "market_products" }, () => {
+          void loadDeposits();
+        })
+        .subscribe();
+    };
+    void setup();
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [loadDeposits]);
 
   const exportCSV = () => {
     const header = "ID;Fecha;Total;Comision;Estado;Entrega;Comprador;Vendedor";

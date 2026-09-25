@@ -14,6 +14,7 @@ import {
   LogOut,
   Globe,
   MonitorPlay,
+  ShoppingBag,
 } from "lucide-react";
 import { AuthProvider, useAuthState } from "@/lib/auth-context";
 import { createClient } from "@/lib/supabase/client";
@@ -160,6 +161,7 @@ const nav = [
   { href: "/gimnasio/cobros", label: "Cobros & Cuotas", icon: Wallet },
   { href: "/gimnasio/qr", label: "Código QR", icon: QrCode },
   { href: "/gimnasio/accesos", label: "Accesos & Aforo", icon: Activity },
+  { href: "/market", label: "SpotterShop", icon: ShoppingBag },
 ];
 
 function MobileGymNav() {

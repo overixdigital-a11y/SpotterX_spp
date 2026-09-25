@@ -696,3 +696,11 @@ otifications_type_check re-creada con la lista acumulativa completa + 'pago_publ
 - **/perfil (social)**: eliminada la card "SpotterShop" -> /market (todas las roles) y quitado `ShoppingBag` del import de lucide (ChevronRight sigue en uso, Store tambien). El acceso social al mercado sigue vivo por el item nav "Market" del SocialShell.
 - Sin migracion. Los usuarios no pierden accesos: /market from admin sidebar + SocialShell nav "Market" + MarketShell propio.
 - Deploy verificado por API (push automatico).
+
+**Lote 31 REHECHO - SpotterShop en el menu lateral del gimnasio (25/09/2026, sin migracion, lint 0 errores, build OK 44 rutas, push deploy automatico):**
+- **Correccion del pedido (el usuario aclaro)**: el boton para ir al market tenia que ir en el MENU LATERAL DEL PANEL DEL GIMNASIO (GymShell: Panel Principal / Miembros / Planes & Promos / Cobros & Cuotas / Codigo QR / Accesos & Aforo), NO en la consola admin global. Con el rebrand de Lote 25 el market se llama **SpotterShop**.
+- **GymShell.tsx**: en el array `nav` (alimenta el sidebar lateral desktop + la barra inferior mobile) se agrego el item `{ href: "/market", label: "SpotterShop", icon: ShoppingBag }` como 7.º, despues de "Accesos & Aforo".
+- **AdminShell.tsx**: se REVIRTIO el item "Market" (que habia quedado mal del intento previo); la consola global queda como estaba (Catalogo + SpotterShop = panel /admin/market).
+- **SocialShell.tsx**: renombrado el label del nav del mercadillo de "Market" a "SpotterShop" (consistencia de marca).
+- **/perfil (social)**: la card SpotterShop sigue removida (pedido original: el mercadillo ya no vive en el perfil de la red social).
+- Sin migracion. Deploy verificado por API (push automatico).

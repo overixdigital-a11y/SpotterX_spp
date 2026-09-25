@@ -669,3 +669,7 @@ otifications_type_check re-creada con la lista acumulativa completa + 'pago_publ
 - Se quito del frontend el flujo report_deposit + wa.me del publicador (la RPC queda en la DB por legacy; la billetera dejo de participar del flujo de publicar).
 - **Migracion 00038 CORRIDA por el usuario** 25/09/2026 y **verificada via REST** (tabla publish_deposits HTTP 200; report_deposit/admin_list_deposits/admin_approve_deposit/admin_set_payment_config existentes con guards 'No autenticado'/'No autorizado'; defaults de platform_config y constraint pago_publicacion NO verificables por REST porque RLS esconde platform_config a anon).
 - **PENDIENTE usuario**: correr **00039_pending_publish.sql** en SQL Editor (con eso el Lote 28 queda CERRADO) + de paso el query de verificacion de 00038 (notif_ok/defaults_ok -> true|true).
+
+## Lote 28 CERRADO (25/09/2026)
+- **Migracion 00039 CORRIDA por el usuario** 25/09/2026 y **verificada via REST**: market_publish_pending (firma completa) -> 'No autenticado'; admin_list_deposits/admin_approve_deposit (con uuid)/admin_publish_revenue -> 'No autorizado'; publish_deposits?select=product_id -> HTTP 200 (columna product_id existe). Deploy bc0a2b4 READY.
+- El flujo queda habilitado en produccion: crear con cupo agotado -> modal publicacion paga -> pending -> admin aprueba y publica.

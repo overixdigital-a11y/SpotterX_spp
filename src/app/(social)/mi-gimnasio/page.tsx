@@ -2,10 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import dynamic from "next/dynamic";
-import { Dumbbell, Loader2, MapPin, QrCode, X, Ban, CheckCircle2, Gift, Clock3, History } from "lucide-react";
+import { Dumbbell, Loader2, MapPin, QrCode, X, Ban, CheckCircle2, Gift, Clock3, Megaphone, Tag, ShoppingBag } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
+import { formatPrice } from "@/lib/market";
+import { getGymModules } from "@/lib/gym-modules";
 
 const Scanner = dynamic(() => import("@yudiel/react-qr-scanner").then((m) => m.Scanner), {
   ssr: false,
@@ -16,6 +19,7 @@ interface Gym {
   name: string | null;
   address: string | null;
   city: string | null;
+  owner_id: string | null;
 }
 
 interface Membership {
@@ -29,6 +33,32 @@ interface Membership {
   gyms: Gym[] | null;
 }
 
+interface Announcement {
+  id: string;
+  kind: string;
+  title: string;
+  body: string | null;
+  image_url: string | null;
+  product_id: string | null;
+  created_at: string;
+}
+
+interface PlanPromo {
+  name: string;
+  price: number;
+  duration_months: number;
+  promo_type: string;
+}
+
+interface ShopProduct {
+  id: string;
+  name: string;
+  price: number;
+  images: string[];
+}
+
+const PROMO_LABEL: Record<string, string> = { "2x1": "2x1", "3x2": "3x2", "4x3": "4x3" };
+
 export default function MiGimnasioPage() {
   const { userId } = useAuthState();
   const router = useRouter();
@@ -36,7 +66,10 @@ export default function MiGimnasioPage() {
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
-  const [history, setHistory] = useState<{ type: string; created_at: string }[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [promos, setPromos] = useState<PlanPromo[]>([]);
+  const [shopProducts, setShopProducts] = useState<ShopProduct[]>([]);
+  const [shopOn, setShopOn] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -48,7 +81,7 @@ export default function MiGimnasioPage() {
       const supabase = createClient();
       const { data } = await supabase
         .from("gym_memberships")
-        .select("id, plan_name, status, pay_status, expires_on, price, gym_id, gyms:gyms!gym_memberships_gym_id_fkey(id, name, address, city)")
+        .select("id, plan_name, status, pay_status, expires_on, price, gym_id, gyms:gyms!gym_memberships_gym_id_fkey(id, name, address, city, owner_id)")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -57,14 +90,36 @@ export default function MiGimnasioPage() {
 
       const gymId = (data as Membership | null)?.gym_id;
       if (active && gymId) {
-        const { data: logs } = await supabase
-          .from("gym_access_logs")
-          .select("type, created_at")
-          .eq("gym_id", gymId)
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false })
-          .limit(15);
-        if (active) setHistory((logs ?? []) as { type: string; created_at: string }[]);
+        const [{ data: posts }, { data: planPromos }, modules] = await Promise.all([
+          supabase
+            .from("gym_announcements")
+            .select("*")
+            .eq("gym_id", gymId)
+            .order("created_at", { ascending: false })
+            .limit(10),
+          supabase
+            .from("gym_plans")
+            .select("name, price, duration_months, promo_type")
+            .eq("gym_id", gymId)
+            .not("promo_type", "is", null)
+            .order("created_at", { ascending: false }),
+          getGymModules(gymId),
+        ]);
+        if (active && posts) setAnnouncements((posts as Announcement[]) ?? []);
+        if (active && planPromos) setPromos((planPromos as PlanPromo[]) ?? []);
+        if (active) setShopOn(modules.spotter_shop);
+
+        const ownerId = (data as Membership | null)?.gyms?.[0]?.owner_id;
+        if (active && modules.spotter_shop && ownerId) {
+          const { data: products } = await supabase
+            .from("market_products")
+            .select("id, name, price, images")
+            .eq("seller_id", ownerId)
+            .eq("status", "active")
+            .order("created_at", { ascending: false })
+            .limit(12);
+          if (active) setShopProducts((products ?? []) as ShopProduct[]);
+        }
       }
 
       if (active) setLoading(false);
@@ -215,37 +270,130 @@ export default function MiGimnasioPage() {
             {scanError && <p className="mt-2 text-center text-xs font-medium text-ember">{scanError}</p>}
           </div>
 
-          {history.length > 0 && (
+          {(announcements.length > 0 || promos.length > 0) && (
             <div className="mt-5 rounded-2xl border border-edge bg-card p-4">
               <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
-                <History className="h-4 w-4 text-neon" /> Últimos accesos
+                <Megaphone className="h-4 w-4 text-neon" /> Comunicados y promos
               </p>
               <div className="mt-3 space-y-2">
-                {history.map((h, i) => (
-                  <div key={i} className="flex items-center justify-between rounded-xl border border-edge px-3 py-2">
+                {promos.map((p, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between rounded-xl border border-ember/30 bg-ember/5 px-3 py-2"
+                  >
                     <div className="flex items-center gap-2">
-                      <span
-                        className={`h-2 w-2 rounded-full ${
-                          h.type === "ingreso" ? "bg-neon" : "bg-ember"
-                        }`}
-                      />
-                      <span className="text-xs font-medium capitalize text-ink">
-                        {h.type === "ingreso" ? "Ingreso" : "Egreso"}
+                      <Tag className="h-3.5 w-3.5 text-ember" />
+                      <span className="text-xs font-bold uppercase text-ember">
+                        {PROMO_LABEL[p.promo_type] ?? p.promo_type}
                       </span>
+                      <span className="text-xs font-medium text-ink">{p.name}</span>
                     </div>
                     <span className="text-[10px] text-muted">
-                      {new Date(h.created_at).toLocaleDateString("es-AR", {
-                        day: "2-digit",
-                        month: "short",
-                      })}{" "}
-                      {new Date(h.created_at).toLocaleTimeString("es-AR", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      ${Number(p.price).toLocaleString("es-AR")} · {p.duration_months} mes
+                      {p.duration_months > 1 ? "es" : ""}
                     </span>
                   </div>
                 ))}
+                {announcements.map((a) => {
+                  const isPromo = a.kind === "promo";
+                  const product = shopProducts.find((sp) => sp.id === a.product_id);
+                  return (
+                    <div key={a.id} className="rounded-xl border border-edge px-3 py-2.5">
+                      {a.image_url && (
+                        <img
+                          src={a.image_url}
+                          alt=""
+                          className="mb-2 h-32 w-full rounded-xl border border-edge object-cover"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      )}
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                            isPromo ? "bg-ember/15 text-ember" : "bg-neon/15 text-neon"
+                          }`}
+                        >
+                          {isPromo ? <Tag className="h-3 w-3" /> : <Megaphone className="h-3 w-3" />}
+                          {isPromo ? "Promo" : "Comunicado"}
+                        </span>
+                        <span className="text-xs font-bold text-ink">{a.title}</span>
+                      </div>
+                      {a.body && <p className="mt-1 text-xs text-muted whitespace-pre-line">{a.body}</p>}
+                      {a.product_id && (
+                        <Link
+                          href={`/market/${a.product_id}`}
+                          className="mt-2 flex items-center justify-between rounded-lg border border-neon/30 bg-neon/5 px-2.5 py-1.5 transition hover:bg-neon/10"
+                        >
+                          <span className="text-[10px] font-semibold text-neon">
+                            {product
+                              ? `${product.name} · ${formatPrice(product.price)}`
+                              : "Ver en SpotterShop"}
+                          </span>
+                          <span className="text-[10px] font-bold text-neon">Ver</span>
+                        </Link>
+                      )}
+                      <p className="mt-1.5 text-[10px] text-muted">
+                        {new Date(a.created_at).toLocaleDateString("es-AR", {
+                          day: "2-digit",
+                          month: "short",
+                        })}
+                      </p>
+                    </div>
+                  );
+                })}
               </div>
+            </div>
+          )}
+
+          {shopOn && (
+            <div className="mt-5 rounded-2xl border border-edge bg-card p-4">
+              <div className="flex items-center justify-between">
+                <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+                  <ShoppingBag className="h-4 w-4 text-neon" /> SpotterShop del gym
+                </p>
+                <Link
+                  href="/market"
+                  className="text-[10px] font-semibold text-neon transition hover:text-glow"
+                >
+                  Ver tienda
+                </Link>
+              </div>
+              {shopProducts.length === 0 ? (
+                <p className="mt-3 rounded-xl border border-dashed border-edge bg-bg px-3 py-4 text-center text-xs text-muted">
+                  Tu gimnasio todavía no tiene artículos a la venta.
+                </p>
+              ) : (
+                <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                  {shopProducts.slice(0, 8).map((p) => (
+                    <Link
+                      key={p.id}
+                      href={`/market/${p.id}`}
+                      className="overflow-hidden rounded-xl border border-edge bg-elevated transition hover:border-neon/40"
+                    >
+                      {p.images[0] ? (
+                        <div className="aspect-square w-full bg-bg">
+                          <img
+                            src={p.images[0]}
+                            alt=""
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex aspect-square w-full items-center justify-center bg-bg text-muted">
+                          <ShoppingBag className="h-6 w-6 opacity-40" />
+                        </div>
+                      )}
+                      <div className="px-1.5 py-1.5">
+                        <p className="truncate text-[10px] font-medium text-ink">{p.name}</p>
+                        <p className="text-[10px] font-bold text-neon">{formatPrice(p.price)}</p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </>

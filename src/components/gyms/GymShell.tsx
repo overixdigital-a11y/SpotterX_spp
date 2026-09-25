@@ -16,6 +16,7 @@ import {
   MonitorPlay,
   ShoppingBag,
   Menu,
+  Megaphone,
 } from "lucide-react";
 import { AuthProvider, useAuthState } from "@/lib/auth-context";
 import { createClient } from "@/lib/supabase/client";
@@ -263,6 +264,13 @@ function DesktopGymSidebar() {
             <MonitorPlay className="h-4 w-4 text-neon" />
             <span>Kiosk Recepción</span>
           </Link>
+          <Link
+            href="/gimnasio/promos"
+            className="flex items-center gap-3 rounded-xl border border-edge bg-elevated/40 px-3.5 py-2.5 text-xs font-medium text-ink hover:border-neon/40 hover:text-neon transition"
+          >
+            <Megaphone className="h-4 w-4 text-ember" />
+            <span>Comunicados y Promos</span>
+          </Link>
           {feedOn && (
             <Link
               href="/home"
@@ -352,6 +360,14 @@ function GymDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
         >
           <MonitorPlay className="h-4 w-4 text-neon" />
           <span>Kiosk Recepción</span>
+        </Link>
+        <Link
+          href="/gimnasio/promos"
+          onClick={onClose}
+          className="flex items-center gap-3 rounded-xl border border-edge bg-elevated/40 px-3.5 py-2.5 text-xs font-medium text-ink hover:border-neon/40 hover:text-neon transition"
+        >
+          <Megaphone className="h-4 w-4 text-ember" />
+          <span>Comunicados y Promos</span>
         </Link>
         {feedOn && (
           <Link

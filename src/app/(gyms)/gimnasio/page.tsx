@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
-import { Loader2, MapPin, Search, Pencil, Check, Save } from "lucide-react";
+import { Loader2, MapPin, Search, Pencil, Check, Save, Megaphone, ChevronRight } from "lucide-react";
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
 import { geocodeAddress, formatAddress } from "@/lib/geo";
@@ -367,6 +368,26 @@ export default function GymPanelPage() {
           )}
         </div>
       </div>
+
+      {/* Comunicados y Promos */}
+      <Link
+        href="/gimnasio/promos"
+        className="mt-6 flex items-center justify-between rounded-2xl border border-edge bg-card p-5 transition hover:border-ember/40"
+      >
+        <div className="flex items-center gap-4">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-ember/15 text-ember">
+            <Megaphone className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-base font-bold text-ink">Comunicados y Promos</p>
+            <p className="mt-0.5 text-xs text-muted">
+              Publicá avisos, novedades y promos. Tus alumnos las ven en su app dentro de &quot;Mi
+              gimnasio&quot;.
+            </p>
+          </div>
+        </div>
+        <ChevronRight className="h-5 w-5 shrink-0 text-muted" />
+      </Link>
     </main>
   );
 }

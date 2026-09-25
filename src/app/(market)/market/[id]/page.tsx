@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, ShoppingCart, MessageCircle, Star } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
+import { getMarketConfig } from "@/lib/market-config";
 import { Avatar } from "@/components/core/Avatar";
 import {
   formatPrice,
@@ -40,6 +41,11 @@ export default function MarketProductPage() {
   const [reviews, setReviews] = useState<MarketReview[]>([]);
   const [qty, setQty] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [allowCart, setAllowCart] = useState(false);
+
+  useEffect(() => {
+    getMarketConfig().then((cfg) => setAllowCart(cfg.allowCart));
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -179,7 +185,7 @@ export default function MarketProductPage() {
         )}
 
         {/* Quantity + Buy */}
-        {product.status === "active" && userId !== product.seller_id && (
+        {product.status === "active" && allowCart && userId !== product.seller_id && (
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <span className="text-sm text-muted">Cantidad:</span>

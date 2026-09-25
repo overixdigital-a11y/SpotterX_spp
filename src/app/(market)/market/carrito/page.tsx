@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Trash2, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
+import { getMarketConfig } from "@/lib/market-config";
 import { formatPrice, type CartItem } from "@/lib/market";
 
 export default function MarketCarritoPage() {
@@ -19,7 +20,12 @@ export default function MarketCarritoPage() {
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
-    const init = () => {
+    const init = async () => {
+      const cfg = await getMarketConfig();
+      if (!cfg.allowCart) {
+        router.replace("/market");
+        return;
+      }
       const raw = localStorage.getItem("spotterx_cart");
       if (raw) {
         try {
@@ -30,7 +36,7 @@ export default function MarketCarritoPage() {
       setLoading(false);
     };
     init();
-  }, []);
+  }, [router]);
 
   const total = cart.reduce((sum, c) => sum + c.price * c.quantity, 0);
 

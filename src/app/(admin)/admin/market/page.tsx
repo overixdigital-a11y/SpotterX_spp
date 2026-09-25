@@ -9,13 +9,18 @@ import {
   Settings,
   Users,
   Wallet,
-  CheckCircle,
   Loader2,
   Search,
   Minus,
   Plus,
   RotateCcw,
   BarChart3,
+  Landmark,
+  Mail,
+  Phone,
+  ShoppingCart,
+  Trash2,
+  Star,
 } from "lucide-react";
 import {
   BarChart,
@@ -28,6 +33,12 @@ import {
 } from "recharts";
 import { createClient } from "@/lib/supabase/client";
 import { formatPrice } from "@/lib/market";
+import {
+  getMarketConfig,
+  resetMarketConfigCache,
+  type PaymentAccount,
+  type AdminContact,
+} from "@/lib/market-config";
 
 interface OrderRow {
   id: string;
@@ -50,15 +61,22 @@ interface SellerRow {
   total: number;
 }
 
-interface WithdrawalRow {
+interface DepositRow {
   id: string;
-  wallet_id: string;
+  pedido: string;
   amount: number;
+  status: string;
+  note: string | null;
   created_at: string;
+  acredited_at: string | null;
   user_id: string;
+  username: string | null;
+  full_name: string | null;
   email: string;
-  username: string;
-  full_name: string;
+}
+
+function newAccountKey() {
+  return `acc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 export default function AdminMarketPage() {
@@ -87,9 +105,23 @@ export default function AdminMarketPage() {
   const [creditNote, setCreditNote] = useState("");
   const [crediting, setCrediting] = useState(false);
 
-  const [withdrawals, setWithdrawals] = useState<WithdrawalRow[]>([]);
-  const [withdrawalsLoading, setWithdrawalsLoading] = useState(true);
-  const [paying, setPaying] = useState<string | null>(null);
+  const [accounts, setAccounts] = useState<PaymentAccount[]>([]);
+  const [contact, setContact] = useState<AdminContact>({ email: "", whatsapp: "" });
+  const [allowCart, setAllowCart] = useState(false);
+  const [savingPaymentConfig, setSavingPaymentConfig] = useState(false);
+  const [accForm, setAccForm] = useState({
+    bank: "",
+    account_type: "CBU",
+    number: "",
+    holder: "",
+    note: "",
+  });
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+
+  const [deposits, setDeposits] = useState<DepositRow[]>([]);
+  const [accredited, setAccredited] = useState<DepositRow[]>([]);
+  const [depositsLoading, setDepositsLoading] = useState(true);
+  const [approving, setApproving] = useState<string | null>(null);
 
   useEffect(() => {
     const run = async () => {
@@ -152,6 +184,11 @@ export default function AdminMarketPage() {
             .slice(0, 6)
         );
       }
+
+      const cfg = await getMarketConfig(true);
+      setAccounts(cfg.accounts.map((a) => ({ ...a })));
+      setContact({ ...cfg.contact });
+      setAllowCart(cfg.allowCart);
       setLoading(false);
     };
     run();
@@ -160,16 +197,11 @@ export default function AdminMarketPage() {
   useEffect(() => {
     const run = async () => {
       const supabase = createClient();
-      const withdrawalsRes = await supabase.rpc("admin_pending_withdrawals");
-      if (withdrawalsRes.data) {
-        setWithdrawals(withdrawalsRes.data as WithdrawalRow[]);
-      }
-      setWithdrawalsLoading(false);
-
-      const productRows = await supabase
-        .from("market_products")
-        .select("seller_id, status")
-        .limit(500);
+      const [productRows, pend, acc] = await Promise.all([
+        supabase.from("market_products").select("seller_id, status").limit(500),
+        supabase.rpc("admin_list_deposits", { p_status: "pendiente" }),
+        supabase.rpc("admin_list_deposits", { p_status: "acreditado" }),
+      ]);
       if (productRows.data) {
         const per = new Map<string, { active: number; total: number }>();
         for (const row of productRows.data as { seller_id: string; status: string }[]) {
@@ -194,6 +226,9 @@ export default function AdminMarketPage() {
           }
         }
       }
+      if (pend.data) setDeposits(pend.data as DepositRow[]);
+      if (acc.data) setAccredited((acc.data as DepositRow[]).slice(0, 5));
+      setDepositsLoading(false);
       setSellersLoading(false);
     };
     run();
@@ -237,6 +272,74 @@ export default function AdminMarketPage() {
     }
     setFreeCount(newFreeCount);
     setPublishPrice(newPublishPrice);
+  };
+
+  const savePaymentConfig = async () => {
+    const supabase = createClient();
+    setSavingPaymentConfig(true);
+    const { error } = await supabase.rpc("admin_set_payment_config", {
+      p_accounts: accounts,
+      p_allow_cart: allowCart,
+      p_contact: contact,
+    });
+    setSavingPaymentConfig(false);
+    if (error) {
+      window.alert("No se pudo guardar la configuración: " + error.message);
+      return;
+    }
+    resetMarketConfigCache();
+    await getMarketConfig();
+  };
+
+  const addOrUpdateAccount = () => {
+    if (!accForm.bank.trim() || !accForm.number.trim()) return;
+    const acc: PaymentAccount = {
+      key: editingKey ?? newAccountKey(),
+      bank: accForm.bank.trim(),
+      account_type: accForm.account_type,
+      number: accForm.number.trim(),
+      holder: accForm.holder.trim(),
+      note: accForm.note.trim(),
+      active: false,
+    };
+    setAccounts((prev) =>
+      editingKey ? prev.map((a) => (a.key === editingKey ? { ...a, ...acc } : a)) : [...prev, acc]
+    );
+    setAccForm({ bank: "", account_type: "CBU", number: "", holder: "", note: "" });
+    setEditingKey(null);
+  };
+
+  const startEditAccount = (key: string) => {
+    const a = accounts.find((x) => x.key === key);
+    if (!a) return;
+    setEditingKey(key);
+    setAccForm({ bank: a.bank, account_type: a.account_type, number: a.number, holder: a.holder, note: a.note });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const removeAccount = (key: string) => {
+    setAccounts((prev) => prev.filter((a) => a.key !== key));
+    if (editingKey === key) {
+      setEditingKey(null);
+      setAccForm({ bank: "", account_type: "CBU", number: "", holder: "", note: "" });
+    }
+  };
+
+  const setActiveAccount = (key: string) => {
+    setAccounts((prev) => prev.map((a) => ({ ...a, active: a.key === key })));
+  };
+
+  const approveDeposit = async (d: DepositRow) => {
+    const supabase = createClient();
+    setApproving(d.id);
+    const { error } = await supabase.rpc("admin_approve_deposit", { p_deposit_id: d.id });
+    setApproving(null);
+    if (error) {
+      window.alert("No se pudo acreditar: " + error.message);
+      return;
+    }
+    setDeposits((prev) => prev.filter((x) => x.id !== d.id));
+    setAccredited((prev) => [d, ...prev].slice(0, 5));
   };
 
   const effectiveQuota = (s: SellerRow) => drafts[s.id] ?? s.shop_free_limit ?? freeCount ?? 3;
@@ -298,18 +401,6 @@ export default function AdminMarketPage() {
     setCreditNote("");
   };
 
-  const markPaid = async (w: WithdrawalRow) => {
-    const supabase = createClient();
-    setPaying(w.id);
-    const { error } = await supabase.rpc("admin_mark_withdrawal_paid", { p_tx_id: w.id });
-    setPaying(null);
-    if (error) {
-      window.alert("No se pudo marcar: " + error.message);
-      return;
-    }
-    setWithdrawals((prev) => prev.filter((x) => x.id !== w.id));
-  };
-
   const filteredSellers = sellers.filter(
     (s) =>
       (s.full_name ?? "").toLowerCase().includes(searchQ.toLowerCase()) ||
@@ -367,9 +458,9 @@ export default function AdminMarketPage() {
         </div>
         <div className="rounded-lg border border-[#1e2530] bg-[#121722] p-4">
           <p className="flex items-center gap-1.5 text-xs font-medium text-[#9ca3af]">
-            <Wallet className="h-3.5 w-3.5 text-[#eab308]" /> Retiros pendientes
+            <Users className="h-3.5 w-3.5 text-[#eab308]" /> Publicadores
           </p>
-          <p className="mt-1 text-2xl font-extrabold text-[#e4e8ee]">{withdrawals.length}</p>
+          <p className="mt-1 text-2xl font-extrabold text-[#e4e8ee]">{sellers.length}</p>
         </div>
       </div>
 
@@ -453,7 +544,7 @@ export default function AdminMarketPage() {
         </h3>
         <p className="mb-3 text-xs text-[#9ca3af]">
           El vendedor cobra el 100% de cada venta. Se cobra por publicación una vez agotado el cupo
-          gratis. El cupo puede ajustarse por publicador abajo.
+          gratis. El cupo puede ajustarse por publicador más abajo.
         </p>
         <div className="flex flex-wrap items-end gap-3">
           <div>
@@ -489,6 +580,174 @@ export default function AdminMarketPage() {
         <p className="mt-3 text-xs text-[#9ca3af]">
           Actual: {freeCount ?? 3} gratis · ${publishPrice ?? 100} por publicación.
         </p>
+      </div>
+
+      <div className="rounded-lg border border-[#1e2530] bg-[#121722] p-4">
+        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#e4e8ee]">
+          <Landmark className="h-4 w-4 text-[#eab308]" /> Configuración del cobro y modo carrito
+        </h3>
+        <p className="mb-3 text-xs text-[#9ca3af]">
+          Estos datos se muestran al publicador cuando se le acaban las publicaciones gratis, junto
+          con el aviso de depósito.
+        </p>
+
+        <div className="space-y-3">
+          <div>
+            <p className="mb-2 text-xs font-semibold text-[#e4e8ee]">Cuentas donde recibís los depósitos</p>
+            <div className="space-y-2">
+              {accounts.length === 0 && (
+                <p className="text-xs text-[#9ca3af]">Sin cuentas cargadas todavía.</p>
+              )}
+              {accounts.map((a) => (
+                <div
+                  key={a.key}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-[#1e2530] bg-[#0c1017] p-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-semibold text-[#e4e8ee]">
+                      {a.bank} · {a.account_type}
+                      {a.active && (
+                        <span className="ml-1.5 rounded-full bg-[#00e5c7]/15 px-2 py-0.5 text-[10px] text-[#00e5c7]">
+                          activa
+                        </span>
+                      )}
+                    </p>
+                    <p className="truncate text-[11px] text-[#9ca3af]">
+                      {a.number}
+                      {a.holder ? ` · ${a.holder}` : ""}
+                      {a.note ? ` · ${a.note}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      onClick={() => setActiveAccount(a.key)}
+                      disabled={a.active}
+                      className="rounded-md border border-[#1e2530] p-1.5 text-[#9ca3af] hover:text-[#00e5c7] disabled:opacity-40"
+                      title="Usar esta cuenta"
+                    >
+                      <Star className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => startEditAccount(a.key)}
+                      className="rounded-md border border-[#1e2530] p-1.5 text-[#9ca3af] hover:text-[#e4e8ee]"
+                      title="Editar"
+                    >
+                      <Settings className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => removeAccount(a.key)}
+                      className="rounded-md border border-[#1e2530] p-1.5 text-[#9ca3af] hover:text-[#f87171]"
+                      title="Quitar"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <input
+                value={accForm.bank}
+                onChange={(e) => setAccForm({ ...accForm, bank: e.target.value })}
+                placeholder="Banco (ej: Banco Nación)"
+                className="rounded-lg border border-[#1e2530] bg-[#0c1017] px-3 py-2 text-sm text-[#e4e8ee]"
+              />
+              <select
+                value={accForm.account_type}
+                onChange={(e) => setAccForm({ ...accForm, account_type: e.target.value })}
+                className="rounded-lg border border-[#1e2530] bg-[#0c1017] px-3 py-2 text-sm text-[#e4e8ee]"
+              >
+                {["CBU", "Alias", "CVU", "Transferencia"].map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+              <input
+                value={accForm.number}
+                onChange={(e) => setAccForm({ ...accForm, number: e.target.value })}
+                placeholder="CBU / Alias / CVU / número"
+                className="rounded-lg border border-[#1e2530] bg-[#0c1017] px-3 py-2 text-sm text-[#e4e8ee]"
+              />
+              <input
+                value={accForm.holder}
+                onChange={(e) => setAccForm({ ...accForm, holder: e.target.value })}
+                placeholder="Titular"
+                className="rounded-lg border border-[#1e2530] bg-[#0c1017] px-3 py-2 text-sm text-[#e4e8ee]"
+              />
+              <input
+                value={accForm.note}
+                onChange={(e) => setAccForm({ ...accForm, note: e.target.value })}
+                placeholder="Nota (opcional)"
+                className="col-span-2 rounded-lg border border-[#1e2530] bg-[#0c1017] px-3 py-2 text-sm text-[#e4e8ee]"
+              />
+            </div>
+            <button
+              onClick={addOrUpdateAccount}
+              disabled={!accForm.bank.trim() || !accForm.number.trim()}
+              className="mt-2 flex items-center gap-1.5 rounded-lg border border-[#00e5c7]/30 bg-[#00e5c7]/10 px-3 py-1.5 text-xs font-semibold text-[#00e5c7] hover:bg-[#00e5c7]/20 disabled:opacity-40"
+            >
+              <Plus className="h-3.5 w-3.5" /> {editingKey ? "Guardar cambios de cuenta" : "Agregar cuenta"}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="mb-1 flex items-center gap-1 text-[11px] font-medium text-[#9ca3af]">
+                <Mail className="h-3 w-3" /> Email de contacto
+              </label>
+              <input
+                value={contact.email}
+                onChange={(e) => setContact({ ...contact, email: e.target.value })}
+                placeholder="admin@spotterx.com"
+                className="w-full rounded-lg border border-[#1e2530] bg-[#0c1017] px-3 py-2 text-sm text-[#e4e8ee]"
+              />
+            </div>
+            <div>
+              <label className="mb-1 flex items-center gap-1 text-[11px] font-medium text-[#9ca3af]">
+                <Phone className="h-3 w-3" /> WhatsApp (para alertas de depósito)
+              </label>
+              <input
+                value={contact.whatsapp}
+                onChange={(e) => setContact({ ...contact, whatsapp: e.target.value })}
+                placeholder="5491100000000"
+                className="w-full rounded-lg border border-[#1e2530] bg-[#0c1017] px-3 py-2 text-sm text-[#e4e8ee]"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border border-[#1e2530] bg-[#0c1017] p-3">
+            <div>
+              <p className="flex items-center gap-1.5 text-xs font-semibold text-[#e4e8ee]">
+                <ShoppingCart className="h-4 w-4 text-[#38bdf8]" /> Modo carrito
+              </p>
+              <p className="text-[11px] text-[#9ca3af]">
+                Oculto ahora. Lo habilitás cuando quieras implementar el carrito de compras a futuro.
+              </p>
+            </div>
+            <button
+              onClick={() => setAllowCart((v) => !v)}
+              className={`relative h-6 w-11 shrink-0 rounded-full transition ${
+                allowCart ? "bg-[#00e5c7]" : "bg-[#1e2530]"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${
+                  allowCart ? "left-[22px]" : "left-0.5"
+                }`}
+              />
+            </button>
+          </div>
+
+          <button
+            onClick={savePaymentConfig}
+            disabled={savingPaymentConfig}
+            className="flex items-center gap-1.5 rounded-lg bg-[#00e5c7] px-4 py-2 text-sm font-bold text-[#0c1017] hover:bg-[#00e5c7]/90 disabled:opacity-50"
+          >
+            {savingPaymentConfig && <Loader2 className="h-4 w-4 animate-spin" />} Guardar configuración
+          </button>
+        </div>
       </div>
 
       <div className="rounded-lg border border-[#1e2530] bg-[#121722] p-4">
@@ -651,39 +910,55 @@ export default function AdminMarketPage() {
 
         <div className="rounded-lg border border-[#1e2530] bg-[#121722] p-4">
           <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#e4e8ee]">
-            <CheckCircle className="h-4 w-4 text-[#eab308]" /> Retiros pendientes
+            <Landmark className="h-4 w-4 text-[#eab308]" /> Depósitos pendientes de acreditar
           </h3>
-          {withdrawalsLoading && (
-            <p className="py-4 text-xs text-[#9ca3af]">Cargando retiros...</p>
-          )}
-          {!withdrawalsLoading && withdrawals.length === 0 && (
-            <p className="py-4 text-xs text-[#9ca3af]">Sin retiros pendientes.</p>
+          {depositsLoading && <p className="py-4 text-xs text-[#9ca3af]">Cargando depósitos...</p>}
+          {!depositsLoading && deposits.length === 0 && (
+            <p className="py-4 text-xs text-[#9ca3af]">Sin depósitos pendientes.</p>
           )}
           <div className="space-y-2">
-            {withdrawals.map((w) => (
+            {deposits.map((d) => (
               <div
-                key={w.id}
+                key={d.id}
                 className="flex items-center justify-between gap-2 rounded-lg border border-[#1e2530] bg-[#0c1017] p-3"
               >
                 <div className="min-w-0">
                   <p className="truncate text-xs font-semibold text-[#e4e8ee]">
-                    {w.full_name || w.username || "—"} · {formatPrice(Math.abs(w.amount))}
+                    {d.pedido} · {formatPrice(d.amount)}
                   </p>
                   <p className="truncate text-[11px] text-[#9ca3af]">
-                    {w.email} · {new Date(w.created_at).toLocaleString("es-AR")}
+                    {d.full_name || d.username || "—"} · {d.email} ·{" "}
+                    {new Date(d.created_at).toLocaleString("es-AR")}
                   </p>
                 </div>
                 <button
-                  onClick={() => markPaid(w)}
-                  disabled={paying === w.id}
+                  onClick={() => approveDeposit(d)}
+                  disabled={approving === d.id}
                   className="flex shrink-0 items-center gap-1 rounded-md bg-[#eab308] px-3 py-1.5 text-xs font-bold text-[#0c1017] hover:bg-[#eab308]/90 disabled:opacity-40"
                 >
-                  {paying === w.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
-                  Pagado
+                  {approving === d.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                  Acreditar
                 </button>
               </div>
             ))}
           </div>
+          {accredited.length > 0 && (
+            <div className="mt-4">
+              <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[#9ca3af]">
+                Últimos acreditados
+              </p>
+              <div className="space-y-1.5">
+                {accredited.map((d) => (
+                  <div key={d.id} className="flex items-center justify-between rounded-lg bg-[#0c1017] px-3 py-2">
+                    <p className="truncate text-xs text-[#9ca3af]">
+                      {d.pedido} · {formatPrice(d.amount)} · {d.full_name || d.username}
+                    </p>
+                    <span className="shrink-0 text-[10px] font-semibold text-[#22c55e]">Acreditado</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

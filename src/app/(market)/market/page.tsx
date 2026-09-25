@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Search, ShoppingCart, Store } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { MARKET_CATEGORIES, type MarketProduct } from "@/lib/market";
+import { getMarketConfig } from "@/lib/market-config";
 import ProductCard from "@/components/market/ProductCard";
 
 export default function MarketPage() {
@@ -13,7 +14,12 @@ export default function MarketPage() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
+  const [allowCart, setAllowCart] = useState(false);
   const PAGE = 20;
+
+  useEffect(() => {
+    getMarketConfig().then((cfg) => setAllowCart(cfg.allowCart));
+  }, []);
 
   const load = useCallback(
     async () => {
@@ -74,9 +80,11 @@ export default function MarketPage() {
             <Link href="/market/mis-publicaciones" className="text-xs font-semibold text-neon">
               Mis ventas
             </Link>
-            <Link href="/market/carrito" className="relative text-muted">
-              <ShoppingCart className="h-5 w-5" />
-            </Link>
+            {allowCart && (
+              <Link href="/market/carrito" className="relative text-muted">
+                <ShoppingCart className="h-5 w-5" />
+              </Link>
+            )}
           </div>
         </div>
 

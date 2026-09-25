@@ -30,13 +30,18 @@ interface GlobalStats {
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<GlobalStats | null>(null);
+  const [publishRevenue, setPublishRevenue] = useState({ total: 0, count: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
       const supabase = createClient();
-      const { data } = await supabase.rpc("admin_global_stats");
+      const [{ data }, rev] = await Promise.all([
+        supabase.rpc("admin_global_stats"),
+        supabase.rpc("admin_publish_revenue"),
+      ]);
       if (data) setStats(data as GlobalStats);
+      if (rev.data) setPublishRevenue(rev.data as { total: number; count: number });
       setLoading(false);
     };
     load();
@@ -94,8 +99,9 @@ export default function AdminDashboardPage() {
         />
         <StatCard
           icon={<DollarSign className="h-4 w-4 text-[#00e5c7]" />}
-          label="Comisión mes"
-          value={formatPrice(stats?.commission_month ?? 0)}
+          label="Ingresos publicaciones"
+          value={formatPrice(publishRevenue.total)}
+          detail={`${publishRevenue.count} publicaciones pagas`}
           accent
         />
       </div>

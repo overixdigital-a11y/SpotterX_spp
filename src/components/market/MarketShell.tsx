@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   Store,
   Plus,
@@ -14,23 +15,32 @@ import {
 } from "lucide-react";
 import { AuthProvider } from "@/lib/auth-context";
 import { createClient } from "@/lib/supabase/client";
+import { getMarketConfig } from "@/lib/market-config";
 
-const nav = [
-  { href: "/market", label: "Productos", icon: Store },
-  { href: "/market/crear", label: "Crear producto", icon: Plus, highlight: true },
-  { href: "/market/mis-publicaciones", label: "Mis ventas", icon: Tag },
-  { href: "/market/mis-compras", label: "Mis compras", icon: ShoppingBag },
-  { href: "/market/billetera", label: "Billetera", icon: Wallet },
-  { href: "/market/carrito", label: "Carrito", icon: ShoppingCart },
-];
+function navFor(allowCart: boolean) {
+  return [
+    { href: "/market", label: "Productos", icon: Store },
+    { href: "/market/crear", label: "Crear producto", icon: Plus, highlight: true },
+    { href: "/market/mis-publicaciones", label: "Mis ventas", icon: Tag },
+    { href: "/market/mis-compras", label: "Mis compras", icon: ShoppingBag },
+    { href: "/market/billetera", label: "Billetera", icon: Wallet },
+    ...(allowCart
+      ? [{ href: "/market/carrito", label: "Carrito", icon: ShoppingCart }]
+      : []),
+  ];
+}
 
-const pillNav = [
-  { href: "/market", label: "Productos", icon: Store },
-  { href: "/market/crear", label: "Crear", icon: Plus, highlight: true },
-  { href: "/market/mis-publicaciones", label: "Ventas", icon: Tag },
-  { href: "/market/mis-compras", label: "Compras", icon: ShoppingBag },
-  { href: "/market/carrito", label: "Carrito", icon: ShoppingCart },
-];
+function pillNavFor(allowCart: boolean) {
+  return [
+    { href: "/market", label: "Productos", icon: Store },
+    { href: "/market/crear", label: "Crear", icon: Plus, highlight: true },
+    { href: "/market/mis-publicaciones", label: "Ventas", icon: Tag },
+    { href: "/market/mis-compras", label: "Compras", icon: ShoppingBag },
+    ...(allowCart
+      ? [{ href: "/market/carrito", label: "Carrito", icon: ShoppingCart }]
+      : []),
+  ];
+}
 
 function activeHref(pathname: string, items: { href: string }[]) {
   return items
@@ -39,9 +49,10 @@ function activeHref(pathname: string, items: { href: string }[]) {
     .sort((a, b) => b.length - a.length)[0];
 }
 
-function DesktopSidebar() {
+function DesktopSidebar({ allowCart }: { allowCart: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
+  const nav = navFor(allowCart);
   const current = activeHref(pathname, nav);
 
   const onLogout = async () => {
@@ -128,8 +139,9 @@ function DesktopSidebar() {
   );
 }
 
-function MarketPill() {
+function MarketPill({ allowCart }: { allowCart: boolean }) {
   const pathname = usePathname();
+  const pillNav = pillNavFor(allowCart);
   const current = activeHref(pathname, pillNav);
 
   return (
@@ -157,12 +169,18 @@ function MarketPill() {
 }
 
 export function MarketShell({ children }: { children: React.ReactNode }) {
+  const [allowCart, setAllowCart] = useState(false);
+
+  useEffect(() => {
+    getMarketConfig().then((cfg) => setAllowCart(cfg.allowCart));
+  }, []);
+
   return (
     <AuthProvider>
       <div className="flex min-h-screen bg-bg">
-        <DesktopSidebar />
+        <DesktopSidebar allowCart={allowCart} />
         <div className="flex-1 min-w-0 md:pl-64 pb-24 md:pb-8">{children}</div>
-        <MarketPill />
+        <MarketPill allowCart={allowCart} />
       </div>
     </AuthProvider>
   );

@@ -42,6 +42,8 @@ export function ProfileGrid({ posts }: { posts: PostData[] }) {
                 <img
                   src={p.media_url}
                   alt={p.caption || ""}
+                  loading="lazy"
+                  decoding="async"
                   className="h-full w-full object-cover"
                 />
               )

@@ -31,7 +31,11 @@ import ExercisePicker from "@/components/training/ExercisePicker";
 import FoodPicker, { type Food } from "@/components/training/FoodPicker";
 import { MEALS, getDietData, formatQuantity } from "@/lib/diets";
 import { DISCIPLINES, getDisciplineFields, getSeries, resolveSeries, legacyToSeries, formatSeries, isSeriesDiscipline, type FieldDef, type Series } from "@/lib/disciplines";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import dynamic from "next/dynamic";
+const MonthlyBars = dynamic(
+  () => import("@/components/training/HistoryCharts").then((m) => m.MonthlyBars),
+  { ssr: false }
+);
 import {
   monthGrid,
   monthLabel,
@@ -1738,26 +1742,7 @@ export default function AlumnoPage() {
 
           <div className="mt-3 rounded-xl border border-edge bg-card p-4">
             <p className="text-sm font-semibold text-ink">Cumplimiento · últimos 6 meses</p>
-            <div className="mt-3 h-40">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={history.bars}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e2530" vertical={false} />
-                  <XAxis dataKey="mes" tick={{ fill: "#6b7280", fontSize: 10 }} />
-                  <YAxis tick={{ fill: "#6b7280", fontSize: 10 }} width={24} allowDecimals={false} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#161b22",
-                      border: "1px solid #1e2530",
-                      borderRadius: 8,
-                      fontSize: 12,
-                    }}
-                    labelStyle={{ color: "#9ca3af" }}
-                  />
-                  <Bar dataKey="hechas" name="Hechas" fill="#00f2fe" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="planificadas" name="Planificadas" fill="#ff5e36" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <MonthlyBars bars={history.bars} />
           </div>
 
           {history.totalDays === 0 && (

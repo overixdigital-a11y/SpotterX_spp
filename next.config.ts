@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
     {
       source: "/:path*",
       headers: [
-        { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+        { key: "Cache-Control", value: "private, no-cache, must-revalidate" },
       ],
     },
   ],

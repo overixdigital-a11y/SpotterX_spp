@@ -22,15 +22,11 @@ import {
   Trash2,
   Star,
 } from "lucide-react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
-} from "recharts";
+import dynamic from "next/dynamic";
+const SalesChart = dynamic(
+  () => import("@/components/admin/SalesChart").then((m) => m.SalesChart),
+  { ssr: false }
+);
 import { createClient } from "@/lib/supabase/client";
 import { formatPrice } from "@/lib/market";
 import {
@@ -542,26 +538,7 @@ export default function AdminMarketPage() {
       {chartData.length > 0 && (
         <div className="rounded-lg border border-[#1e2530] bg-[#121722] p-4">
           <h3 className="mb-3 text-sm font-semibold text-[#e4e8ee]">Resumen de ventas</h3>
-          <div className="h-44">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <CartesianGrid stroke="#1e2530" vertical={false} />
-                <XAxis dataKey="label" stroke="#9ca3af" fontSize={10} tickLine={false} axisLine={false} />
-                <YAxis stroke="#9ca3af" fontSize={10} tickLine={false} axisLine={false} width={40} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#0c1017",
-                    border: "1px solid #1e2530",
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
-                  labelStyle={{ color: "#9ca3af" }}
-                  formatter={(value) => formatPrice(Number(value ?? 0))}
-                />
-                <Bar dataKey="total" name="Ventas" fill="#00e5c7" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <SalesChart data={chartData} />
           {topCategories.length > 0 && (
             <div className="mt-4 flex flex-wrap gap-2">
               {topCategories.map((c) => (

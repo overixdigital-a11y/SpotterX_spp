@@ -1,5 +1,3 @@
-import * as XLSX from "xlsx";
-
 interface PlanillaRow {
   full_name: string;
   email: string;
@@ -20,6 +18,7 @@ export async function parsePlanilla(
 
   if (ext === "xlsx" || ext === "xls") {
     const buf = await file.arrayBuffer();
+    const XLSX = await import("xlsx");
     const wb = XLSX.read(buf, { type: "array" });
     const sheet = wb.Sheets[wb.SheetNames[0]];
     const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);

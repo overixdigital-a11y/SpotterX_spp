@@ -27,70 +27,6 @@ const categories = [
 
 type Tab = "all" | "following";
 
-interface FeedDiag {
-  docSW: number;
-  docCW: number;
-  feedSW: number;
-  feedCW: number;
-  offenders: { tag: string; cls: string; delta: number }[];
-}
-
-function measureDiag(feedEl: HTMLElement | null): FeedDiag {
-  const doc = document.documentElement;
-  const offenders: { tag: string; cls: string; delta: number }[] = [];
-  const seen = new Set<string>();
-  const viwW = doc.clientWidth;
-      for (const el of Array.from(document.querySelectorAll<HTMLElement>("*"))) {
-        if (el === feedEl) continue;
-        if (el.closest("[data-med]")) continue;
-        const t = el.tagName.toLowerCase();
-        if (t === "html" || t === "body") continue;
-        const delta = el.scrollWidth - el.clientWidth;
-        if (delta > 0) {
-          const tag = el.tagName.toLowerCase();
-          const cls = String(el.className || "").split(/\s+/).filter(Boolean).join("_");
-          const key = tag + "|" + cls;
-      if (!seen.has(key)) {
-        seen.add(key);
-        offenders.push({ tag, cls, delta });
-      }
-      if (offenders.length >= 6) break;
-    }
-  }
-  offenders.sort((a, b) => b.delta - a.delta);
-  const offendersFull = offenders.filter((o) => o.delta > 0 && o.cls.length > 0).slice(0, 60);
-  return {
-    docSW: doc.scrollWidth,
-    docCW: doc.clientWidth,
-    feedSW: feedEl?.scrollWidth ?? 0,
-    feedCW: feedEl?.clientWidth ?? 0,
-    offenders: offendersFull,
-  };
-}
-
-function renderDiag(d: FeedDiag) {
-  return (
-    <>
-      <span>
-        doc {d.docSW}/{d.docCW}
-      </span>
-      {d.feedSW > 0 && (
-        <span>
-          {" "}
-          · feed {d.feedSW}/{d.feedCW}
-        </span>
-      )}
-      {d.offenders.length > 0 && (
-        <span className="text-ember">
-          {" "}
-          · {d.offenders.map((o) => `${o.tag}.${o.cls} +${o.delta}px`).join(" | ")}
-        </span>
-      )}
-    </>
-  );
-}
-
-
 export function Feed() {
   const { userId } = useAuthState();
   const [tab, setTab] = useState<Tab>("all");
@@ -103,19 +39,6 @@ export function Feed() {
   const [composer, setComposer] = useState<{ caption: string } | null>(null);
   const [composerNonce, setComposerNonce] = useState(0);
   const [loadingStreak, setLoadingStreak] = useState(false);
-  const [diag, setDiag] = useState<FeedDiag | null>(null);
-  const feedRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const measure = () => setDiag(measureDiag(feedRef.current));
-    measure();
-    const t = setInterval(measure, 2000);
-    window.addEventListener("resize", measure);
-    return () => {
-      clearInterval(t);
-      window.removeEventListener("resize", measure);
-    };
-  }, []);
 
   const openStreak = async () => {
     if (!userId) return;
@@ -214,7 +137,7 @@ export function Feed() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-[92vw] overflow-x-clip" ref={feedRef}>
+    <div className="mx-auto w-full max-w-[92vw] overflow-x-clip">
       {/* Tabs */}
       <div className="sticky top-[52px] z-10 flex items-center gap-1 border-b border-edge bg-bg/90 px-4 pt-2 pb-2 backdrop-blur md:top-0">
         {(

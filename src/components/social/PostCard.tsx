@@ -210,6 +210,8 @@ export function PostCard({
           <img
             src={post.media_url}
             alt={post.caption || ""}
+            loading="lazy"
+            decoding="async"
             className="aspect-square w-full bg-bg object-cover md:aspect-[4/5]"
           />
         )

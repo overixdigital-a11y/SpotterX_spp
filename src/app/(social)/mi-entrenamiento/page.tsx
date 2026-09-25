@@ -27,7 +27,15 @@ import { getDisciplineFields, isSeriesDiscipline, resolveSeries, formatSeries, t
 import { MEALS, getDietData, formatQuantity } from "@/lib/diets";
 import PostComposer from "@/components/social/PostComposer";
 import MediaPicker from "@/components/core/MediaPicker";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import dynamic from "next/dynamic";
+const ProgressLine = dynamic(
+  () => import("@/components/training/HistoryCharts").then((m) => m.ProgressLine),
+  { ssr: false }
+);
+const MonthlyBars = dynamic(
+  () => import("@/components/training/HistoryCharts").then((m) => m.MonthlyBars),
+  { ssr: false }
+);
 import {
   type SessionInfo,
   monthGrid,
@@ -1041,31 +1049,7 @@ export default function MiEntrenamientoPage() {
                         <p className="py-8 text-center text-sm text-muted">Sin datos de progreso todavía.</p>
                       ) : (
                         <>
-                          <div className="mt-4 h-48">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <LineChart data={progressData}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#1e2530" />
-                                <XAxis
-                                  dataKey="date"
-                                  tick={{ fill: "#6b7280", fontSize: 10 }}
-                                  tickFormatter={(v) => v.slice(5)}
-                                />
-                                <YAxis tick={{ fill: "#6b7280", fontSize: 10 }} width={40} />
-                                <Tooltip
-                                  contentStyle={{ backgroundColor: "#161b22", border: "1px solid #1e2530", borderRadius: 8, fontSize: 12 }}
-                                  labelStyle={{ color: "#9ca3af" }}
-                                />
-                                <Line
-                                  type="monotone"
-                                  dataKey="value"
-                                  stroke="#00f2fe"
-                                  strokeWidth={2}
-                                  dot={{ fill: "#00f2fe", r: 3 }}
-                                  activeDot={{ r: 5 }}
-                                />
-                              </LineChart>
-                            </ResponsiveContainer>
-                          </div>
+                          <ProgressLine data={progressData} />
 
                           <div className="mt-3 grid grid-cols-3 gap-2">
                             <div className="rounded-lg border border-edge bg-bg p-2 text-center">
@@ -1214,26 +1198,7 @@ export default function MiEntrenamientoPage() {
 
           <div className="mt-3 rounded-xl border border-edge bg-card p-4">
             <p className="text-sm font-semibold text-ink">Cumplimiento · últimos 6 meses</p>
-            <div className="mt-3 h-40">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={history.bars}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e2530" vertical={false} />
-                  <XAxis dataKey="mes" tick={{ fill: "#6b7280", fontSize: 10 }} />
-                  <YAxis tick={{ fill: "#6b7280", fontSize: 10 }} width={24} allowDecimals={false} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#161b22",
-                      border: "1px solid #1e2530",
-                      borderRadius: 8,
-                      fontSize: 12,
-                    }}
-                    labelStyle={{ color: "#9ca3af" }}
-                  />
-                  <Bar dataKey="hechas" name="Hechas" fill="#00f2fe" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="planificadas" name="Planificadas" fill="#ff5e36" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <MonthlyBars bars={history.bars} />
           </div>
 
           {history.totalDays === 0 && (

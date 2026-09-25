@@ -17,6 +17,8 @@ export default function ProductCard({ product }: ProductCardProps) {
             <img
               src={product.images[0]}
               alt={product.name}
+              loading="lazy"
+              decoding="async"
               className="h-full w-full object-cover"
             />
           </div>

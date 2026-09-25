@@ -15,10 +15,13 @@ import {
   Globe,
   MonitorPlay,
   ShoppingBag,
+  Menu,
 } from "lucide-react";
 import { AuthProvider, useAuthState } from "@/lib/auth-context";
 import { createClient } from "@/lib/supabase/client";
 import { useGymModules } from "@/lib/gym-modules";
+import { MobileDrawer } from "@/components/core/MobileDrawer";
+import { NavRow } from "@/components/core/NavRow";
 
 interface ActorRef {
   full_name: string | null;
@@ -126,29 +129,26 @@ function NotificationBell() {
   );
 }
 
-function MobileHeader() {
-  const router = useRouter();
-  const onLogout = async () => {
-    await createClient().auth.signOut();
-    router.refresh();
-    router.push("/login");
-  };
-
+function MobileHeader({ onMenu }: { onMenu: () => void }) {
   return (
     <header className="sticky top-0 z-30 border-b border-edge bg-bg/95 backdrop-blur md:hidden">
       <div className="mx-auto flex max-w-md items-center justify-between px-4 py-3">
+        <button
+          onClick={onMenu}
+          className="text-ink"
+          aria-label="Abrir menú"
+        >
+          <Menu className="h-6 w-6" />
+        </button>
         <span className="text-lg font-bold tracking-tight">
           <span className="text-neon text-glow">Spotter</span>
           <span className="text-ember">X</span>
         </span>
-        <span className="rounded-full border border-neon/40 bg-neon/10 px-3 py-1 text-xs font-semibold text-neon">
-          Gimnasio
-        </span>
         <div className="flex items-center gap-2">
+          <span className="rounded-full border border-neon/40 bg-neon/10 px-3 py-1 text-xs font-semibold text-neon">
+            Gimnasio
+          </span>
           <NotificationBell />
-          <button onClick={onLogout} className="text-xs font-medium text-muted hover:text-ember">
-            Salir
-          </button>
         </div>
       </div>
     </header>
@@ -292,14 +292,93 @@ function DesktopGymSidebar() {
   );
 }
 
+function GymDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { nav, feedOn } = useModuleGate();
+
+  const onLogout = async () => {
+    await createClient().auth.signOut();
+    router.refresh();
+    router.push("/login");
+  };
+
+  return (
+    <MobileDrawer
+      open={open}
+      onClose={onClose}
+      brand={
+        <div className="flex items-center gap-2">
+          <span className="text-lg font-bold tracking-tight">
+            <span className="text-neon text-glow">Spotter</span>
+            <span className="text-ember">X</span>
+          </span>
+          <span className="rounded-full border border-neon/40 bg-neon/10 px-2 py-0.5 text-[10px] font-bold text-neon uppercase tracking-wider">
+            Gym Admin
+          </span>
+        </div>
+      }
+      footer={
+        <button
+          onClick={onLogout}
+          className="flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-muted transition hover:bg-ember/10 hover:text-ember"
+        >
+          <LogOut className="h-4 w-4" />
+          <span>Cerrar sesión</span>
+        </button>
+      }
+    >
+      <nav className="space-y-1">
+        <p className="px-3 text-[11px] font-bold uppercase tracking-wider text-muted mb-2">Administración</p>
+        {nav.map((n) => (
+          <NavRow
+            key={n.href}
+            href={n.href}
+            icon={n.icon}
+            label={n.label}
+            active={pathname === n.href}
+            onClick={onClose}
+          />
+        ))}
+      </nav>
+
+      <div className="pt-2 border-t border-edge/60 space-y-2">
+        <p className="px-3 text-[11px] font-bold uppercase tracking-wider text-muted mb-2">Herramientas</p>
+        <Link
+          href="/gimnasio/pantalla"
+          target="_blank"
+          onClick={onClose}
+          className="flex items-center gap-3 rounded-xl border border-edge bg-elevated/40 px-3.5 py-2.5 text-xs font-medium text-ink hover:border-neon/40 hover:text-neon transition"
+        >
+          <MonitorPlay className="h-4 w-4 text-neon" />
+          <span>Kiosk Recepción</span>
+        </Link>
+        {feedOn && (
+          <Link
+            href="/home"
+            onClick={onClose}
+            className="flex items-center gap-3 rounded-xl border border-edge bg-elevated/40 px-3.5 py-2.5 text-xs font-medium text-ink hover:border-neon/40 hover:text-neon transition"
+          >
+            <Globe className="h-4 w-4 text-muted" />
+            <span>Ir a Red Social</span>
+          </Link>
+        )}
+      </div>
+    </MobileDrawer>
+  );
+}
+
 export function GymShell({ children }: { children: React.ReactNode }) {
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
   return (
     <AuthProvider>
+      <GymDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
       <div className="flex min-h-screen bg-bg">
         <DesktopGymSidebar />
 
         <div className="flex-1 md:pl-64">
-          <MobileHeader />
+          <MobileHeader onMenu={() => setDrawerOpen(true)} />
           <main className="mx-auto min-h-screen w-full max-w-7xl p-4 md:p-8 pb-24 md:pb-8">
             {children}
           </main>

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 import {
   Users,
   MapPin,
@@ -10,34 +11,36 @@ import {
   ShoppingBag,
   LogOut,
   Home,
+  Menu,
 } from "lucide-react";
 import { AuthProvider } from "@/lib/auth-context";
 import { createClient } from "@/lib/supabase/client";
+import { MobileDrawer } from "@/components/core/MobileDrawer";
+import { NavRow } from "@/components/core/NavRow";
 
-function Header() {
-  const router = useRouter();
-  const onLogout = async () => {
-    await createClient().auth.signOut();
-    router.refresh();
-    router.push("/login");
-  };
-
+function Header({ onMenu }: { onMenu: () => void }) {
   return (
     <header className="sticky top-0 z-30 border-b border-edge bg-bg/95 backdrop-blur md:hidden">
       <div className="mx-auto flex max-w-md items-center justify-between px-4 py-3">
+        <button
+          onClick={onMenu}
+          className="text-ink"
+          aria-label="Abrir menú"
+        >
+          <Menu className="h-6 w-6" />
+        </button>
         <span className="text-lg font-bold tracking-tight">
           <span className="text-neon text-glow">Spotter</span>
           <span className="text-ember">X</span>
         </span>
-        <span className="rounded-full border border-ember/40 bg-ember/10 px-3 py-1 text-xs font-semibold text-ember">
-          Profesor
-        </span>
-        <Link href="/perfil/editar" className="text-muted hover:text-neon">
-          <Settings className="h-5 w-5" />
-        </Link>
-        <button onClick={onLogout} className="text-xs font-medium text-muted hover:text-ember">
-          Salir
-        </button>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full border border-ember/40 bg-ember/10 px-3 py-1 text-xs font-semibold text-ember">
+            Profesor
+          </span>
+          <Link href="/perfil/editar" className="text-muted hover:text-neon">
+            <Settings className="h-5 w-5" />
+          </Link>
+        </div>
       </div>
     </header>
   );
@@ -160,13 +163,87 @@ function ProfeNav() {
   );
 }
 
+function TrainerDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const onLogout = async () => {
+    await createClient().auth.signOut();
+    router.refresh();
+    router.push("/login");
+  };
+
+  return (
+    <MobileDrawer
+      open={open}
+      onClose={onClose}
+      brand={
+        <div className="flex items-center gap-2">
+          <span className="text-lg font-bold tracking-tight">
+            <span className="text-neon text-glow">Spotter</span>
+            <span className="text-ember">X</span>
+          </span>
+          <span className="rounded-full border border-ember/40 bg-ember/10 px-2 py-0.5 text-[10px] font-bold text-ember uppercase tracking-wider">
+            Profesor
+          </span>
+        </div>
+      }
+      footer={
+        <button
+          onClick={onLogout}
+          className="flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-muted transition hover:bg-ember/10 hover:text-ember"
+        >
+          <LogOut className="h-4 w-4" />
+          <span>Cerrar sesión</span>
+        </button>
+      }
+    >
+      <nav className="space-y-1.5">
+        {nav.map((n) => (
+          <NavRow
+            key={n.href}
+            href={n.href}
+            icon={n.icon}
+            label={n.label}
+            active={isActive(pathname, n.href)}
+            onClick={onClose}
+          />
+        ))}
+      </nav>
+
+      <div className="pt-2 border-t border-edge/60">
+        <p className="mb-2 px-3.5 text-[11px] font-bold uppercase tracking-wider text-muted">Mi Espacio</p>
+        <Link
+          href="/home"
+          onClick={onClose}
+          className="flex items-center gap-3 rounded-xl border border-edge bg-elevated/40 px-3.5 py-2.5 text-xs font-medium text-ink transition hover:border-neon/40 hover:text-neon"
+        >
+          <Home className="h-4 w-4 text-neon" />
+          <span>Red social</span>
+        </Link>
+        <Link
+          href="/perfil/editar"
+          onClick={onClose}
+          className="mt-2 flex items-center gap-3 rounded-xl border border-edge bg-elevated/40 px-3.5 py-2.5 text-xs font-medium text-ink transition hover:border-neon/40 hover:text-neon"
+        >
+          <Settings className="h-4 w-4 text-neon" />
+          <span>Editar perfil</span>
+        </Link>
+      </div>
+    </MobileDrawer>
+  );
+}
+
 export function TrainingShell({ children }: { children: React.ReactNode }) {
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
   return (
     <AuthProvider>
+      <TrainerDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
       <div className="flex min-h-screen bg-bg">
         <DesktopSidebar />
         <div className="flex-1 min-w-0 md:pl-64">
-          <Header />
+          <Header onMenu={() => setDrawerOpen(true)} />
           <div className="min-h-screen w-full min-w-0 pb-24 md:pb-8">{children}</div>
         </div>
         <ProfeNav />

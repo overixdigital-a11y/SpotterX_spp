@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Trash2, Loader2 } from "lucide-react";
+import { MarketNavHamburger } from "@/components/market/MarketNavContext";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { getMarketConfig } from "@/lib/market-config";
@@ -117,6 +118,7 @@ export default function MarketCarritoPage() {
   return (
     <main className="mx-auto max-w-md md:max-w-2xl lg:max-w-3xl">
       <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-edge bg-bg/90 px-4 py-3 backdrop-blur">
+        <MarketNavHamburger />
         <button onClick={() => router.back()} className="text-muted">
           <ArrowLeft className="h-5 w-5" />
         </button>

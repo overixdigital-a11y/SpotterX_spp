@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ShoppingBag } from "lucide-react";
+import { MarketNavHamburger } from "@/components/market/MarketNavContext";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { formatPrice, orderStatusLabel, type MarketOrder, type MarketOrderItem, type MarketProduct } from "@/lib/market";
@@ -69,6 +70,7 @@ export default function MisComprasPage() {
   return (
     <main className="mx-auto max-w-md md:max-w-2xl lg:max-w-3xl">
       <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-edge bg-bg/90 px-4 py-3 backdrop-blur">
+        <MarketNavHamburger />
         <Link href="/market" className="text-muted">
           <ArrowLeft className="h-5 w-5" />
         </Link>

@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, ShoppingCart, MessageCircle, Star, Loader2 } from "lucide-react";
+import { MarketNavHamburger } from "@/components/market/MarketNavContext";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { useModuleGuard, getBlockedOwners } from "@/lib/gym-modules";
@@ -152,6 +153,7 @@ export default function MarketProductPage() {
     <main className="mx-auto max-w-md md:max-w-2xl lg:max-w-3xl">
       {/* Header */}
       <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-edge bg-bg/90 px-4 py-3 backdrop-blur">
+        <MarketNavHamburger />
         <button onClick={() => router.back()} className="text-muted">
           <ArrowLeft className="h-5 w-5" />
         </button>

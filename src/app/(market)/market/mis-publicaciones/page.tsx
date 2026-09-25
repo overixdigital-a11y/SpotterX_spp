@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Package, TrendingUp, Loader2 } from "lucide-react";
+import { MarketNavHamburger } from "@/components/market/MarketNavContext";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { formatPrice, orderStatusLabel, type MarketProduct, type MarketOrder } from "@/lib/market";
@@ -105,6 +106,7 @@ export default function MisPublicacionesPage() {
     <main className="mx-auto max-w-md md:max-w-2xl lg:max-w-3xl">
       <div className="sticky top-0 z-30 border-b border-edge bg-bg/90 backdrop-blur">
         <div className="flex items-center gap-3 px-4 py-3">
+          <MarketNavHamburger />
           <Link href="/market" className="text-muted">
             <ArrowLeft className="h-5 w-5" />
           </Link>

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { TopBar } from "@/components/core/TopBar";
 import { BottomNav } from "@/components/core/BottomNav";
+import { MobileDrawer } from "@/components/core/MobileDrawer";
+import { NavRow } from "@/components/core/NavRow";
 import { AuthProvider, useAuthState } from "@/lib/auth-context";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/core/Avatar";
@@ -34,11 +36,39 @@ const navItems = [
   { href: "/perfil", label: "Mi Perfil", icon: User },
 ];
 
+function MiEspacioSection({ onNavigate }: { onNavigate?: () => void }) {
+  const { profile } = useAuthState();
+  const userRole = profile?.role;
+
+  return (
+    <div className="pt-2 border-t border-edge/60">
+      <p className="px-3.5 text-[11px] font-bold uppercase tracking-wider text-muted mb-2">Mi Espacio</p>
+      {userRole === "gym" ? (
+        <Link
+          href="/gimnasio"
+          onClick={onNavigate}
+          className="flex items-center gap-3 rounded-xl border border-ember/40 bg-ember/10 px-3.5 py-2.5 text-xs font-semibold text-ember transition hover:bg-ember/20"
+        >
+          <ShieldCheck className="h-4 w-4" />
+          <span>Panel de Gimnasio</span>
+        </Link>
+      ) : (
+        <Link
+          href="/perfil"
+          onClick={onNavigate}
+          className="flex items-center gap-3 rounded-xl border border-edge bg-elevated/40 px-3.5 py-2.5 text-xs font-medium text-ink transition hover:border-neon/40 hover:text-neon"
+        >
+          <Dumbbell className="h-4 w-4 text-neon" />
+          <span>Pasaporte Gimnasio</span>
+        </Link>
+      )}
+    </div>
+  );
+}
+
 function DesktopSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { profile } = useAuthState();
-  const userRole = profile?.role;
 
   const onLogout = async () => {
     await createClient().auth.signOut();
@@ -97,26 +127,7 @@ function DesktopSidebar() {
         </nav>
 
         {/* Section: Gym Access Shortcut if Alumno or Gym */}
-        <div className="pt-2 border-t border-edge/60">
-          <p className="px-3.5 text-[11px] font-bold uppercase tracking-wider text-muted mb-2">Mi Espacio</p>
-          {userRole === "gym" ? (
-            <Link
-              href="/gimnasio"
-              className="flex items-center gap-3 rounded-xl border border-ember/40 bg-ember/10 px-3.5 py-2.5 text-xs font-semibold text-ember transition hover:bg-ember/20"
-            >
-              <ShieldCheck className="h-4 w-4" />
-              <span>Panel de Gimnasio</span>
-            </Link>
-          ) : (
-            <Link
-              href="/perfil"
-              className="flex items-center gap-3 rounded-xl border border-edge bg-elevated/40 px-3.5 py-2.5 text-xs font-medium text-ink transition hover:border-neon/40 hover:text-neon"
-            >
-              <Dumbbell className="h-4 w-4 text-neon" />
-              <span>Pasaporte Gimnasio</span>
-            </Link>
-          )}
-        </div>
+        <MiEspacioSection />
       </div>
 
       {/* Logout */}
@@ -254,19 +265,52 @@ function RightSidebarWidget() {
 
 export function SocialShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const onLogout = async () => {
     await createClient().auth.signOut();
     router.refresh();
     router.push("/login");
   };
 
+  const closeDrawer = () => setDrawerOpen(false);
+
   return (
     <AuthProvider>
+      <MobileDrawer
+        open={drawerOpen}
+        onClose={closeDrawer}
+        footer={
+          <button
+            onClick={onLogout}
+            className="flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-muted transition hover:bg-ember/10 hover:text-ember"
+          >
+            <LogOut className="h-4 w-4" />
+            <span>Cerrar sesión</span>
+          </button>
+        }
+      >
+        <nav className="space-y-1.5">
+          {navItems.map((item) => (
+            <NavRow
+              key={item.href}
+              href={item.href}
+              icon={item.icon}
+              label={item.label}
+              active={pathname.startsWith(item.href)}
+              highlight={item.highlight}
+              onClick={closeDrawer}
+            />
+          ))}
+        </nav>
+        <MiEspacioSection onNavigate={closeDrawer} />
+      </MobileDrawer>
+
       <div className="flex min-h-screen bg-bg">
         <DesktopSidebar />
         
         <div className="flex-1 min-w-0 md:pl-64 lg:pr-80">
-          <TopBar onLogout={onLogout} />
+          <TopBar onMenuOpen={() => setDrawerOpen(true)} />
           <main className="mx-auto min-h-screen w-full min-w-0 max-w-xl px-4 py-4 md:py-6 md:max-w-2xl lg:max-w-3xl pb-24 md:pb-8">
             {children}
           </main>

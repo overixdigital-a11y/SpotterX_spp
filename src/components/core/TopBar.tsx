@@ -1,30 +1,16 @@
 "use client";
 
-import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Menu, LogOut, User } from "lucide-react";
-import { useState } from "react";
+import { Menu, User } from "lucide-react";
 
-const titles: Record<string, string> = {
-  "/home": "SpotterX",
-  "/discover": "Descubrir",
-  "/crear": "Crear contenido",
-  "/notificaciones": "Notificaciones",
-  "/perfil": "Mi perfil",
-};
-
-export function TopBar({ onLogout }: { onLogout?: () => void }) {
-  const pathname = usePathname();
-  const [open, setOpen] = useState(false);
-  const title = titles[pathname] ?? "SpotterX";
-
+export function TopBar({ onMenuOpen }: { onMenuOpen?: () => void }) {
   return (
     <header className="sticky top-0 z-30 border-b border-edge bg-bg/95 backdrop-blur md:hidden">
       <div className="mx-auto flex max-w-md items-center justify-between px-4 py-3">
         <button
-          onClick={() => setOpen((v) => !v)}
+          onClick={onMenuOpen}
           className="text-ink"
-          aria-label="Menú"
+          aria-label="Abrir menú"
         >
           <Menu className="h-6 w-6" />
         </button>
@@ -37,27 +23,10 @@ export function TopBar({ onLogout }: { onLogout?: () => void }) {
           </span>
         </Link>
 
-        <button className="text-muted" aria-label="Cuenta">
+        <Link href="/perfil" className="text-muted" aria-label="Cuenta">
           <User className="h-6 w-6" />
-        </button>
+        </Link>
       </div>
-
-      {open && (
-        <div className="border-t border-edge bg-card">
-          <div className="mx-auto max-w-md px-4 py-2">
-            <p className="px-2 py-1 text-sm font-semibold text-muted">{title}</p>
-            {onLogout && (
-              <button
-                onClick={onLogout}
-                className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-sm font-medium text-ember hover:bg-elevated"
-              >
-                <LogOut className="h-4 w-4" />
-                Cerrar sesión
-              </button>
-            )}
-          </div>
-        </div>
-      )}
     </header>
   );
 }

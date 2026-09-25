@@ -16,6 +16,9 @@ import {
 import { AuthProvider } from "@/lib/auth-context";
 import { createClient } from "@/lib/supabase/client";
 import { getMarketConfig } from "@/lib/market-config";
+import { MobileDrawer } from "@/components/core/MobileDrawer";
+import { NavRow } from "@/components/core/NavRow";
+import { MarketNavProvider } from "@/components/market/MarketNavContext";
 
 function navFor(allowCart: boolean) {
   return [
@@ -168,8 +171,75 @@ function MarketPill({ allowCart }: { allowCart: boolean }) {
   );
 }
 
+function MarketDrawer({ open, onClose, allowCart }: { open: boolean; onClose: () => void; allowCart: boolean }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const nav = navFor(allowCart);
+  const current = activeHref(pathname, nav);
+
+  const onLogout = async () => {
+    await createClient().auth.signOut();
+    router.refresh();
+    router.push("/login");
+  };
+
+  return (
+    <MobileDrawer
+      open={open}
+      onClose={onClose}
+      brand={
+        <div className="flex items-center gap-2">
+          <span className="text-lg font-bold tracking-tight">
+            <span className="text-neon text-glow">Spotter</span>
+            <span className="text-ember">X</span>
+          </span>
+          <span className="rounded-full bg-ember/10 px-2 py-0.5 text-[10px] font-bold text-ember uppercase tracking-wider">
+            Shop
+          </span>
+        </div>
+      }
+      footer={
+        <button
+          onClick={onLogout}
+          className="flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-muted transition hover:bg-ember/10 hover:text-ember"
+        >
+          <LogOut className="h-4 w-4" />
+          <span>Cerrar sesión</span>
+        </button>
+      }
+    >
+      <nav className="space-y-1.5">
+        {nav.map((n) => (
+          <NavRow
+            key={n.href}
+            href={n.href}
+            icon={n.icon}
+            label={n.label}
+            active={current === n.href}
+            highlight={n.highlight}
+            onClick={onClose}
+          />
+        ))}
+      </nav>
+
+      <div className="pt-2 border-t border-edge/60">
+        <p className="mb-2 px-3.5 text-[11px] font-bold uppercase tracking-wider text-muted">Mi Espacio</p>
+        <Link
+          href="/home"
+          onClick={onClose}
+          className="flex items-center gap-3 rounded-xl border border-edge bg-elevated/40 px-3.5 py-2.5 text-xs font-medium text-ink transition hover:border-neon/40 hover:text-neon"
+        >
+          <Home className="h-4 w-4 text-neon" />
+          <span>Red social</span>
+        </Link>
+      </div>
+    </MobileDrawer>
+  );
+}
+
 export function MarketShell({ children }: { children: React.ReactNode }) {
   const [allowCart, setAllowCart] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     getMarketConfig().then((cfg) => setAllowCart(cfg.allowCart));
@@ -177,11 +247,14 @@ export function MarketShell({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthProvider>
-      <div className="flex min-h-screen bg-bg">
-        <DesktopSidebar allowCart={allowCart} />
-        <div className="flex-1 min-w-0 md:pl-64 pb-24 md:pb-8">{children}</div>
-        <MarketPill allowCart={allowCart} />
-      </div>
+      <MarketNavProvider open={() => setDrawerOpen(true)}>
+        <MarketDrawer allowCart={allowCart} open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+        <div className="flex min-h-screen bg-bg">
+          <DesktopSidebar allowCart={allowCart} />
+          <div className="flex-1 min-w-0 md:pl-64 pb-24 md:pb-8">{children}</div>
+          <MarketPill allowCart={allowCart} />
+        </div>
+      </MarketNavProvider>
     </AuthProvider>
   );
 }

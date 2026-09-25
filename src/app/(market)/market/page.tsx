@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Search, ShoppingCart, Store, Loader2 } from "lucide-react";
+import { MarketNavHamburger } from "@/components/market/MarketNavContext";
 import { createClient } from "@/lib/supabase/client";
 import { MARKET_CATEGORIES, type MarketProduct } from "@/lib/market";
 import { getMarketConfig } from "@/lib/market-config";
@@ -117,6 +118,7 @@ export default function MarketPage() {
     <main className="mx-auto max-w-md md:max-w-2xl lg:max-w-4xl">
       <div className="sticky top-0 z-30 border-b border-edge bg-bg/90 backdrop-blur">
         <div className="flex items-center gap-3 px-4 py-3">
+          <MarketNavHamburger />
           <Store className="h-5 w-5 text-ember" />
           <h1 className="text-lg font-bold text-ink">SpotterShop</h1>
           <div className="ml-auto flex items-center gap-2">

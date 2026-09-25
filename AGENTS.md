@@ -673,3 +673,9 @@ otifications_type_check re-creada con la lista acumulativa completa + 'pago_publ
 ## Lote 28 CERRADO (25/09/2026)
 - **Migracion 00039 CORRIDA por el usuario** 25/09/2026 y **verificada via REST**: market_publish_pending (firma completa) -> 'No autenticado'; admin_list_deposits/admin_approve_deposit (con uuid)/admin_publish_revenue -> 'No autorizado'; publish_deposits?select=product_id -> HTTP 200 (columna product_id existe). Deploy bc0a2b4 READY.
 - El flujo queda habilitado en produccion: crear con cupo agotado -> modal publicacion paga -> pending -> admin aprueba y publica.
+
+**Lote 29 - Fix: la config de SpotterShop no se leia (RLS sin policies en platform_config) (25/09/2026, sin cambios de codigo, migracion 00040 PENDIENTE de correr por el usuario):**
+- **Sintoma del usuario**: cargo la cuenta bancaria en /admin/market (Config SpotterShop) pero al publicar el modal mostraba "El administrador todavia no cargo una cuenta de cobro".
+- **Causa raiz identificada por REST**: platform_config tiene RLS HABILITADA (probado: INSERT anon -> "new row violates row-level security policy", HTTP 401) y **ninguna policy** -> `GET /rest/v1/platform_config` devuelve `[]` para TODOS los roles. El guardado del admin funciona porque `admin_set_payment_config` es security definer; lo que no andaba era LEERLA de vuelta. Afectaba a getMarketConfig() (accounts:[] -> modal sin cuenta) y a la lectura directa de /admin/market (free_publishes/publish_price).
+- **Fix**: migracion `00040_platform_config_read.sql` que agrega policy **SELECT con using(true)** (valores publicos: cupo, precio, cuentas de cobro, contacto, toggle carrito) a las roles anon+authenticated. INSERT/UPDATE/DELETE quedan SIN policy (solo escriben las RPCs security definer). Idempotente (DO block con if-not-exists). Sin cambios de frontend.
+- **PENDIENTE usuario**: correr 00040 en SQL Editor. Despues se verifica con GET anon a platform_config (debe devolver las filas).

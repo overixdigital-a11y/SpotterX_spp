@@ -324,13 +324,17 @@ begin
     raise exception 'El precio no puede ser negativo';
   end if;
 
-  insert into public.platform_config (key, value, updated_at)
-  values ('free_publishes', to_jsonb(p_free_count), now())
-  on conflict (key) do update set value = to_jsonb(p_free_count), updated_at = now();
+  if p_free_count is not null then
+    insert into public.platform_config (key, value, updated_at)
+    values ('free_publishes', to_jsonb(p_free_count), now())
+    on conflict (key) do update set value = to_jsonb(p_free_count), updated_at = now();
+  end if;
 
-  insert into public.platform_config (key, value, updated_at)
-  values ('publish_price', to_jsonb(p_price), now())
-  on conflict (key) do update set value = to_jsonb(p_price), updated_at = now();
+  if p_price is not null then
+    insert into public.platform_config (key, value, updated_at)
+    values ('publish_price', to_jsonb(p_price), now())
+    on conflict (key) do update set value = to_jsonb(p_price), updated_at = now();
+  end if;
 end;
 $$;
 

@@ -9,11 +9,10 @@ import {
   ShoppingBag,
   Wallet,
   ShoppingCart,
-  Shield,
   Home,
   LogOut,
 } from "lucide-react";
-import { AuthProvider, useAuthState } from "@/lib/auth-context";
+import { AuthProvider } from "@/lib/auth-context";
 import { createClient } from "@/lib/supabase/client";
 
 const nav = [
@@ -43,7 +42,6 @@ function activeHref(pathname: string, items: { href: string }[]) {
 function DesktopSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { profile } = useAuthState();
   const current = activeHref(pathname, nav);
 
   const onLogout = async () => {
@@ -101,23 +99,6 @@ function DesktopSidebar() {
               </Link>
             );
           })}
-
-          {profile?.is_admin && (
-            <Link
-              href="/market/admin"
-              className={`flex items-center gap-3.5 rounded-xl px-3.5 py-3 text-sm font-medium transition ${
-                current === "/market/admin"
-                  ? "bg-elevated text-neon font-semibold border border-neon/30"
-                  : "text-ink/80 hover:bg-elevated/60 hover:text-ink"
-              }`}
-            >
-              <Shield
-                className={`h-5 w-5 ${current === "/market/admin" ? "text-neon" : "text-muted"}`}
-                strokeWidth={current === "/market/admin" ? 2.4 : 2}
-              />
-              <span>Admin</span>
-            </Link>
-          )}
         </nav>
 
         <div className="border-t border-edge/60 pt-2">

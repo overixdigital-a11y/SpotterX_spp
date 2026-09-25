@@ -20,7 +20,7 @@ export default function AdminMarketPage() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalSales, setTotalSales] = useState(0);
-  const [totalCommission, setTotalCommission] = useState(0);
+  const [publishRevenue, setPublishRevenue] = useState({ total: 0, count: 0 });
 
   useEffect(() => {
     const load = async () => {
@@ -33,8 +33,9 @@ export default function AdminMarketPage() {
       if (data) {
         setOrders(data as OrderRow[]);
         setTotalSales(data.reduce((sum, o) => sum + (o.total ?? 0), 0));
-        setTotalCommission(data.reduce((sum, o) => sum + (o.platform_fee ?? 0), 0));
       }
+      const { data: rev } = await supabase.rpc("admin_publish_revenue");
+      if (rev) setPublishRevenue(rev as { total: number; count: number });
       setLoading(false);
     };
     load();
@@ -93,11 +94,12 @@ export default function AdminMarketPage() {
         </div>
         <div className="rounded-lg border border-[#00e5c7]/20 bg-[#00e5c7]/5 p-4">
           <p className="flex items-center gap-1.5 text-xs font-medium text-[#9ca3af]">
-            <DollarSign className="h-3.5 w-3.5 text-[#00e5c7]" /> Comisión total
+            <DollarSign className="h-3.5 w-3.5 text-[#00e5c7]" /> Ingresos por publicaciones
           </p>
           <p className="mt-1 text-xl font-extrabold text-[#00e5c7]">
-            {formatPrice(totalCommission)}
+            {formatPrice(publishRevenue.total)}
           </p>
+          <p className="text-[10px] text-[#9ca3af]">{publishRevenue.count} publicaciones pagas</p>
         </div>
         <button
           onClick={exportCSV}

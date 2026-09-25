@@ -231,7 +231,7 @@ export default function PerfilPage() {
           <span className="rounded-full bg-neon/20 p-1.5 text-neon">
             <ShoppingBag className="h-4 w-4" />
           </span>
-          Marketplace
+          SpotterShop
         </p>
         <ChevronRight className="h-4 w-4 text-neon" />
       </Link>

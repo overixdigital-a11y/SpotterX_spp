@@ -1,16 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, MapPin } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, Loader2, MapPin, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
+import { useToast } from "@/components/core/ToastProvider";
 import { MARKET_CATEGORIES, type MarketCategory } from "@/lib/market";
+
+interface PublishQuote {
+  free_limit: number;
+  free_left: number;
+  price: number;
+  balance: number;
+  in_shop: number;
+  will_pay: boolean;
+}
 
 export default function MarketCrearPage() {
   const { userId } = useAuthState();
   const router = useRouter();
+  const toast = useToast();
   const [saving, setSaving] = useState(false);
+  const [quote, setQuote] = useState<PublishQuote | null>(null);
   const [form, setForm] = useState({
     name: "",
     description: "",
@@ -37,6 +50,14 @@ export default function MarketCrearPage() {
     setPreviews((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  useEffect(() => {
+    if (!userId) return;
+    const supabase = createClient();
+    supabase.rpc("get_publish_quote").then(({ data }) => {
+      if (data) setQuote(data as PublishQuote);
+    });
+  }, [userId]);
+
   const publish = async () => {
     if (!userId || !form.name.trim() || !form.price || !form.category) return;
     setSaving(true);
@@ -53,22 +74,28 @@ export default function MarketCrearPage() {
       }
     }
 
-    const { error } = await supabase.from("market_products").insert({
-      seller_id: userId,
-      name: form.name.trim(),
-      description: form.description.trim() || null,
-      price: Number(form.price),
-      category: form.category,
-      condition: form.condition,
-      stock: Number(form.stock) || 1,
-      location: form.location.trim() || null,
-      images: imageUrls,
+    const { error } = await supabase.rpc("market_publish", {
+      p_name: form.name.trim(),
+      p_description: form.description.trim() || null,
+      p_price: Number(form.price),
+      p_category: form.category,
+      p_condition: form.condition,
+      p_stock: Number(form.stock) || 1,
+      p_location: form.location.trim() || null,
+      p_images: imageUrls,
     });
 
     setSaving(false);
-    if (!error) {
-      router.push("/market");
+    if (error) {
+      toast(
+        error.message.includes("Saldo insuficiente")
+          ? "Saldo insuficiente para publicar. Cargá saldo en tu billetera."
+          : error.message,
+        "error"
+      );
+      return;
     }
+    router.push("/market");
   };
 
   return (
@@ -81,6 +108,37 @@ export default function MarketCrearPage() {
       </div>
 
       <div className="space-y-4 p-4">
+        {/* Quota banner */}
+        {quote &&
+          (quote.will_pay ? (
+            quote.balance >= quote.price ? (
+              <div className="flex items-center gap-2 rounded-xl border border-ember/30 bg-ember/10 p-3 text-xs font-medium text-ink">
+                <Sparkles className="h-4 w-4 shrink-0 text-ember" />
+                <span>
+                  Esta publicación cuesta <b>{quote.price}</b> (ya usaste tu cupo gratis) y se descuenta de tu
+                  billetera al publicar.
+                </span>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-ember/30 bg-ember/10 p-3 text-xs text-ink">
+                <p className="flex items-center gap-2 font-medium">
+                  <Sparkles className="h-4 w-4 shrink-0 text-ember" />
+                  <span>
+                    Esta publicación cuesta <b>{quote.price}</b> y tu saldo es <b>{quote.balance}</b>.
+                  </span>
+                </p>
+                <Link href="/market/billetera" className="mt-1.5 inline-block font-semibold text-ember">
+                  Cargar saldo en mi billetera →
+                </Link>
+              </div>
+            )
+          ) : (
+            <div className="flex items-center gap-2 rounded-xl border border-neon/30 bg-neon/10 p-3 text-xs font-medium text-ink">
+              <Sparkles className="h-4 w-4 shrink-0 text-neon" />
+              <span>Publicación gratis: te quedan <b>{quote.free_left}</b> de tu cupo ({quote.in_shop}/{quote.free_limit}).</span>
+            </div>
+          ))}
+
         {/* Photos */}
         <div>
           <label className="text-xs font-medium text-muted">Fotos (máx. 5)</label>

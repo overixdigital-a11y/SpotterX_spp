@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Trash2, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
-import { formatPrice, commissionFor, type CartItem } from "@/lib/market";
+import { formatPrice, type CartItem } from "@/lib/market";
 
 export default function MarketCarritoPage() {
   const { userId } = useAuthState();
@@ -17,7 +17,6 @@ export default function MarketCarritoPage() {
   const [deliveryType, setDeliveryType] = useState<"retiro" | "envio">("retiro");
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
-  const [commissionRate, setCommissionRate] = useState(0.01);
 
   useEffect(() => {
     const init = () => {
@@ -29,22 +28,11 @@ export default function MarketCarritoPage() {
         } catch { /* ignore */ }
       }
       setLoading(false);
-
-      const supabase = createClient();
-      supabase
-        .from("platform_config")
-        .select("value")
-        .eq("key", "commission_rate")
-        .maybeSingle()
-        .then(({ data }) => {
-          if (data) setCommissionRate((data.value as unknown as number));
-        });
     };
     init();
   }, []);
 
   const total = cart.reduce((sum, c) => sum + c.price * c.quantity, 0);
-  const fee = commissionFor(total, commissionRate);
 
   const updateQty = (idx: number, delta: number) => {
     setCart((prev) => {
@@ -218,10 +206,6 @@ export default function MarketCarritoPage() {
               <div className="flex justify-between text-xs text-muted">
                 <span>Subtotal ({cart.reduce((s, c) => s + c.quantity, 0)} items)</span>
                 <span>{formatPrice(total)}</span>
-              </div>
-              <div className="flex justify-between text-xs text-muted">
-                <span>Comisión SpotterX (1%)</span>
-                <span>{formatPrice(fee)}</span>
               </div>
               <div className="border-t border-edge pt-1 flex justify-between text-sm font-bold text-ink">
                 <span>Total</span>

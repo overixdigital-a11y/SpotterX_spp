@@ -13,6 +13,11 @@ import {
   CheckCircle,
   Loader2,
   Settings,
+  Minus,
+  Plus,
+  RotateCcw,
+  Search,
+  Trophy,
 } from "lucide-react";
 import {
   BarChart,
@@ -25,6 +30,7 @@ import {
 } from "recharts";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
+import { useToast } from "@/components/core/ToastProvider";
 import { formatPrice } from "@/lib/market";
 
 interface DashboardData {
@@ -33,7 +39,6 @@ interface DashboardData {
   totalOrders: number;
   monthlyOrders: number;
   monthlySales: number;
-  totalCommission: number;
   topCategories: { name: string; count: number }[];
   monthlySalesChart: { month: string; ventas: number }[];
 }
@@ -47,19 +52,39 @@ interface WithdrawalRequest {
   user?: { full_name: string | null; username: string | null; email: string | null };
 }
 
+interface SellerRow {
+  id: string;
+  username: string | null;
+  full_name: string | null;
+  email: string | null;
+  avatar_url: string | null;
+  free_limit: number | null;
+  active: number;
+  total: number;
+}
+
 export default function MarketAdminPage() {
   const { userId, profile } = useAuthState();
+  const toast = useToast();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [commissionRate, setCommissionRate] = useState(0.01);
-  const [newRate, setNewRate] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [freeCount, setFreeCount] = useState(3);
+  const [newFreeCount, setNewFreeCount] = useState("");
+  const [publishPrice, setPublishPrice] = useState(100);
+  const [newPublishPrice, setNewPublishPrice] = useState("");
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [publishRevenue, setPublishRevenue] = useState({ total: 0, count: 0 });
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
   const [loadingWithdrawals, setLoadingWithdrawals] = useState(true);
   const [creditUserId, setCreditUserId] = useState("");
   const [creditAmount, setCreditAmount] = useState("");
   const [creditNote, setCreditNote] = useState("");
   const [crediting, setCrediting] = useState(false);
+  const [sellers, setSellers] = useState<SellerRow[]>([]);
+  const [loadingSellers, setLoadingSellers] = useState(true);
+  const [searchQ, setSearchQ] = useState("");
+  const [drafts, setDrafts] = useState<Record<string, number>>({});
+  const [savingQuota, setSavingQuota] = useState<string | null>(null);
 
   useEffect(() => {
     if (!userId || !profile?.is_admin) return;
@@ -71,7 +96,6 @@ export default function MarketAdminPage() {
         activeRes,
         ordersRes,
         monthlyOrdersRes,
-        commissionRes,
         categoriesRes,
         monthlySalesRes,
       ] = await Promise.all([
@@ -79,8 +103,6 @@ export default function MarketAdminPage() {
         supabase.from("market_products").select("id", { count: "exact", head: true }).eq("status", "active"),
         supabase.from("market_orders").select("id", { count: "exact", head: true }),
         supabase.from("market_orders").select("id", { count: "exact", head: true })
-          .gte("created_at", new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()),
-        supabase.from("market_orders").select("total, platform_fee")
           .gte("created_at", new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()),
         supabase.from("market_products").select("category")
           .eq("status", "active"),
@@ -90,9 +112,6 @@ export default function MarketAdminPage() {
 
       const monthlySales = (monthlyOrdersRes.data as { total: number }[] | null)
         ?.reduce((sum, o) => sum + (o.total ?? 0), 0) ?? 0;
-
-      const totalCommission = (commissionRes.data as { platform_fee: number }[] | null)
-        ?.reduce((sum, o) => sum + (o.platform_fee ?? 0), 0) ?? 0;
 
       // Category counts
       const catMap = new Map<string, number>();
@@ -115,16 +134,17 @@ export default function MarketAdminPage() {
         .map(([month, ventas]) => ({ month, ventas }))
         .sort((a, b) => a.month.localeCompare(b.month));
 
-      // Commission rate
-      const { data: configData } = await supabase
-        .from("platform_config")
-        .select("value")
-        .eq("key", "commission_rate")
-        .maybeSingle();
-      if (configData) {
-        const rate = configData.value as unknown as number;
-        setCommissionRate(rate);
+      // Monetización SpotterShop (config global + ingresos por publicaciones)
+      const [cfgRes, revenueRes] = await Promise.all([
+        supabase.from("platform_config").select("key, value").in("key", ["free_publishes", "publish_price"]),
+        supabase.rpc("admin_publish_revenue"),
+      ]);
+      if (cfgRes.data) {
+        const map = new Map((cfgRes.data as { key: string; value: unknown }[]).map((r) => [r.key, r.value]));
+        setFreeCount(Number(map.get("free_publishes") ?? 3));
+        setPublishPrice(Number(map.get("publish_price") ?? 100));
       }
+      setPublishRevenue((revenueRes.data as { total: number; count: number }) ?? { total: 0, count: 0 });
 
       setData({
         totalProducts: productsRes.count ?? 0,
@@ -132,7 +152,6 @@ export default function MarketAdminPage() {
         totalOrders: ordersRes.count ?? 0,
         monthlyOrders: monthlyOrdersRes.count ?? 0,
         monthlySales,
-        totalCommission,
         topCategories,
         monthlySalesChart,
       });
@@ -184,15 +203,115 @@ export default function MarketAdminPage() {
     load();
   }, [userId, profile?.is_admin]);
 
-  const saveCommission = async () => {
-    const rate = parseFloat(newRate);
-    if (isNaN(rate) || rate < 0 || rate > 0.5) return;
-    setSaving(true);
+  // Load sellers ranking (public providers)
+  useEffect(() => {
+    if (!userId || !profile?.is_admin) return;
     const supabase = createClient();
-    await supabase.rpc("admin_set_commission", { p_rate: rate });
-    setCommissionRate(rate);
-    setNewRate("");
-    setSaving(false);
+    const load = async () => {
+      setLoadingSellers(true);
+      const { data: products } = await supabase
+        .from("market_products")
+        .select("seller_id, status")
+        .limit(5000);
+      const activeMap: Record<string, number> = {};
+      const totalMap: Record<string, number> = {};
+      (products ?? []).forEach((p) => {
+        totalMap[p.seller_id] = (totalMap[p.seller_id] ?? 0) + 1;
+        if (p.status === "active" || p.status === "paused") {
+          activeMap[p.seller_id] = (activeMap[p.seller_id] ?? 0) + 1;
+        }
+      });
+      const ids = Object.keys(totalMap);
+      if (ids.length === 0) {
+        setSellers([]);
+        setLoadingSellers(false);
+        return;
+      }
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id, username, full_name, email, shop_free_limit")
+        .in("id", ids);
+      const rows: SellerRow[] = ((profs ?? []) as unknown as {
+        id: string;
+        username: string | null;
+        full_name: string | null;
+        email: string | null;
+        free_limit: number | null;
+      }[]).map((p) => ({
+        id: p.id,
+        username: p.username,
+        full_name: p.full_name,
+        email: p.email,
+        avatar_url: null,
+        free_limit: p.free_limit,
+        active: activeMap[p.id] ?? 0,
+        total: totalMap[p.id] ?? 0,
+      }));
+      rows.sort((a, b) => b.active - a.active);
+      setSellers(rows);
+      setLoadingSellers(false);
+    };
+    load();
+  }, [userId, profile?.is_admin]);
+
+  const saveConfig = async () => {
+    const hasFree = newFreeCount.trim() !== "";
+    const hasPrice = newPublishPrice.trim() !== "";
+    if (!hasFree && !hasPrice) return;
+    const fc = hasFree ? parseInt(newFreeCount, 10) : null;
+    const pp = hasPrice ? parseFloat(newPublishPrice) : null;
+    if (fc !== null && (isNaN(fc) || fc < 0 || fc > 100)) return;
+    if (pp !== null && (isNaN(pp) || pp <= 0)) return;
+    setSavingConfig(true);
+    const supabase = createClient();
+    const { error } = await supabase.rpc("admin_set_publication_config", {
+      p_free_count: fc,
+      p_price: pp,
+    });
+    setSavingConfig(false);
+    if (!error) {
+      if (fc !== null) setFreeCount(fc);
+      if (pp !== null) setPublishPrice(pp);
+      setNewFreeCount("");
+      setNewPublishPrice("");
+      toast("Monetización actualizada", "success");
+    } else {
+      toast(error.message, "error");
+    }
+  };
+
+  const applyQuota = async (seller: SellerRow) => {
+    const value = drafts[seller.id];
+    if (value === undefined || isNaN(value)) return;
+    setSavingQuota(seller.id);
+    const supabase = createClient();
+    const { error } = await supabase.rpc("admin_set_user_free_limit", {
+      p_user_id: seller.id,
+      p_free_limit: value,
+    });
+    setSavingQuota(null);
+    if (!error) {
+      setSellers((prev) => prev.map((r) => (r.id === seller.id ? { ...r, free_limit: value } : r)));
+      toast(value === 0 ? "Le quedó sin publicaciones gratis" : "Cupo actualizado", "success");
+    } else {
+      toast(error.message, "error");
+    }
+  };
+
+  const resetQuota = async (seller: SellerRow) => {
+    setSavingQuota(seller.id);
+    const supabase = createClient();
+    const { error } = await supabase.rpc("admin_set_user_free_limit", {
+      p_user_id: seller.id,
+      p_free_limit: null,
+    });
+    setSavingQuota(null);
+    if (!error) {
+      setSellers((prev) => prev.map((r) => (r.id === seller.id ? { ...r, free_limit: null } : r)));
+      toast("Vuelve a usar el cupo global", "success");
+    } else {
+      toast(error.message, "error");
+    }
   };
 
   const markPaid = async (txId: string) => {
@@ -225,7 +344,7 @@ export default function MarketAdminPage() {
       <main className="mx-auto max-w-md flex flex-col items-center justify-center px-4 py-20">
         <p className="text-sm text-muted">No tenés acceso a esta página</p>
         <Link href="/market" className="mt-3 text-sm font-semibold text-neon">
-          Volver al marketplace
+          Volver a SpotterShop
         </Link>
       </main>
     );
@@ -278,10 +397,10 @@ export default function MarketAdminPage() {
           </div>
           <div className="rounded-2xl border border-edge bg-card p-4">
             <p className="flex items-center gap-1.5 text-xs font-semibold text-muted">
-              <DollarSign className="h-3.5 w-3.5 text-neon" /> Comisión
+              <DollarSign className="h-3.5 w-3.5 text-ember" /> Ingresos pub.
             </p>
-            <p className="mt-1 text-xl font-extrabold text-neon">{formatPrice(data?.totalCommission ?? 0)}</p>
-            <p className="text-[10px] text-muted">este mes</p>
+            <p className="mt-1 text-xl font-extrabold text-neon">{formatPrice(publishRevenue.total)}</p>
+            <p className="text-[10px] text-muted">{publishRevenue.count} publicaciones pagas</p>
           </div>
         </div>
 
@@ -332,36 +451,161 @@ export default function MarketAdminPage() {
           </div>
         )}
 
-        {/* Commission Rate */}
+        {/* Monetización SpotterShop (global) */}
         <div className="rounded-2xl border border-edge bg-card p-4">
-          <p className="flex items-center gap-1.5 text-sm font-semibold text-ink mb-3">
-            <Settings className="h-4 w-4 text-muted" /> Comisión actual
+          <p className="flex items-center gap-1.5 text-sm font-semibold text-ink mb-1">
+            <Settings className="h-4 w-4 text-ember" /> Monetización SpotterShop
           </p>
-          <div className="flex items-center gap-3">
-            <div className="flex-1">
-              <p className="text-3xl font-extrabold text-neon">{(commissionRate * 100).toFixed(1)}%</p>
-            </div>
-            <div className="flex gap-2">
+          <p className="mb-3 text-[11px] text-muted">
+            Sin comisión por venta. Se cobra por publicación una vez agotado el cupo gratis (global o por usuario).
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] font-semibold text-muted">Publicaciones gratis (global)</label>
               <input
                 type="number"
-                step="0.1"
                 min="0"
-                max="50"
-                value={newRate}
-                onChange={(e) => setNewRate(e.target.value)}
-                placeholder={`${(commissionRate * 100).toFixed(1)}%`}
-                className="w-20 rounded-lg border border-edge bg-bg px-2 py-1.5 text-xs text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+                value={newFreeCount}
+                onChange={(e) => setNewFreeCount(e.target.value)}
+                placeholder={`${freeCount}`}
+                className="mt-1 w-full rounded-lg border border-edge bg-bg px-3 py-2 text-xs text-ink placeholder:text-muted focus:border-neon focus:outline-none"
               />
-              <button
-                onClick={saveCommission}
-                disabled={saving || !newRate}
-                className="flex items-center gap-1 rounded-lg bg-neon px-3 py-1.5 text-xs font-semibold text-bg disabled:opacity-50"
-              >
-                {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-                Guardar
-              </button>
+              <p className="mt-1 text-[10px] text-muted">Valor actual: {freeCount}</p>
+            </div>
+            <div>
+              <label className="text-[10px] font-semibold text-muted">Precio por publicación ($)</label>
+              <input
+                type="number"
+                min="1"
+                value={newPublishPrice}
+                onChange={(e) => setNewPublishPrice(e.target.value)}
+                placeholder={`${publishPrice}`}
+                className="mt-1 w-full rounded-lg border border-edge bg-bg px-3 py-2 text-xs text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+              />
+              <p className="mt-1 text-[10px] text-muted">Valor actual: ${publishPrice}</p>
             </div>
           </div>
+          <button
+            onClick={saveConfig}
+            disabled={savingConfig || (newFreeCount.trim() === "" && newPublishPrice.trim() === "")}
+            className="mt-3 flex w-full items-center justify-center gap-1 rounded-lg bg-neon py-2 text-xs font-semibold text-bg disabled:opacity-50"
+          >
+            {savingConfig ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+            Guardar
+          </button>
+        </div>
+
+        {/* Publicadores — ranking y premios */}
+        <div className="rounded-2xl border border-edge bg-card p-4">
+          <p className="flex items-center gap-1.5 text-sm font-semibold text-ink mb-1">
+            <Trophy className="h-4 w-4 text-ember" /> Publicadores — ranking y premios
+          </p>
+          <p className="mb-3 text-[11px] text-muted">
+            Ordenados por publicaciones vigentes. Transferí publicaciones gratis (premio) o ajustá el cupo por usuario.
+          </p>
+          <div className="relative mb-3">
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
+            <input
+              type="text"
+              value={searchQ}
+              onChange={(e) => setSearchQ(e.target.value)}
+              placeholder="Buscar publicador..."
+              className="w-full rounded-lg border border-edge bg-bg py-2 pl-8 pr-3 text-xs text-ink placeholder:text-muted focus:border-neon focus:outline-none"
+            />
+          </div>
+          {loadingSellers ? (
+            <Loader2 className="mx-auto h-5 w-5 animate-spin text-neon" />
+          ) : (
+            <div className="space-y-2">
+              {(() => {
+                const q = searchQ.trim().toLowerCase();
+                const visible = q
+                  ? sellers.filter((s) =>
+                      [s.username, s.full_name, s.email].some((v) => v?.toLowerCase().includes(q))
+                    )
+                  : sellers;
+                return visible.length === 0 ? (
+                  <p className="py-4 text-center text-xs text-muted">Todavía no hay publicadores</p>
+                ) : (
+                  visible.map((s, i) => {
+                    const effective = s.free_limit ?? freeCount;
+                    const draft = drafts[s.id];
+                    const val = draft !== undefined && !isNaN(draft) ? draft : effective;
+                    return (
+                      <div key={s.id} className="rounded-xl border border-edge bg-bg p-3">
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neon/15 text-xs font-bold text-neon">
+                            {s.full_name?.[0]?.toUpperCase() ?? s.username?.[0]?.toUpperCase() ?? "#"}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-xs font-semibold text-ink">
+                              #{i + 1} {s.full_name ?? s.username ?? "Usuario"}
+                            </p>
+                            <p className="truncate text-[10px] text-muted">
+                              @{s.username ?? "—"} · {s.email}
+                            </p>
+                            <p className="text-[10px] text-muted">
+                              {s.active} vigentes · {s.total} publicadas
+                            </p>
+                          </div>
+                          <span
+                            className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                              s.free_limit != null ? "bg-ember/15 text-ember" : "bg-neon/15 text-neon"
+                            }`}
+                          >
+                            cupo {effective}
+                            {s.free_limit != null ? " · ajustado" : ""}
+                          </span>
+                        </div>
+                        <div className="mt-2 flex items-center gap-1.5">
+                          <button
+                            onClick={() =>
+                              setDrafts((d) => ({ ...d, [s.id]: Math.max(0, (drafts[s.id] ?? effective) - 1) }))
+                            }
+                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-edge text-muted"
+                            title="Quitar una publicación gratis"
+                          >
+                            <Minus className="h-3.5 w-3.5" />
+                          </button>
+                          <input
+                            type="number"
+                            min="0"
+                            value={val}
+                            onChange={(e) => setDrafts((d) => ({ ...d, [s.id]: Number(e.target.value) }))}
+                            className="w-16 rounded-lg border border-edge bg-bg px-2 py-1 text-center text-xs text-ink focus:border-neon focus:outline-none"
+                          />
+                          <button
+                            onClick={() => setDrafts((d) => ({ ...d, [s.id]: (drafts[s.id] ?? effective) + 1 }))}
+                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-edge text-muted"
+                            title="Agregar una publicación gratis (premio)"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => applyQuota(s)}
+                            disabled={savingQuota === s.id || draft === undefined || isNaN(draft) || draft === effective}
+                            className="flex items-center gap-1 rounded-lg bg-neon px-2.5 py-1.5 text-[10px] font-semibold text-bg disabled:opacity-50"
+                          >
+                            {savingQuota === s.id ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                            Aplicar
+                          </button>
+                          <button
+                            onClick={() => resetQuota(s)}
+                            disabled={savingQuota === s.id}
+                            className="ml-auto flex items-center gap-1 rounded-lg border border-edge px-2.5 py-1.5 text-[10px] font-semibold text-muted disabled:opacity-50"
+                            title="Volver al cupo global"
+                          >
+                            <RotateCcw className="h-3 w-3" />
+                            Global
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                );
+              })()}
+            </div>
+          )}
         </div>
 
         {/* Credit Wallet */}

@@ -46,7 +46,7 @@ function Header() {
 const nav = [
   { href: "/entrenamiento", label: "Alumnos", icon: Users },
   { href: "/entrenamiento/zona", label: "Mi zona", icon: MapPin },
-  { href: "/market", label: "Market", icon: ShoppingBag },
+  { href: "/market", label: "SpotterShop", icon: ShoppingBag },
   { href: "/perfil", label: "Perfil", icon: User },
 ];
 

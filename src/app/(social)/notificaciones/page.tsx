@@ -41,7 +41,7 @@ const textMap: Record<string, string> = {
   vencimiento: "te avisa que tu membresía vence pronto",
   solicitud_staff: "se postuló para trabajar en tu gimnasio",
   staff_aprobado: "aprobó tu postulación en su gimnasio",
-  orden: "tiene una nueva orden en el marketplace",
+  orden: "tiene una nueva orden en SpotterShop",
 };
 
 export default function NotificacionesPage() {

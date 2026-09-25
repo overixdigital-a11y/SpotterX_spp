@@ -25,7 +25,7 @@ const NAV_ITEMS = [
   { href: "/admin/gyms", label: "Gyms", icon: Dumbbell },
   { href: "/admin/profes", label: "Profes", icon: GraduationCap },
   { href: "/admin/catalogo", label: "Catálogo", icon: Package },
-  { href: "/admin/market", label: "Market", icon: Store },
+  { href: "/admin/market", label: "SpotterShop", icon: Store },
 ] as const;
 
 export function AdminShell({ children }: { children: React.ReactNode }) {

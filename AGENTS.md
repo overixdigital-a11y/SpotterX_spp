@@ -689,3 +689,10 @@ otifications_type_check re-creada con la lista acumulativa completa + 'pago_publ
   - `/market/billetera`: canal `billetera-live` (market_orders filter seller_id y buyer_id) evento "*" -> refetch de ventas/compras.
 - **Por que funciona sin migracion**: market_products/market_orders/notifications ya estan en supabase_realtime (00026/00005); publish_deposits NO se usa en realtime (el admin se entera via la notif pago_publicacion que 00039 ya inserta). RLS: notifications entrega solo las propias (recipient), market_products entrega a todo autenticado (policy lectura), market_orders solo buyer/seller. checks: el approve es pending->active = un UPDATE que entra por el canal del vendedor y del storefront.
 - Commit `PENDIENTE` (verificado en deploy por API).
+
+**Lote 31 - Market en el menu lateral del perfil administrador (25/09/2026, sin migracion, lint 0 errores, build OK 44 rutas, push deploy automatico):**
+- **Pedido del usuario**: "el market de la cuenta de gym me gustaria que este en el menu lateral del perfil de administrador y no en el perfil de la red social". Hoy la entrada al mercado desde la red era una card "SpotterShop" en /perfil (visible para todos los roles); el AdminShell ya tenia "SpotterShop" pero apunta al panel de administracion /admin/market.
+- **AdminShell.tsx** (NAV_ITEMS): nuevo item **{ href: "/market", label: "Market", icon: Store }** entre "Catalogo" y "SpotterShop" -> lleva a la TIENDA (/market, donde el publicador vende). El item "SpotterShop" (/admin/market), el panel de administracion, queda intacto. NAV_ITEMS alimenta desktop sidebar + drawer mobile.
+- **/perfil (social)**: eliminada la card "SpotterShop" -> /market (todas las roles) y quitado `ShoppingBag` del import de lucide (ChevronRight sigue en uso, Store tambien). El acceso social al mercado sigue vivo por el item nav "Market" del SocialShell.
+- Sin migracion. Los usuarios no pierden accesos: /market from admin sidebar + SocialShell nav "Market" + MarketShell propio.
+- Deploy verificado por API (push automatico).

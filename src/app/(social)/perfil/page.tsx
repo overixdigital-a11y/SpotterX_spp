@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuthState } from "@/lib/auth-context";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
-import { MapPin, Zap, ChevronRight, Dumbbell, ShoppingBag, Users, GraduationCap, UserRound, Pencil, Store } from "lucide-react";
+import { MapPin, Zap, ChevronRight, Dumbbell, Users, GraduationCap, UserRound, Pencil, Store } from "lucide-react";
 
 interface WorkplaceGym {
   gym_id: string;
@@ -222,19 +222,6 @@ export default function PerfilPage() {
           </Link>
         </div>
       )}
-
-      <Link
-        href="/market"
-        className="mx-4 mt-4 flex items-center justify-between rounded-xl border border-neon/30 bg-neon/10 p-3.5"
-      >
-        <p className="flex items-center gap-2 text-sm font-semibold text-ink">
-          <span className="rounded-full bg-neon/20 p-1.5 text-neon">
-            <ShoppingBag className="h-4 w-4" />
-          </span>
-          SpotterShop
-        </p>
-        <ChevronRight className="h-4 w-4 text-neon" />
-      </Link>
 
       <div className="mt-5 grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 divide-x divide-edge border-b border-t border-edge text-center">
         {[

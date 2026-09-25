@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Camera, Film, Type, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
+import { useModuleGuard } from "@/lib/gym-modules";
 
 const categories = [
   "#CrossFit",
@@ -18,11 +19,20 @@ const categories = [
 export default function CrearPage() {
   const router = useRouter();
   const { userId } = useAuthState();
+  const { busy } = useModuleGuard("feed");
   const [file, setFile] = useState<File | null>(null);
   const [caption, setCaption] = useState("");
   const [category, setCategory] = useState("#CrossFit");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  if (busy) {
+    return (
+      <div className="flex justify-center pt-20">
+        <Loader2 className="h-6 w-6 animate-spin text-neon" />
+      </div>
+    );
+  }
 
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFile(e.target.files?.[0] ?? null);

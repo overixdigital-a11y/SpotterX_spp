@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
+import { useModuleGuard } from "@/lib/gym-modules";
 import { todayLocal } from "@/lib/format";
 import ExercisePicker from "@/components/training/ExercisePicker";
 import FoodPicker, { type Food } from "@/components/training/FoodPicker";
@@ -133,6 +134,7 @@ export default function AlumnoPage() {
   const params = useParams<{ id: string }>();
   const studentId = params.id;
   const { userId, profile } = useAuthState();
+  const { busy } = useModuleGuard("entrenamiento");
   const [student, setStudent] = useState<StudentProfile | null>(null);
   const [tab, setTab] = useState<"planes" | "rutinas" | "historial" | "chat">("planes");
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -839,6 +841,14 @@ export default function AlumnoPage() {
   if (loading) {
     return (
       <main className="flex justify-center py-20">
+        <Loader2 className="h-6 w-6 animate-spin text-neon" />
+      </main>
+    );
+  }
+
+  if (busy) {
+    return (
+      <main className="flex justify-center pt-20">
         <Loader2 className="h-6 w-6 animate-spin text-neon" />
       </main>
     );

@@ -4,6 +4,15 @@ import { useEffect, useState } from "react";
 import { Dumbbell, Users, MapPin, Upload, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { parsePlanilla } from "@/lib/parsePlanilla";
+import { useToast } from "@/components/core/ToastProvider";
+import {
+  ALL_GYM_MODULES,
+  DEFAULT_GYM_MODULES,
+  resetGymModulesCache,
+  resetBlockedOwnersCache,
+  type GymModules,
+  type GymModule,
+} from "@/lib/gym-modules";
 
 const INVITE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL + "/functions/v1/invite-member";
@@ -30,7 +39,9 @@ interface ImportResult {
 }
 
 export default function AdminGymsPage() {
+  const toast = useToast();
   const [gyms, setGyms] = useState<GymRow[]>([]);
+  const [moduleMap, setModuleMap] = useState<Record<string, GymModules>>({});
   const [loading, setLoading] = useState(true);
   const [importGymId, setImportGymId] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
@@ -52,7 +63,7 @@ export default function AdminGymsPage() {
       const gymIds = data.map((g) => g.id);
       const ownerIds = [...new Set(data.map((g) => g.owner_id))];
 
-      const [{ data: memberships }, { data: owners }] = await Promise.all([
+      const [{ data: memberships }, { data: owners }, { data: moduleRows }] = await Promise.all([
         supabase
           .from("gym_memberships")
           .select("gym_id")
@@ -62,6 +73,9 @@ export default function AdminGymsPage() {
           .from("profiles")
           .select("id, full_name, username")
           .in("id", ownerIds),
+        supabase
+          .from("gym_module_settings")
+          .select("gym_id, module, enabled"),
       ]);
 
       const countMap = new Map<string, number>();
@@ -72,6 +86,16 @@ export default function AdminGymsPage() {
       owners?.forEach((o) => {
         ownerMap.set(o.id, { full_name: o.full_name, username: o.username });
       });
+      const modules: Record<string, GymModules> = {};
+      gymIds.forEach((id) => {
+        modules[id] = { ...DEFAULT_GYM_MODULES };
+      });
+      moduleRows?.forEach((r) => {
+        const gym = modules[r.gym_id];
+        if (gym && r.module in gym) {
+          gym[r.module as GymModule] = r.enabled;
+        }
+      });
 
       setGyms(
         data.map((g) => ({
@@ -81,10 +105,35 @@ export default function AdminGymsPage() {
           owner_username: ownerMap.get(g.owner_id)?.username ?? null,
         }))
       );
+      setModuleMap(modules);
       setLoading(false);
     };
     load();
   }, []);
+
+  const toggleModule = async (gymId: string, module: GymModule, next: boolean) => {
+    const prev = moduleMap[gymId]?.[module] ?? true;
+    if (prev === next) return;
+    setModuleMap((m) => ({
+      ...m,
+      [gymId]: { ...m[gymId], [module]: next },
+    }));
+    const { error } = await createClient().rpc("admin_set_gym_module", {
+      p_gym_id: gymId,
+      p_module: module,
+      p_enabled: next,
+    });
+    if (error) {
+      setModuleMap((m) => ({
+        ...m,
+        [gymId]: { ...m[gymId], [module]: prev },
+      }));
+      toast(`No se pudo actualizar: ${error.message}`, "error");
+      return;
+    }
+    resetGymModulesCache();
+    resetBlockedOwnersCache();
+  };
 
   const handleFile = async (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -184,6 +233,9 @@ export default function AdminGymsPage() {
                   Miembros
                 </th>
                 <th className="px-4 py-2.5 text-xs font-medium text-[#9ca3af]">
+                  Módulos
+                </th>
+                <th className="px-4 py-2.5 text-xs font-medium text-[#9ca3af]">
                   Importar
                 </th>
               </tr>
@@ -223,6 +275,33 @@ export default function AdminGymsPage() {
                     <span className="flex items-center gap-1 text-xs text-[#9ca3af]">
                       <Users className="h-3 w-3" /> {g.member_count}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-1">
+                      {ALL_GYM_MODULES.map((m) => {
+                        const on = moduleMap[g.id]?.[m.key] ?? true;
+                        return (
+                          <button
+                            key={m.key}
+                            onClick={() => toggleModule(g.id, m.key, !on)}
+                            title={m.label}
+                            className={`rounded-md border px-2 py-1 text-[10px] font-semibold transition ${
+                              on
+                                ? "border-[#00e5c7]/50 bg-[#00e5c7]/10 text-[#00e5c7]"
+                                : "border-[#1e2530] bg-transparent text-[#6b7280] hover:text-[#9ca3af]"
+                            }`}
+                          >
+                            {m.key === "spotter_shop"
+                              ? "Shop"
+                              : m.key === "entrenamiento"
+                                ? "Entren."
+                                : m.key === "catalogo"
+                                  ? "Cat."
+                                  : "Feed"}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md bg-[#f97316]/10 px-3 py-1.5 text-[11px] font-medium text-[#f97316] hover:bg-[#f97316]/20">

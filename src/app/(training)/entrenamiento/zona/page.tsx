@@ -8,6 +8,7 @@ import { geocodeAddress, formatAddress, searchGymsWeb, WebGymSuggestion } from "
 import { DISCIPLINES } from "@/lib/disciplines";
 import { timeAgo } from "@/lib/format";
 import ProvinceCityFields from "@/components/gyms/ProvinceCityFields";
+import { useModuleGuard } from "@/lib/gym-modules";
 
 const DISCIPLINE_LABELS = DISCIPLINES.map((d) => d.label);
 
@@ -56,6 +57,7 @@ const STATUS_CLASS: Record<string, string> = {
 
 export default function ZonaPage() {
   const { userId } = useAuthState();
+  const { busy } = useModuleGuard("entrenamiento");
   const [zones, setZones] = useState<TrainerGym[]>([]);
   const [requests, setRequests] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -325,6 +327,14 @@ export default function ZonaPage() {
   if (loading) {
     return (
       <main className="flex justify-center py-20">
+        <Loader2 className="h-6 w-6 animate-spin text-neon" />
+      </main>
+    );
+  }
+
+  if (busy) {
+    return (
+      <main className="flex justify-center pt-20">
         <Loader2 className="h-6 w-6 animate-spin text-neon" />
       </main>
     );

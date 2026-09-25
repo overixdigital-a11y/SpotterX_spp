@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Package, TrendingUp } from "lucide-react";
+import { ArrowLeft, Package, TrendingUp, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { formatPrice, orderStatusLabel, type MarketProduct, type MarketOrder } from "@/lib/market";
+import { useModuleGuard } from "@/lib/gym-modules";
 
 export default function MisPublicacionesPage() {
   const { userId } = useAuthState();
+  const { busy } = useModuleGuard("spotter_shop");
   const [tab, setTab] = useState<"productos" | "ventas">("productos");
   const [products, setProducts] = useState<MarketProduct[]>([]);
   const [orders, setOrders] = useState<MarketOrder[]>([]);
@@ -88,6 +90,14 @@ export default function MisPublicacionesPage() {
         <div className="h-5 w-1/2 rounded bg-card" />
         <div className="h-20 rounded bg-card" />
       </main>
+    );
+  }
+
+  if (busy) {
+    return (
+      <div className="flex justify-center pt-20">
+        <Loader2 className="h-6 w-6 animate-spin text-neon" />
+      </div>
     );
   }
 

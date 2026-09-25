@@ -11,8 +11,17 @@ import { Sparkles, Users, Loader2, Flame } from "lucide-react";
 import { computeStreak, logDates } from "@/lib/history";
 import { todayLocal } from "@/lib/format";
 import PostComposer from "./PostComposer";
+import { getBlockedOwners } from "@/lib/gym-modules";
 
 const PAGE = 12;
+
+let blockedFeedOwners: Promise<Set<string>> | null = null;
+function blockedOwnersOf() {
+  if (!blockedFeedOwners) {
+    blockedFeedOwners = getBlockedOwners("feed").then((owners) => new Set(owners));
+  }
+  return blockedFeedOwners;
+}
 
 const categories = [
   "#CrossFit",
@@ -89,11 +98,13 @@ export function Feed() {
     }
 
     const hydrated = await hydratePosts(data as unknown as PostRow[], userId);
-    if (hydrated.length < PAGE) setHasMore(false);
+    const blocked = await blockedOwnersOf();
+    const visible = hydrated.filter((p) => !blocked.has(p.author_id));
+    if (visible.length < PAGE) setHasMore(false);
     else setHasMore(true);
     if (data.length > 0) cursorRef.current = data[data.length - 1].created_at;
 
-    setPosts((prev) => (replace ? hydrated : [...prev, ...hydrated]));
+    setPosts((prev) => (replace ? visible : [...prev, ...visible]));
   };
 
   const loadFirst = async () => {

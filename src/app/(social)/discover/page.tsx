@@ -9,6 +9,7 @@ import { useAuthState } from "@/lib/auth-context";
 import { Avatar } from "@/components/core/Avatar";
 import { PostCard, type PostData } from "@/components/social/PostCard";
 import { hydratePosts, type PostRow } from "@/lib/posts";
+import { useModuleGuard, getBlockedOwners } from "@/lib/gym-modules";
 import { EmptyState } from "@/components/core/EmptyState";
 
 const categories = [
@@ -41,6 +42,7 @@ export default function DiscoverPage() {
 function Discover() {
   const searchParams = useSearchParams();
   const { userId } = useAuthState();
+  const guard = useModuleGuard("feed");
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<string | null>(searchParams.get("cat"));
   const [people, setPeople] = useState<Person[]>([]);
@@ -118,7 +120,8 @@ function Discover() {
       const { data } = await query;
       if (!active) return;
       const hydrated = await hydratePosts((data as unknown as PostRow[]) ?? [], userId);
-      if (active) setPosts(hydrated);
+      const blocked = new Set(await getBlockedOwners("feed"));
+      if (active) setPosts(hydrated.filter((p) => !blocked.has(p.author_id)));
       if (active) setLoading(false);
     };
     const t = setTimeout(run, 0);
@@ -136,6 +139,14 @@ function Discover() {
       .insert({ follower_id: userId, following_id: p.id });
     if (!error) setSuggestions((prev) => prev.filter((x) => x.id !== p.id));
   };
+
+  if (guard.busy) {
+    return (
+      <div className="flex justify-center pt-20">
+        <Loader2 className="h-6 w-6 animate-spin text-neon" />
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">

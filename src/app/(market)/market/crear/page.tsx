@@ -8,6 +8,7 @@ import { useAuthState } from "@/lib/auth-context";
 import { useToast } from "@/components/core/ToastProvider";
 import { MARKET_CATEGORIES, type MarketCategory, formatPrice } from "@/lib/market";
 import { getMarketConfig, activePaymentAccount, type MarketConfig } from "@/lib/market-config";
+import { useModuleGuard } from "@/lib/gym-modules";
 
 interface PublishQuote {
   free_limit: number;
@@ -22,6 +23,7 @@ export default function MarketCrearPage() {
   const { userId } = useAuthState();
   const router = useRouter();
   const toast = useToast();
+  const { busy } = useModuleGuard("spotter_shop");
   const [saving, setSaving] = useState(false);
   const [quote, setQuote] = useState<PublishQuote | null>(null);
   const [config, setConfig] = useState<MarketConfig | null>(null);
@@ -125,6 +127,14 @@ export default function MarketCrearPage() {
     }
     void finalizePublish("free");
   };
+
+  if (busy) {
+    return (
+      <main className="mx-auto max-w-md p-4 pt-20 text-center">
+        <Loader2 className="mx-auto h-6 w-6 animate-spin text-neon" />
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto max-w-md md:max-w-2xl lg:max-w-3xl">

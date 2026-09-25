@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Zap, MessageCircle, UserPlus, Loader2, Mail, DoorOpen, CheckCheck, ShieldAlert, CalendarClock, Store, UserCheck, ShoppingBag } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
+import { useModuleGuard } from "@/lib/gym-modules";
 import { timeAgo } from "@/lib/format";
 import { EmptyState } from "@/components/core/EmptyState";
 
@@ -46,6 +47,7 @@ const textMap: Record<string, string> = {
 
 export default function NotificacionesPage() {
   const { userId } = useAuthState();
+  const { busy } = useModuleGuard("feed");
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -115,6 +117,14 @@ export default function NotificacionesPage() {
       <main className="flex justify-center py-16">
         <Loader2 className="h-6 w-6 animate-spin text-neon" />
       </main>
+    );
+  }
+
+  if (busy) {
+    return (
+      <div className="flex justify-center pt-20">
+        <Loader2 className="h-6 w-6 animate-spin text-neon" />
+      </div>
     );
   }
 

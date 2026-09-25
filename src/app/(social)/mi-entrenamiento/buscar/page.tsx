@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Clock3, Loader2, MessageCircle, Navigation, Search, User } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
+import { useModuleGuard } from "@/lib/gym-modules";
 import { Avatar } from "@/components/core/Avatar";
 import { haversineDistance, formatDistance, getDirectionsUrl } from "@/lib/geo";
 import dynamic from "next/dynamic";
@@ -48,6 +49,7 @@ interface TrainerProfile {
 export default function BuscarProfePage() {
   const { userId } = useAuthState();
   const router = useRouter();
+  const { busy } = useModuleGuard("entrenamiento");
   const [loading, setLoading] = useState(true);
   const [zones, setZones] = useState<Zone[]>([]);
   const [profiles, setProfiles] = useState<Map<string, TrainerProfile>>(new Map());
@@ -166,6 +168,14 @@ export default function BuscarProfePage() {
   if (loading) {
     return (
       <main className="flex justify-center py-20">
+        <Loader2 className="h-6 w-6 animate-spin text-neon" />
+      </main>
+    );
+  }
+
+  if (busy) {
+    return (
+      <main className="flex justify-center pt-20">
         <Loader2 className="h-6 w-6 animate-spin text-neon" />
       </main>
     );

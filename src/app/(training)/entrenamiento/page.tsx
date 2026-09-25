@@ -5,6 +5,7 @@ import Link from "next/link";
 import { UserPlus, Loader2, Users, Building2, Search } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
+import { useModuleGuard } from "@/lib/gym-modules";
 
 interface Student {
   id: string;
@@ -14,6 +15,7 @@ interface Student {
 
 export default function EntrenamientoPage() {
   const { userId } = useAuthState();
+  const { busy } = useModuleGuard("entrenamiento");
   const [tab, setTab] = useState<"propio" | "gym">("propio");
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,6 +81,14 @@ export default function EntrenamientoPage() {
   if (loading) {
     return (
       <main className="flex justify-center py-20">
+        <Loader2 className="h-6 w-6 animate-spin text-neon" />
+      </main>
+    );
+  }
+
+  if (busy) {
+    return (
+      <main className="flex justify-center pt-20">
         <Loader2 className="h-6 w-6 animate-spin text-neon" />
       </main>
     );

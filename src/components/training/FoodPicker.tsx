@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Search, Plus, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
+import { useGymModuleAccess } from "@/lib/gym-modules";
 
 export interface Food {
   id: string;
@@ -64,6 +65,7 @@ export default function FoodPicker({
   className = "",
 }: FoodPickerProps) {
   const { userId } = useAuthState();
+  const { blocked } = useGymModuleAccess("catalogo");
   const [list, setList] = useState<Food[]>([]);
   const [available, setAvailable] = useState<boolean | null>(null);
   const [open, setOpen] = useState(false);
@@ -74,6 +76,7 @@ export default function FoodPicker({
   const boxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (blocked) return;
     let active = true;
     loadFoods().then((items) => {
       if (!active) return;
@@ -83,7 +86,7 @@ export default function FoodPicker({
       if (active) setAvailable(false);
     });
     return () => { active = false; };
-  }, []);
+  }, [blocked]);
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -220,7 +223,7 @@ export default function FoodPicker({
         : "border-edge bg-edge/40 text-muted hover:text-ink"
     }`;
 
-  if (available === false) {
+  if (blocked || available === false) {
     return (
       <input
         value={value}

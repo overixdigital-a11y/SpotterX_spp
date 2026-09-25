@@ -2,20 +2,31 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Search, ShoppingCart, Store } from "lucide-react";
+import { Search, ShoppingCart, Store, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { MARKET_CATEGORIES, type MarketProduct } from "@/lib/market";
 import { getMarketConfig } from "@/lib/market-config";
+import { useModuleGuard, getBlockedOwners } from "@/lib/gym-modules";
 import ProductCard from "@/components/market/ProductCard";
 
+const PAGE = 20;
+
+let blockedSellers: Promise<Set<string>> | null = null;
+function blockedSellersOf() {
+  if (!blockedSellers) {
+    blockedSellers = getBlockedOwners("spotter_shop").then((owners) => new Set(owners));
+  }
+  return blockedSellers;
+}
+
 export default function MarketPage() {
+  const { busy } = useModuleGuard("spotter_shop");
   const [products, setProducts] = useState<MarketProduct[]>([]);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const [allowCart, setAllowCart] = useState(false);
-  const PAGE = 20;
 
   useEffect(() => {
     getMarketConfig().then((cfg) => setAllowCart(cfg.allowCart));
@@ -25,6 +36,7 @@ export default function MarketPage() {
     async () => {
       setLoading(true);
       const supabase = createClient();
+      const blocked = await blockedSellersOf();
       let q = supabase
         .from("market_products")
         .select("*")
@@ -32,6 +44,9 @@ export default function MarketPage() {
         .order("created_at", { ascending: false })
         .range(0, PAGE - 1);
 
+      if (blocked.size > 0) {
+        q = q.not("seller_id", "in", `(${Array.from(blocked).join(",")})`);
+      }
       if (search.trim()) {
         q = q.ilike("name", `%${search.trim()}%`);
       }
@@ -73,12 +88,14 @@ export default function MarketPage() {
 
   const loadMore = async () => {
     const supabase = createClient();
+    const blocked = await blockedSellersOf();
     let q = supabase
       .from("market_products")
       .select("*")
       .eq("status", "active")
       .order("created_at", { ascending: false })
       .range(products.length, products.length + PAGE - 1);
+    if (blocked.size > 0) q = q.not("seller_id", "in", `(${Array.from(blocked).join(",")})`);
     if (search.trim()) q = q.ilike("name", `%${search.trim()}%`);
     if (activeCategory) q = q.eq("category", activeCategory);
     const { data } = await q;
@@ -87,6 +104,14 @@ export default function MarketPage() {
       setHasMore(data.length === PAGE);
     }
   };
+
+  if (busy) {
+    return (
+      <div className="flex justify-center pt-20">
+        <Loader2 className="h-6 w-6 animate-spin text-neon" />
+      </div>
+    );
+  }
 
   return (
     <main className="mx-auto max-w-md md:max-w-2xl lg:max-w-4xl">

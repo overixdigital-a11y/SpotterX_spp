@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard,
   Users,
@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { AuthProvider, useAuthState } from "@/lib/auth-context";
 import { createClient } from "@/lib/supabase/client";
+import { useGymModules } from "@/lib/gym-modules";
 
 interface ActorRef {
   full_name: string | null;
@@ -154,7 +155,7 @@ function MobileHeader() {
   );
 }
 
-const nav = [
+const allNav = [
   { href: "/gimnasio", label: "Panel Principal", icon: LayoutDashboard },
   { href: "/gimnasio/miembros", label: "Miembros", icon: Users },
   { href: "/gimnasio/planes", label: "Planes & Promos", icon: Receipt },
@@ -164,8 +165,19 @@ const nav = [
   { href: "/market", label: "SpotterShop", icon: ShoppingBag },
 ];
 
+function useModuleGate() {
+  const { userId } = useAuthState();
+  const { modules } = useGymModules(userId);
+  const nav = useMemo(
+    () => (modules && !modules.spotter_shop ? allNav.filter((n) => n.href !== "/market") : allNav),
+    [modules]
+  );
+  return { nav, feedOn: modules ? modules.feed : true };
+}
+
 function MobileGymNav() {
   const pathname = usePathname();
+  const { nav } = useModuleGate();
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-edge bg-card/95 backdrop-blur md:hidden">
       <div className="mx-auto flex max-w-md items-center justify-around px-1 py-1">
@@ -193,6 +205,7 @@ function MobileGymNav() {
 function DesktopGymSidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const { nav, feedOn } = useModuleGate();
 
   const onLogout = async () => {
     await createClient().auth.signOut();
@@ -250,13 +263,15 @@ function DesktopGymSidebar() {
             <MonitorPlay className="h-4 w-4 text-neon" />
             <span>Kiosk Recepción</span>
           </Link>
-          <Link
-            href="/home"
-            className="flex items-center gap-3 rounded-xl border border-edge bg-elevated/40 px-3.5 py-2.5 text-xs font-medium text-ink hover:border-neon/40 hover:text-neon transition"
-          >
-            <Globe className="h-4 w-4 text-muted" />
-            <span>Ir a Red Social</span>
-          </Link>
+          {feedOn && (
+            <Link
+              href="/home"
+              className="flex items-center gap-3 rounded-xl border border-edge bg-elevated/40 px-3.5 py-2.5 text-xs font-medium text-ink hover:border-neon/40 hover:text-neon transition"
+            >
+              <Globe className="h-4 w-4 text-muted" />
+              <span>Ir a Red Social</span>
+            </Link>
+          )}
         </div>
       </div>
 

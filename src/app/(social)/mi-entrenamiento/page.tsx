@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
+import { useModuleGuard } from "@/lib/gym-modules";
 import { todayLocal } from "@/lib/format";
 import { getDisciplineFields, isSeriesDiscipline, resolveSeries, formatSeries, type FieldDef } from "@/lib/disciplines";
 import { MEALS, getDietData, formatQuantity } from "@/lib/diets";
@@ -133,6 +134,7 @@ interface Msg {
 
 export default function MiEntrenamientoPage() {
   const { userId } = useAuthState();
+  const { busy } = useModuleGuard("entrenamiento");
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [trainerId, setTrainerId] = useState<string | null>(null);
   const [tab, setTab] = useState<"planes" | "rutinas" | "historial" | "chat">("planes");
@@ -564,6 +566,14 @@ export default function MiEntrenamientoPage() {
   }
 
   const trainer = trainers.find((t) => t.id === trainerId) ?? trainers[0];
+
+  if (busy) {
+    return (
+      <main className="flex justify-center pt-20">
+        <Loader2 className="h-6 w-6 animate-spin text-neon" />
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto max-w-full px-4 pt-5 pb-24">

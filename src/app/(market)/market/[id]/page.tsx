@@ -3,9 +3,10 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ShoppingCart, MessageCircle, Star } from "lucide-react";
+import { ArrowLeft, ShoppingCart, MessageCircle, Star, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
+import { useModuleGuard, getBlockedOwners } from "@/lib/gym-modules";
 import { getMarketConfig } from "@/lib/market-config";
 import { Avatar } from "@/components/core/Avatar";
 import {
@@ -36,12 +37,14 @@ export default function MarketProductPage() {
   const { id } = useParams<{ id: string }>();
   const { userId } = useAuthState();
   const router = useRouter();
+  const { busy } = useModuleGuard("spotter_shop");
   const [product, setProduct] = useState<MarketProduct | null>(null);
   const [seller, setSeller] = useState<Seller | null>(null);
   const [reviews, setReviews] = useState<MarketReview[]>([]);
   const [qty, setQty] = useState(1);
   const [loading, setLoading] = useState(true);
   const [allowCart, setAllowCart] = useState(false);
+  const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
     getMarketConfig().then((cfg) => setAllowCart(cfg.allowCart));
@@ -57,6 +60,12 @@ export default function MarketProductPage() {
         .eq("id", id)
         .maybeSingle();
       if (!p) { setLoading(false); return; }
+      const blocked = new Set(await getBlockedOwners("spotter_shop"));
+      if (blocked.has(p.seller_id)) {
+        setHidden(true);
+        setLoading(false);
+        return;
+      }
       setProduct(p as MarketProduct);
 
       const { data: s } = await supabase
@@ -105,12 +114,28 @@ export default function MarketProductPage() {
     router.push("/market/carrito");
   };
 
+  if (busy) {
+    return (
+      <main className="mx-auto max-w-md p-4 pt-20 text-center">
+        <Loader2 className="mx-auto h-6 w-6 animate-spin text-neon" />
+      </main>
+    );
+  }
+
   if (loading) {
     return (
       <main className="mx-auto max-w-md animate-pulse space-y-4 p-4">
         <div className="aspect-square rounded-xl bg-card" />
         <div className="h-5 w-3/4 rounded bg-card" />
         <div className="h-4 w-1/2 rounded bg-card" />
+      </main>
+    );
+  }
+
+  if (hidden) {
+    return (
+      <main className="mx-auto max-w-md p-4 text-center py-20">
+        <p className="text-muted">Este producto no está disponible</p>
       </main>
     );
   }

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Search, Check, Plus, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
+import { useGymModuleAccess } from "@/lib/gym-modules";
 import { DISCIPLINES } from "@/lib/disciplines";
 
 interface Exercise {
@@ -49,6 +50,7 @@ export default function ExercisePicker({
   className = "",
 }: ExercisePickerProps) {
   const { userId } = useAuthState();
+  const { blocked } = useGymModuleAccess("catalogo");
   const [list, setList] = useState<Exercise[]>([]);
   const [available, setAvailable] = useState<boolean | null>(null);
   const [open, setOpen] = useState(false);
@@ -62,6 +64,7 @@ export default function ExercisePicker({
   const boxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (blocked) return;
     let active = true;
     loadExercises().then((items) => {
       if (!active) return;
@@ -71,7 +74,7 @@ export default function ExercisePicker({
       if (active) setAvailable(false);
     });
     return () => { active = false; };
-  }, []);
+  }, [blocked]);
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -204,7 +207,7 @@ export default function ExercisePicker({
     closeAll();
   };
 
-  if (available === false) {
+  if (blocked || available === false) {
     return (
       <input
         value={value}

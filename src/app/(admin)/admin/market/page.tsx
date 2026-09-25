@@ -73,6 +73,9 @@ interface DepositRow {
   username: string | null;
   full_name: string | null;
   email: string;
+  product_id: string | null;
+  product_name: string | null;
+  product_price: number | null;
 }
 
 function newAccountKey() {
@@ -335,7 +338,7 @@ export default function AdminMarketPage() {
     const { error } = await supabase.rpc("admin_approve_deposit", { p_deposit_id: d.id });
     setApproving(null);
     if (error) {
-      window.alert("No se pudo acreditar: " + error.message);
+      window.alert("No se pudo aprobar la publicación: " + error.message);
       return;
     }
     setDeposits((prev) => prev.filter((x) => x.id !== d.id));
@@ -870,7 +873,16 @@ export default function AdminMarketPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      {!allowCart && (
+        <div className="rounded-lg border border-[#1e2530] bg-[#121722] p-3 text-xs text-[#9ca3af]">
+          La función de <b className="text-[#e4e8ee]">saldo / acreditar</b> está desactivada mientras el
+          modo carrito esté apagado. Cuando lo actives en la sección Config SpotterShop, aparece la
+          opción Acreditar saldo para cargar saldo manual.
+        </div>
+      )}
+
+      <div className={`grid gap-6 ${allowCart ? "lg:grid-cols-2" : "lg:grid-cols-1"}`}>
+        {allowCart && (
         <div className="rounded-lg border border-[#1e2530] bg-[#121722] p-4">
           <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#e4e8ee]">
             <Wallet className="h-4 w-4 text-[#22c55e]" /> Acreditar saldo
@@ -907,14 +919,15 @@ export default function AdminMarketPage() {
             </button>
           </div>
         </div>
+        )}
 
         <div className="rounded-lg border border-[#1e2530] bg-[#121722] p-4">
           <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#e4e8ee]">
-            <Landmark className="h-4 w-4 text-[#eab308]" /> Depósitos pendientes de acreditar
+            <Landmark className="h-4 w-4 text-[#eab308]" /> Publicaciones pendientes de pago
           </h3>
-          {depositsLoading && <p className="py-4 text-xs text-[#9ca3af]">Cargando depósitos...</p>}
+          {depositsLoading && <p className="py-4 text-xs text-[#9ca3af]">Cargando publicaciones pendientes...</p>}
           {!depositsLoading && deposits.length === 0 && (
-            <p className="py-4 text-xs text-[#9ca3af]">Sin depósitos pendientes.</p>
+            <p className="py-4 text-xs text-[#9ca3af]">Sin publicaciones pendientes de pago.</p>
           )}
           <div className="space-y-2">
             {deposits.map((d) => (
@@ -926,6 +939,11 @@ export default function AdminMarketPage() {
                   <p className="truncate text-xs font-semibold text-[#e4e8ee]">
                     {d.pedido} · {formatPrice(d.amount)}
                   </p>
+                  {d.product_name ? (
+                    <p className="truncate text-[11px] font-semibold text-[#00e5c7]">
+                      {d.product_name} · {formatPrice(d.product_price ?? 0)}
+                    </p>
+                  ) : null}
                   <p className="truncate text-[11px] text-[#9ca3af]">
                     {d.full_name || d.username || "—"} · {d.email} ·{" "}
                     {new Date(d.created_at).toLocaleString("es-AR")}
@@ -937,7 +955,7 @@ export default function AdminMarketPage() {
                   className="flex shrink-0 items-center gap-1 rounded-md bg-[#eab308] px-3 py-1.5 text-xs font-bold text-[#0c1017] hover:bg-[#eab308]/90 disabled:opacity-40"
                 >
                   {approving === d.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                  Acreditar
+                  {d.product_id ? "Aprobar y publicar" : "Aprobar"}
                 </button>
               </div>
             ))}

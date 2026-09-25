@@ -20,7 +20,7 @@ export interface MarketProduct {
   category: string;
   condition: "new" | "used";
   stock: number;
-  status: "active" | "sold" | "paused";
+  status: "active" | "sold" | "paused" | "pending";
   location: string | null;
   created_at: string;
   updated_at: string;

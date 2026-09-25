@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft, Loader2, MapPin, Sparkles, Send, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Loader2, MapPin, Sparkles, CheckCircle2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { useToast } from "@/components/core/ToastProvider";
@@ -20,14 +19,13 @@ interface PublishQuote {
 }
 
 export default function MarketCrearPage() {
-  const { userId, profile } = useAuthState();
+  const { userId } = useAuthState();
   const router = useRouter();
   const toast = useToast();
   const [saving, setSaving] = useState(false);
   const [quote, setQuote] = useState<PublishQuote | null>(null);
   const [config, setConfig] = useState<MarketConfig | null>(null);
-  const [pedido, setPedido] = useState<string | null>(null);
-  const [informing, setInforming] = useState(false);
+  const [showPayModal, setShowPayModal] = useState(false);
   const [form, setForm] = useState({
     name: "",
     description: "",
@@ -63,52 +61,30 @@ export default function MarketCrearPage() {
     getMarketConfig().then((cfg) => setConfig(cfg));
   }, [userId]);
 
-  const reportDeposit = async () => {
-    if (!quote) return;
-    setInforming(true);
-    const supabase = createClient();
-    const { data: newPedido, error } = await supabase.rpc("report_deposit", {
-      p_amount: quote.price,
-      p_note: null,
-    });
-    setInforming(false);
-    if (error || !newPedido) {
-      toast(error?.message ?? "No se pudo registrar el depósito", "error");
-      return;
-    }
-    setPedido(newPedido as string);
-
-    const account = activePaymentAccount(config);
-    const who = profile ? `${profile.full_name ?? ""} (${profile.email ?? "@" + (profile.username ?? "")})`.trim() : "publicador";
-    const txt = `Hola! Registré un depósito para publicar en SpotterShop.\n\nPedido: ${newPedido}\nMonto: $${quote.price}\nPublicador: ${who}`.replace(/\n/g, "%0A").replace(/ /g, "%20");
-
-    const whatsapp = config?.contact.whatsapp ?? "";
-    if (whatsapp) {
-      window.open(`https://wa.me/${whatsapp.replace(/[^0-9]/g, "")}?text=${txt}`, "_blank");
-    }
-    void account;
-    toast(`Depósito registrado (Pedido ${newPedido}). Enviá el comprobante por WhatsApp al admin.`);
-  };
-
   const account = config ? activePaymentAccount(config) : null;
 
-  const publish = async () => {
-    if (!userId || !form.name.trim() || !form.price || !form.category) return;
-    setSaving(true);
+  const uploadImages = async (): Promise<string[]> => {
+    if (!userId) return [];
     const supabase = createClient();
-
-    const imageUrls: string[] = [];
+    const urls: string[] = [];
     for (const f of files) {
       const ext = f.name.split(".").pop() ?? "jpg";
       const path = `${userId}/market/${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
       const { error } = await supabase.storage.from("media").upload(path, f);
       if (!error) {
         const { data } = supabase.storage.from("media").getPublicUrl(path);
-        if (data?.publicUrl) imageUrls.push(data.publicUrl);
+        if (data?.publicUrl) urls.push(data.publicUrl);
       }
     }
+    return urls;
+  };
 
-    const { error } = await supabase.rpc("market_publish", {
+  const finalizePublish = async (mode: "free" | "pending") => {
+    if (!userId || !form.name.trim() || !form.price || !form.category) return;
+    setSaving(true);
+    const supabase = createClient();
+    const imageUrls = await uploadImages();
+    const base = {
       p_name: form.name.trim(),
       p_description: form.description.trim() || null,
       p_price: Number(form.price),
@@ -117,19 +93,37 @@ export default function MarketCrearPage() {
       p_stock: Number(form.stock) || 1,
       p_location: form.location.trim() || null,
       p_images: imageUrls,
-    });
+    };
 
-    setSaving(false);
-    if (error) {
-      toast(
-        error.message.includes("Saldo insuficiente")
-          ? "Saldo insuficiente para publicar. Cargá saldo en tu billetera."
-          : error.message,
-        "error"
-      );
+    if (mode === "free") {
+      const { error } = await supabase.rpc("market_publish", base);
+      setSaving(false);
+      if (error) {
+        toast(error.message, "error");
+        return;
+      }
+      router.push("/market");
       return;
     }
-    router.push("/market");
+
+    const { data: pedido, error } = await supabase.rpc("market_publish_pending", base);
+    setSaving(false);
+    if (error || !pedido) {
+      toast(error?.message ?? "No se pudo dejar la publicación pendiente", "error");
+      return;
+    }
+    setShowPayModal(false);
+    toast(`Publicación pendiente — Pedido ${pedido}. Se publica cuando el admin confirme tu depósito.`);
+    router.push("/market/mis-publicaciones");
+  };
+
+  const publish = () => {
+    if (!userId || !form.name.trim() || !form.price || !form.category) return;
+    if (quote?.will_pay) {
+      setShowPayModal(true);
+      return;
+    }
+    void finalizePublish("free");
   };
 
   return (
@@ -145,73 +139,26 @@ export default function MarketCrearPage() {
         {/* Quota banner */}
         {quote &&
           (quote.will_pay ? (
-            quote.balance >= quote.price ? (
-              <div className="flex items-center gap-2 rounded-xl border border-ember/30 bg-ember/10 p-3 text-xs font-medium text-ink">
+            <div className="rounded-xl border border-ember/30 bg-ember/10 p-3 text-xs text-ink">
+              <p className="flex items-center gap-2 font-medium">
                 <Sparkles className="h-4 w-4 shrink-0 text-ember" />
                 <span>
-                  Esta publicación cuesta <b>{quote.price}</b> (ya usaste tu cupo gratis) y se descuenta de tu
-                  billetera al publicar.
+                  Publicación paga: <b>{formatPrice(quote.price)}</b>. Se te acabó el cupo gratis (
+                  {config?.freeCount ?? 3} publicaciones).
                 </span>
-              </div>
-            ) : account ? (
-              <div className="rounded-xl border border-ember/30 bg-ember/10 p-3 text-xs text-ink">
-                <p className="flex items-center gap-2 font-medium">
-                  <Sparkles className="h-4 w-4 shrink-0 text-ember" />
-                  <span>
-                    Publicación paga: <b>${quote.price}</b>. Se te acabó el cupo gratis (
-                    {config?.freeCount ?? 3} publicaciones) y tu saldo es <b>{formatPrice(quote.balance)}</b>.
-                  </span>
-                </p>
-                <div className="mt-2.5 space-y-1 rounded-lg border border-ember/20 bg-bg/60 p-2.5">
-                  <p className="font-semibold text-ink">
-                    Transferí a: {account.bank} — {account.account_type}
-                  </p>
-                  <p className="text-ink">{account.number}</p>
-                  {account.holder && <p className="text-ink">Titular: {account.holder}</p>}
-                  {account.note && <p className="text-muted">{account.note}</p>}
-                  {config?.contact.email && (
-                    <p className="text-muted">Contacto: {config.contact.email}</p>
-                  )}
-                </div>
-                {pedido ? (
-                  <div className="mt-2.5 flex items-center gap-2 rounded-lg border border-neon/30 bg-neon/10 p-2.5">
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-neon" />
-                    <span>
-                      Depósito registrado. Tu <b>pedido es {pedido}</b> — guardalo y mandá el
-                      comprobante por WhatsApp para que te acrediten el saldo.
-                    </span>
-                  </div>
-                ) : (
-                  <button
-                    onClick={reportDeposit}
-                    disabled={informing}
-                    className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg bg-ember py-2 text-xs font-bold text-bg disabled:opacity-50"
-                  >
-                    {informing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                    Hice el depósito — avisar
-                  </button>
-                )}
-                <Link href="/market/billetera" className="mt-1.5 inline-block font-semibold text-ember">
-                  Ver mi billetera →
-                </Link>
-              </div>
-            ) : (
-              <div className="rounded-xl border border-ember/30 bg-ember/10 p-3 text-xs text-ink">
-                <p className="flex items-center gap-2 font-medium">
-                  <Sparkles className="h-4 w-4 shrink-0 text-ember" />
-                  <span>
-                    Esta publicación cuesta <b>{quote.price}</b> y tu saldo es <b>{quote.balance}</b>.
-                  </span>
-                </p>
-                <Link href="/market/billetera" className="mt-1.5 inline-block font-semibold text-ember">
-                  Cargar saldo en mi billetera →
-                </Link>
-              </div>
-            )
+              </p>
+              <p className="mt-1.5 text-muted">
+                Al tocar <b>Publicar</b> vas a ver la cuenta del administrador para transferir. Tu
+                publicación queda <b>pendiente</b> hasta que el admin confirme el pago.
+              </p>
+            </div>
           ) : (
             <div className="flex items-center gap-2 rounded-xl border border-neon/30 bg-neon/10 p-3 text-xs font-medium text-ink">
               <Sparkles className="h-4 w-4 shrink-0 text-neon" />
-              <span>Publicación gratis: te quedan <b>{quote.free_left}</b> de tu cupo ({quote.in_shop}/{quote.free_limit}).</span>
+              <span>
+                Publicación gratis: te quedan <b>{quote.free_left}</b> de tu cupo ({quote.in_shop}/
+                {quote.free_limit}).
+              </span>
             </div>
           ))}
 
@@ -360,6 +307,75 @@ export default function MarketCrearPage() {
           Publicar
         </button>
       </div>
+
+      {/* Publicación paga modal */}
+      {showPayModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 sm:items-center">
+          <div className="w-full max-w-md rounded-2xl border border-ember/30 bg-card p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold text-ink">Publicación paga</h2>
+                <p className="mt-0.5 text-[11px] text-muted">
+                  Transferí <b className="text-ink">{formatPrice(quote?.price ?? 0)}</b> a esta
+                  cuenta y tu publicación queda <b className="text-ink">pendiente</b> hasta que el
+                  admin confirme el pago.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowPayModal(false)}
+                className="rounded-lg p-1 text-muted hover:text-ink"
+                aria-label="Cerrar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {account ? (
+              <div className="mt-3 rounded-xl border border-ember/20 bg-bg/60 p-3">
+                <p className="text-xs font-bold text-ink">
+                  {account.bank} — {account.account_type}
+                </p>
+                <p className="mt-0.5 text-sm font-semibold text-ink">{account.number}</p>
+                {account.holder && <p className="text-[11px] text-ink">Titular: {account.holder}</p>}
+                {account.note && <p className="text-[11px] text-muted">{account.note}</p>}
+              </div>
+            ) : (
+              <div className="mt-3 rounded-xl border border-ember/20 bg-bg/60 p-3 text-[11px] text-ink">
+                El administrador todavía no cargó una cuenta de cobro. Contactalo para que te pase
+                los datos para transferir.
+              </div>
+            )}
+            {config?.contact.email && (
+              <p className="mt-2 text-[11px] text-muted">
+                Contacto: {config.contact.email}
+                {config.contact.whatsapp ? ` · WhatsApp ${config.contact.whatsapp}` : ""}
+              </p>
+            )}
+
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => setShowPayModal(false)}
+                disabled={saving}
+                className="flex-1 rounded-xl border border-edge py-2.5 text-xs font-semibold text-muted hover:text-ink disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => void finalizePublish("pending")}
+                disabled={saving}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-ember py-2.5 text-xs font-bold text-bg disabled:opacity-50"
+              >
+                {saving ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                )}
+                Confirmé la transferencia y publicar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

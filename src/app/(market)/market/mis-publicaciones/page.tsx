@@ -110,10 +110,15 @@ export default function MisPublicacionesPage() {
                   <p className="text-xs text-neon font-bold">{formatPrice(p.price)}</p>
                   <div className="mt-1 flex gap-2">
                     <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
-                      p.status === "active" ? "bg-neon/15 text-neon" : p.status === "sold" ? "bg-ember/15 text-ember" : "bg-muted/15 text-muted"
+                      p.status === "active" ? "bg-neon/15 text-neon" : p.status === "sold" ? "bg-ember/15 text-ember" : p.status === "pending" ? "bg-yellow-500/15 text-yellow-400" : "bg-muted/15 text-muted"
                     }`}>
-                      {p.status === "active" ? "Activo" : p.status === "sold" ? "Vendido" : "Pausado"}
+                      {p.status === "active" ? "Activo" : p.status === "sold" ? "Vendido" : p.status === "pending" ? "Pendiente de pago" : "Pausado"}
                     </span>
+                    {p.status === "pending" && (
+                      <p className="mt-1 text-[10px] text-muted">
+                        Se publica cuando el admin confirme el pago.
+                      </p>
+                    )}
                   </div>
                 </div>
                 {p.status === "active" && (

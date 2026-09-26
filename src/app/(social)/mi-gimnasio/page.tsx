@@ -6,6 +6,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Dumbbell, Loader2, MapPin, QrCode, X, Ban, CheckCircle2, Gift, Clock3, ShoppingBag, ChevronUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import type { SupabaseClient, RealtimeChannel } from "@supabase/supabase-js";
 import { useAuthState } from "@/lib/auth-context";
 import { formatPrice } from "@/lib/market";
 import { getGymModules } from "@/lib/gym-modules";
@@ -54,15 +55,29 @@ export default function MiGimnasioPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [photoIndex, setPhotoIndex] = useState(0);
 
+  const loadProducts = useCallback(async (ownerId: string) => {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("market_products")
+      .select("id, name, price, images, description, category")
+      .eq("seller_id", ownerId)
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(12);
+    setShopProducts((data ?? []) as ShopProduct[]);
+  }, []);
+
   useEffect(() => {
     let active = true;
+    let client: SupabaseClient | null = null;
+    let channel: RealtimeChannel | null = null;
     (async () => {
       if (!userId) {
         if (active) setLoading(false);
         return;
       }
-      const supabase = createClient();
-      const { data } = await supabase
+      client = createClient();
+      const { data } = await client
         .from("gym_memberships")
         .select("id, plan_name, status, pay_status, expires_on, price, gym_id, gyms:gyms!gym_memberships_gym_id_fkey(id, name, address, city, owner_id)")
         .eq("user_id", userId)
@@ -76,16 +91,31 @@ export default function MiGimnasioPage() {
         const modules = await getGymModules(gymId);
         if (active) setShopOn(modules.spotter_shop);
 
-        const ownerId = (data as Membership | null)?.gyms?.[0]?.owner_id;
+        const { data: gymRow } = await client
+          .from("gyms")
+          .select("owner_id")
+          .eq("id", gymId)
+          .maybeSingle();
+        const ownerId = (gymRow?.owner_id as string | null) ?? null;
         if (active && modules.spotter_shop && ownerId) {
-          const { data: products } = await supabase
-            .from("market_products")
-            .select("id, name, price, images, description, category")
-            .eq("seller_id", ownerId)
-            .eq("status", "active")
-            .order("created_at", { ascending: false })
-            .limit(12);
-          if (active) setShopProducts((products ?? []) as ShopProduct[]);
+          setTimeout(() => {
+            void loadProducts(ownerId);
+          }, 0);
+          channel = client
+            .channel("mi-gimnasio-shop-live")
+            .on(
+              "postgres_changes" as const,
+              {
+                event: "*",
+                schema: "public",
+                table: "market_products",
+                filter: `seller_id=eq.${ownerId}`,
+              },
+              () => {
+                void loadProducts(ownerId);
+              }
+            )
+            .subscribe();
         }
       }
 
@@ -93,8 +123,11 @@ export default function MiGimnasioPage() {
     })();
     return () => {
       active = false;
+      if (channel && client) {
+        client.removeChannel(channel);
+      }
     };
-  }, [userId]);
+  }, [userId, loadProducts]);
 
   const onScan = useCallback(
     (codes: { rawValue?: string }[]) => {

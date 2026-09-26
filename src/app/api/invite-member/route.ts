@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SERVICE_ROLE =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.SPOTTERX_SERVICE_ROLE ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+import {
+  getServiceClient,
+  isServiceRoleConfigured,
+  MISSING_SERVICE_ROLE_ERROR,
+} from "@/lib/server/supabase-admin";
 
 function randomCode(n = 8) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -15,8 +13,11 @@ function randomCode(n = 8) {
 }
 
 export async function POST(req: Request) {
+  if (!isServiceRoleConfigured()) {
+    return NextResponse.json({ error: MISSING_SERVICE_ROLE_ERROR }, { status: 500 });
+  }
   try {
-    const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
+    const supabase = getServiceClient();
 
     // 1) Verificar quién llama: token en header Authorization
     const authHeader = req.headers.get("Authorization") ?? "";

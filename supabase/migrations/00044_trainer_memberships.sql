@@ -50,7 +50,8 @@ alter table public.trainer_membership_payments enable row level security;
 drop policy if exists "TM: lectura involucrados" on public.trainer_memberships;
 create policy "TM: lectura involucrados" on public.trainer_memberships
   for select using (auth.uid() in (trainer_id, student_id));
-drop policy if exists "TM: profe gestiona" on public.trainer_memberships
+drop policy if exists "TM: profe gestiona" on public.trainer_memberships;
+create policy "TM: profe gestiona" on public.trainer_memberships
   for all using (auth.uid() = trainer_id) with check (auth.uid() = trainer_id);
 drop policy if exists "Admin: lectura global" on public.trainer_memberships;
 create policy "Admin: lectura global" on public.trainer_memberships
@@ -61,7 +62,8 @@ create policy "Admin: lectura global" on public.trainer_memberships
 drop policy if exists "TMP: lectura involucrados" on public.trainer_membership_payments;
 create policy "TMP: lectura involucrados" on public.trainer_membership_payments
   for select using (auth.uid() in (trainer_id, student_id));
-drop policy if exists "TMP: profe gestiona" on public.trainer_membership_payments
+drop policy if exists "TMP: profe gestiona" on public.trainer_membership_payments;
+create policy "TMP: profe gestiona" on public.trainer_membership_payments
   for all using (auth.uid() = trainer_id) with check (auth.uid() = trainer_id);
 
 -- 5) Marcar pagado: transaccional (patron gym_cobros)
@@ -109,6 +111,9 @@ begin
   return v_to;
 end;
 $$;
+
+grant execute on function public.trainer_mark_membership_paid(uuid, numeric, text) to authenticated;
+revoke execute on function public.trainer_mark_membership_paid(uuid, numeric, text) from anon;
 
 -- 6) Notificaciones: nuevo tipo con la lista ACUMULATIVA COMPLETA
 -- (leccion 00024/00035/00038: nunca recrear con una lista parcial)

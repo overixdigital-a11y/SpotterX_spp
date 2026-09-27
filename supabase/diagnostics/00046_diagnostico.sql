@@ -63,3 +63,44 @@ end;
 $$;
 
 select public._diag_00046() as diagnostico_por_gym;
+
+-- Cuanto hay de verdad en cada gym (simula al dueno). Solo lectura.
+create or replace function public._diag_00046_datos()
+returns jsonb
+language plpgsql
+as $$
+declare
+  r record;
+  v_owner uuid;
+  v_out jsonb := '[]'::jsonb;
+begin
+  for r in select g.id, g.name, g.owner_id from public.gyms g order by g.name loop
+    v_owner := r.owner_id;
+    perform set_config('request.jwt.claim.sub', v_owner::text, true);
+    perform set_config('request.jwt.claims',
+      json_build_object('sub', v_owner, 'role', 'authenticated')::text, true);
+
+    v_out := v_out || jsonb_build_object(
+      'gym', r.name,
+      'membresias_activas', (select count(*) from public.gym_memberships m
+                               where m.gym_id = r.id and m.status = 'activa'),
+      'membresias_inactivas', (select count(*) from public.gym_memberships m
+                               where m.gym_id = r.id and m.status <> 'activa'),
+      'pagos_totales', (select count(*) from public.gym_payments p
+                          where p.gym_id = r.id),
+      'mes_ultimo_pago', (select max(p.paid_at)::date from public.gym_payments p
+                            where p.gym_id = r.id),
+      'meses_que_vencen', (select coalesce(jsonb_agg(x.mes), '[]'::jsonb)
+                            from (select to_char(m.expires_on, 'YYYY-MM') as mes
+                                    from public.gym_memberships m
+                                   where m.gym_id = r.id and m.status = 'activa'
+                                     and m.expires_on is not null
+                                   group by 1 order by 1) x)
+    );
+  end loop;
+  perform set_config('request.jwt.claim.sub', '', true);
+  return v_out;
+end;
+$$;
+
+select public._diag_00046_datos() as datos_por_gym;

@@ -12,6 +12,8 @@ interface Props {
   month: string;
   /** No se puede avanzar mas alla del mes actual. */
   isCurrentMonth: boolean;
+  /** Permite avanzar mas alla del mes actual (ver `canGoNext` en las paginas). */
+  canGoNext: boolean;
   onPrev: () => void;
   onNext: () => void;
   onExport?: () => void;
@@ -34,6 +36,7 @@ export function AccountingSummary({
   data,
   month,
   isCurrentMonth,
+  canGoNext,
   onPrev,
   onNext,
   onExport,
@@ -71,7 +74,7 @@ export function AccountingSummary({
         <button
           type="button"
           onClick={onNext}
-          disabled={isCurrentMonth}
+          disabled={!canGoNext}
           aria-label="Mes siguiente"
           className="rounded-lg border border-edge bg-elevated p-2 text-muted transition hover:border-neon/40 hover:text-neon disabled:opacity-30"
         >
@@ -138,19 +141,22 @@ export function AccountingSummary({
         )}
       </div>
 
-      {/* Ticket promedio */}
-      {data.cantidad > 0 && (
-        <div className="grid grid-cols-2 gap-3">
+      {/* Activos SIEMPRE visible (es el unico numero util cuando todavia no hay
+          pagos registrados; antes estaba escondido detras de `cantidad > 0` y un
+          gym sin cobrosEDIA no muestra ni cuantos socios tiene). El ticket
+          promedio si depende de que haya pagos. */}
+      <div className={`grid gap-3 ${data.cantidad > 0 ? "grid-cols-2" : "grid-cols-1"}`}>
+        <div className="rounded-2xl border border-edge bg-card p-3">
+          <p className="text-[11px] font-semibold text-muted">Activos</p>
+          <p className="text-lg font-black text-ink">{data.activos}</p>
+        </div>
+        {data.cantidad > 0 && (
           <div className="rounded-2xl border border-edge bg-card p-3">
             <p className="text-[11px] font-semibold text-muted">Ticket promedio</p>
             <p className="text-lg font-black text-ink">{formatMoney(Math.round(ticket))}</p>
           </div>
-          <div className="rounded-2xl border border-edge bg-card p-3">
-            <p className="text-[11px] font-semibold text-muted">Activos</p>
-            <p className="text-lg font-black text-ink">{data.activos}</p>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Proximos vencimientos: 7 / 15 / 30 dias */}
       <div>

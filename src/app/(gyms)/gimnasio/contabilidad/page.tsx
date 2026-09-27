@@ -188,6 +188,7 @@ export default function GymContabilidadPage() {
         data={data}
         month={month}
         isCurrentMonth={month >= now}
+        canGoNext={month < monthStart(shiftMonth(now, 1))}
         onPrev={() => setMonth((m) => monthStart(shiftMonth(m, -1)))}
         onNext={() => setMonth((m) => monthStart(shiftMonth(m, 1)))}
         onExport={exportCsv}

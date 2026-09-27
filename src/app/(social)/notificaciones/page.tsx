@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Zap, MessageCircle, UserPlus, Loader2, Mail, DoorOpen, CheckCheck, ShieldAlert, CalendarClock, Store, UserCheck, ShoppingBag } from "lucide-react";
+import { Zap, MessageCircle, UserPlus, Loader2, Mail, DoorOpen, CheckCheck, ShieldAlert, CalendarClock, Store, UserCheck, ShoppingBag, BadgeDollarSign } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { useModuleGuard } from "@/lib/gym-modules";
@@ -17,6 +17,7 @@ interface Notif {
   actor: { id: string; username: string; full_name: string | null; avatar_url: string | null } | null;
   post_id: string | null;
   gym_id: string | null;
+  message: string | null;
   read: boolean;
   created_at: string;
 }
@@ -31,6 +32,7 @@ const iconMap: Record<string, { Icon: typeof Zap; tone: string }> = {
   solicitud_staff: { Icon: Store, tone: "text-ember" },
   staff_aprobado: { Icon: UserCheck, tone: "text-neon" },
   orden: { Icon: ShoppingBag, tone: "text-neon" },
+  cuota_profe: { Icon: BadgeDollarSign, tone: "text-ember" },
 };
 
 const textMap: Record<string, string> = {
@@ -43,6 +45,7 @@ const textMap: Record<string, string> = {
   solicitud_staff: "se postuló para trabajar en tu gimnasio",
   staff_aprobado: "aprobó tu postulación en su gimnasio",
   orden: "tiene una nueva orden en SpotterShop",
+  cuota_profe: "te avisa sobre tu cuota con tu profe",
 };
 
 export default function NotificacionesPage() {
@@ -176,10 +179,14 @@ export default function NotificacionesPage() {
                   </div>
                   <Icon className={`h-5 w-5 shrink-0 ${tone}`} />
                   <div className="min-w-0 flex-1 leading-tight">
-                    <p className="text-sm text-ink">
-                      <span className="font-semibold">{actor}</span>{" "}
-                      {textMap[n.type] ?? "actualizó algo nuevo"}
-                    </p>
+                    {n.message ? (
+                      <p className="text-sm text-ink">{n.message}</p>
+                    ) : (
+                      <p className="text-sm text-ink">
+                        <span className="font-semibold">{actor}</span>{" "}
+                        {textMap[n.type] ?? "actualizó algo nuevo"}
+                      </p>
+                    )}
                     <p className="text-xs text-muted">{timeAgo(n.created_at)}</p>
                   </div>
                   {!n.read && <span className="h-2 w-2 shrink-0 rounded-full bg-neon" />}
@@ -220,6 +227,13 @@ export default function NotificacionesPage() {
               if (n.type === "orden") {
                 return (
                   <Link key={n.id} href="/market/mis-compras" className="block">
+                    {inner}
+                  </Link>
+                );
+              }
+              if (n.type === "cuota_profe") {
+                return (
+                  <Link key={n.id} href="/mi-entrenamiento" className="block">
                     {inner}
                   </Link>
                 );

@@ -31,6 +31,7 @@ import { useModuleGuard } from "@/lib/gym-modules";
 import { todayLocal } from "@/lib/format";
 import { useToast } from "@/components/core/ToastProvider";
 import ExercisePicker from "@/components/training/ExercisePicker";
+import { MembershipCard } from "@/components/training/MembershipCard";
 import FoodPicker, { type Food } from "@/components/training/FoodPicker";
 import { MEALS, getDietData, formatQuantity } from "@/lib/diets";
 import { DISCIPLINES, getDisciplineFields, getSeries, resolveSeries, legacyToSeries, formatSeries, isSeriesDiscipline, type FieldDef, type Series } from "@/lib/disciplines";
@@ -912,6 +913,16 @@ export default function AlumnoPage() {
           Desvincular
         </button>
       </div>
+
+      {userId && (
+        <div className="mt-4">
+          <MembershipCard
+            trainerId={userId}
+            studentId={studentId}
+            studentName={student?.full_name || student?.username || "Alumno"}
+          />
+        </div>
+      )}
 
       <div className="mt-4 grid grid-cols-4 gap-2 rounded-xl bg-card p-1">
         {(

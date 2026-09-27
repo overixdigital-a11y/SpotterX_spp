@@ -28,6 +28,7 @@ import { todayLocal } from "@/lib/format";
 import { getDisciplineFields, isSeriesDiscipline, resolveSeries, formatSeries, type FieldDef } from "@/lib/disciplines";
 import { MEALS, getDietData, formatQuantity } from "@/lib/diets";
 import { useToast } from "@/components/core/ToastProvider";
+import { StudentMembershipCard } from "@/components/training/StudentMembershipCard";
 import PostComposer from "@/components/social/PostComposer";
 import MediaPicker from "@/components/core/MediaPicker";
 import dynamic from "next/dynamic";
@@ -658,6 +659,10 @@ export default function MiEntrenamientoPage() {
           Desvincular
         </button>
       </div>
+
+      {trainer && trainer.source !== "gym" && (
+        <StudentMembershipCard trainerId={trainer.id} />
+      )}
 
       <div className="mt-4 grid grid-cols-4 gap-2 rounded-xl bg-card p-1">
         {(

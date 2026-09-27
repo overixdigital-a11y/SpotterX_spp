@@ -12,6 +12,7 @@ import {
   LogOut,
   Home,
   Menu,
+  BadgeDollarSign,
 } from "lucide-react";
 import { AuthProvider } from "@/lib/auth-context";
 import { createClient } from "@/lib/supabase/client";
@@ -53,6 +54,11 @@ const nav = [
   { href: "/perfil", label: "Perfil", icon: User },
 ];
 
+// Solo navegacion vertical (sidebar + drawer): no entra en la pill inferior.
+const extraNav = [
+  { href: "/entrenamiento/cuotas", label: "Cuotas", icon: BadgeDollarSign },
+];
+
 function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + "/");
 }
@@ -81,6 +87,27 @@ function DesktopSidebar() {
 
         <nav className="space-y-1.5">
           {nav.map((n) => {
+            const Icon = n.icon;
+            const active = isActive(pathname, n.href);
+            return (
+              <Link
+                key={n.href}
+                href={n.href}
+                className={`flex items-center gap-3.5 rounded-xl px-3.5 py-3 text-sm font-medium transition ${
+                  active
+                    ? "bg-elevated text-neon font-semibold border border-neon/30"
+                    : "text-ink/80 hover:bg-elevated/60 hover:text-ink"
+                }`}
+              >
+                <Icon
+                  className={`h-5 w-5 ${active ? "text-neon" : "text-muted"}`}
+                  strokeWidth={active ? 2.4 : 2}
+                />
+                <span>{n.label}</span>
+              </Link>
+            );
+          })}
+          {extraNav.map((n) => {
             const Icon = n.icon;
             const active = isActive(pathname, n.href);
             return (
@@ -199,7 +226,7 @@ function TrainerDrawer({ open, onClose }: { open: boolean; onClose: () => void }
       }
     >
       <nav className="space-y-1.5">
-        {nav.map((n) => (
+        {[...nav, ...extraNav].map((n) => (
           <NavRow
             key={n.href}
             href={n.href}

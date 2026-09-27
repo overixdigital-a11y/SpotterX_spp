@@ -18,6 +18,7 @@ import { useAuthState } from "@/lib/auth-context";
 import { useModuleGuard } from "@/lib/gym-modules";
 import { BottomSheet } from "@/components/core/BottomSheet";
 import { useToast } from "@/components/core/ToastProvider";
+import { MembershipSummary } from "@/components/training/MembershipSummary";
 
 interface StudentProfile {
   id: string;
@@ -322,6 +323,9 @@ export default function EntrenamientoPage() {
           <Building2 className="h-4 w-4" /> Del gym
         </button>
       </div>
+
+      {/* Resumen de cuotas (solo alumnos propios) */}
+      {tab === "propio" && <MembershipSummary />}
 
       {/* Agregar */}
       <button

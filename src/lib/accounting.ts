@@ -26,12 +26,22 @@ export interface MonthPoint {
   cantidad: number;
 }
 
+/** Un mes con socios que dejaron vencer la cuota sin renovar. */
+export interface CaidosBucket {
+  mes: string; // YYYY-MM
+  cantidad: number;
+  total: number;
+}
+
 export interface AccountingData {
   // Caja del mes
   cantidad: number;
   total: number;
   prev_cantidad: number;
   prev_total: number;
+  // Caja acumulada (historia del gym/profe)
+  total_all: number;
+  total_year: number;
   // Lo que deberia haber entrado (membresias que vencen este mes)
   esperado_cantidad: number;
   esperado: number;
@@ -48,6 +58,11 @@ export interface AccountingData {
   d7: number;
   d30: number;
   d90: number;
+  // Los mismos vencidos, agrupados por mes de vencimiento: plata recuperable
+  // (vencieron hace dias) vs plata perdida (hace meses).
+  caidos: CaidosBucket[];
+  caidos_cantidad: number;
+  caidos_total: number;
   // extras
   por_metodo: Record<string, number>;
   serie: MonthPoint[];
@@ -65,6 +80,8 @@ const ZERO: AccountingData = {
   total: 0,
   prev_cantidad: 0,
   prev_total: 0,
+  total_all: 0,
+  total_year: 0,
   esperado_cantidad: 0,
   esperado: 0,
   pv7_cantidad: 0,
@@ -78,6 +95,9 @@ const ZERO: AccountingData = {
   d7: 0,
   d30: 0,
   d90: 0,
+  caidos: [],
+  caidos_cantidad: 0,
+  caidos_total: 0,
   por_metodo: {},
   serie: [],
   detalle: [],
@@ -100,6 +120,8 @@ export function normalizeAccounting(raw: unknown): AccountingData {
     total: n(d.total),
     prev_cantidad: n(d.prev_cantidad),
     prev_total: n(d.prev_total),
+    total_all: n(d.total_all),
+    total_year: n(d.total_year),
     esperado_cantidad: n(d.esperado_cantidad),
     esperado: n(d.esperado),
     pv7_cantidad: n(d.pv7_cantidad),
@@ -113,6 +135,14 @@ export function normalizeAccounting(raw: unknown): AccountingData {
     d7: n(d.d7),
     d30: n(d.d30),
     d90: n(d.d90),
+    caidos: Array.isArray(d.caidos)
+      ? d.caidos
+          .filter((b): b is CaidosBucket => !!b && typeof b.mes === "string")
+          .map((b) => ({ mes: b.mes, cantidad: n(b.cantidad), total: n(b.total) }))
+          .sort((a, b) => a.mes.localeCompare(b.mes))
+      : [],
+    caidos_cantidad: n(d.caidos_cantidad),
+    caidos_total: n(d.caidos_total),
     por_metodo: d.por_metodo && typeof d.por_metodo === "object" ? d.por_metodo : {},
     serie: Array.isArray(d.serie) ? d.serie : [],
     detalle: Array.isArray(d.detalle) ? d.detalle : [],

@@ -15,6 +15,7 @@
 -- EXECUTE + format(), que es mucho mas dificil de depurar). Si se agrega una
 -- metrica, hay que agregarla en LAS DOS y mantener las mismas claves del jsonb.
 -- El commentario "-- SHAPE" marca el bloque que debe quedar sincronizado.
+-- SHAPE (39b): metricas agregadas en la segunda corrida -- 5 claves nuevas en el jsonb de LAS DOS funciones (si se agregan a una sola, -- AccountingSummary recibe undefined en la otra y se rompe): --   total_all        numeric  suma de TODOS los pagos historicos --   total_year       numeric  pagos desde el 1 de enero de este anio --   caidos           jsonb[]  [{mes:'YYYY-MM', cantidad:int, total:numeric}] con los --                            socios que dejaron vencer la cuota SIN cancelar, --                            agrupados por mes de vencimiento (ultimos 6 meses). Es --                            el mismo conjunto que `vencidos`, pero con la dimension --                            de tiempo que los separa en plata recuperable vs perdida. --   caidos_cantidad  int      suma de cantidades de `caidos` --   caidos_total     numeric  suma de totales de `caidos` -- Decidido NO agregar "perdida" como porcentaje: el pago de `gym_payments` no -- guarda a que periodo de vencimiento corresponde (cuando alguien paga tarde, -- `gym_mark_membership_paid` le corre el `expires_on` y el pago queda pegado a un -- mes que no era), asi que cualquier % de perdida seria inventado. El hueco DENTRO -- del mes ya lo cubre la barra de cumplimiento (cobrado / esperado). Para atribuir -- pagos a periodos habria que sumar `period_from`/`period_to` a `gym_payments` (el -- profe ya los tiene en `trainer_membership_payments`).
 
 -- ------------------------------------------------------------
 -- 1) SEGURIDAD: gym_payments nunca tuvo RLS
@@ -118,6 +119,46 @@ begin
        and p.paid_at::date >= v_from
        and p.paid_at::date <  v_to
   ),
+  historico as (
+    -- Caja acumulada: total historico y del anio en curso. Es lo primero que
+    -- pregunta cualquiera que abre la pantalla de un gym ("cuanto entro en
+    -- total"), y antes solo se podia ver el mes.
+    select
+      coalesce(sum(p.amount), 0) as total_all,
+      coalesce(sum(p.amount) filter (where p.paid_at >= date_trunc('year', current_date)), 0)
+        as total_year
+      from public.gym_payments p
+     where p.gym_id = p_gym
+  ),
+  caidos_rows as (
+    -- Filas crudas de "caidos": los mismos socios del bloque `vencidos` (activos
+    -- y vencidos) agrupados por mes de vencimiento. `vencidos` dice cuanto te
+    -- deben hoy; esto dice cuando se quedaron, que es lo que separa la plata
+    -- recuperable (vencieron hace dias) de la perdida (hace meses).
+    -- OJO: NO cambiar el filtro de status. Un cancelado explicito ya esta contado
+    -- como baja y sumarlo seria doble conteo. Un "caido" es el que dejo de venir y
+    -- dejo vencer la cuota sin apretar cancelar.
+    select date_trunc('month', m.expires_on)::date as mes,
+           count(*)::int as cantidad,
+           coalesce(sum(m.price), 0) as total
+      from public.gym_memberships m
+     where m.gym_id = p_gym
+       and m.status = 'activa'
+       and m.expires_on is not null
+       and m.expires_on <  current_date
+       and m.expires_on >= (date_trunc('month', current_date) - interval '5 months')::date
+     group by 1
+  ),
+  caidos as (
+    select coalesce(jsonb_agg(
+             jsonb_build_object(
+               'mes', to_char(c.mes, 'YYYY-MM'),
+               'cantidad', c.cantidad,
+               'total', c.total
+             ) order by c.mes
+           ), '[]'::jsonb) as meses
+      from caidos_rows c
+  ),
   mes as (
     select count(*)::int as cantidad, coalesce(sum(amount), 0) as total from pagos
   ),
@@ -220,7 +261,11 @@ begin
     'por_metodo', (select por_metodo from metodos),
     'serie',      (select meses  from serie),
     'detalle',    (select pagos  from detalle),
-    -- Extras SOLO del gym: los activos son socios, no alumnos sueltos.
+    'total_all',  (select total_all  from historico),
+    'total_year', (select total_year from historico),
+    'caidos',     (select meses  from caidos),
+    'caidos_cantidad', (select coalesce(sum(c.cantidad), 0) from caidos_rows c),
+    'caidos_total',    (select coalesce(sum(c.total), 0)    from caidos_rows c),
     'activos', (select count(*)::int from public.gym_memberships m
                  where m.gym_id = p_gym and m.status = 'activa'),
     'altas',   (select count(*)::int from public.gym_memberships m
@@ -276,6 +321,40 @@ begin
      where p.trainer_id = v_uid
        and p.paid_at::date >= v_from
        and p.paid_at::date <  v_to
+  ),
+  historico as (
+    -- Caja acumulada del profe (mismo concepto que en la version del gym).
+    select
+      coalesce(sum(p.amount), 0) as total_all,
+      coalesce(sum(p.amount) filter (where p.paid_at >= date_trunc('year', current_date)), 0)
+        as total_year
+      from public.trainer_membership_payments p
+     where p.trainer_id = v_uid
+  ),
+  caidos_rows as (
+    -- Alumnos que dejaron vencer su cuota sin renovar (ver la nota en la version
+    -- del gym). El profe no tiene `cancelled_at`, asi que TODOS los vencidos son
+    -- "caidos" por definicion: no hay cancelacion explicita que los excluya.
+    select date_trunc('month', m.expires_on)::date as mes,
+           count(*)::int as cantidad,
+           coalesce(sum(m.price), 0) as total
+      from public.trainer_memberships m
+     where m.trainer_id = v_uid
+       and m.status = 'activa'
+       and m.expires_on is not null
+       and m.expires_on <  current_date
+       and m.expires_on >= (date_trunc('month', current_date) - interval '5 months')::date
+     group by 1
+  ),
+  caidos as (
+    select coalesce(jsonb_agg(
+             jsonb_build_object(
+               'mes', to_char(c.mes, 'YYYY-MM'),
+               'cantidad', c.cantidad,
+               'total', c.total
+             ) order by c.mes
+           ), '[]'::jsonb) as meses
+      from caidos_rows c
   ),
   mes as (
     select count(*)::int as cantidad, coalesce(sum(amount), 0) as total from pagos
@@ -375,6 +454,11 @@ begin
     'por_metodo', (select por_metodo from metodos),
     'serie',      (select meses  from serie),
     'detalle',    (select pagos  from detalle),
+    'total_all',  (select total_all  from historico),
+    'total_year', (select total_year from historico),
+    'caidos',     (select meses  from caidos),
+    'caidos_cantidad', (select coalesce(sum(c.cantidad), 0) from caidos_rows c),
+    'caidos_total',    (select coalesce(sum(c.total), 0)    from caidos_rows c),
     'activos', (select count(*)::int from public.trainer_memberships m
                  where m.trainer_id = v_uid and m.status = 'activa'),
     'altas',   (select count(*)::int from public.trainer_memberships m

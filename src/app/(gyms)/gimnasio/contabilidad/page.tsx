@@ -189,6 +189,7 @@ export default function GymContabilidadPage() {
         month={month}
         isCurrentMonth={month >= now}
         canGoNext={month < monthStart(shiftMonth(now, 1))}
+        today={todayLocal()}
         onPrev={() => setMonth((m) => monthStart(shiftMonth(m, -1)))}
         onNext={() => setMonth((m) => monthStart(shiftMonth(m, 1)))}
         onExport={exportCsv}
@@ -201,7 +202,7 @@ export default function GymContabilidadPage() {
         <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted">
           Plantel del mes
         </p>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <div className="rounded-2xl border border-edge bg-card p-3">
             <p className="flex items-center gap-1 text-[11px] font-semibold text-muted">
               <ArrowUpRight className="h-3 w-3 text-neon" /> Altas
@@ -220,7 +221,26 @@ export default function GymContabilidadPage() {
             </p>
             <p className="text-lg font-black text-ink">{data.activos}</p>
           </div>
+          {/* Los que dejaron vencer la cuota sin apretar Cancelar. Antes NO
+              aparecian en ninguna parte y por eso la retencia de arriba puede
+              decir 100% mientras el grupo se achica solo. */}
+          <div className="rounded-2xl border border-edge bg-card p-3">
+            <p className="flex items-center gap-1 text-[11px] font-semibold text-muted">
+              <AlertTriangle className="h-3 w-3 text-muted" /> Se quedaron
+            </p>
+            <p className="text-lg font-black text-ink">{data.caidos_cantidad}</p>
+          </div>
         </div>
+        {data.caidos_cantidad > 0 && (
+          <p className="mt-2 text-[11px] text-muted">
+            Sin contar en &quot;Bajas&quot;: {data.caidos_cantidad}{" "}
+            {data.caidos_cantidad === 1 ? "socio dejó vencer la cuota" : "socios dejaron vencer la cuota"}{" "}
+            sin cancelar ({formatMoney(data.caidos_total)}).{" "}
+            {retention !== null && data.altas > 0
+              ? "Con ellos, la retención real es menor."
+              : "Sumalos a las bajas para medir la retención real."}
+          </p>
+        )}
         {retention !== null && data.altas > 0 && (
           <p className="mt-2 text-[11px] text-muted">
             Se fueron {retention} de cada 100 que entraron. {data.altas - data.bajas >= 0 ? "El grupo crece" : "Cuidado: el grupo achica"}

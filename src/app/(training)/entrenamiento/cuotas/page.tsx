@@ -467,6 +467,7 @@ export default function CuotasPage() {
               month={month}
               isCurrentMonth={month >= currentMonth()}
               canGoNext={month < monthStart(shiftMonth(currentMonth(), 1))}
+              today={todayLocal()}
               onPrev={() => setMonth((m) => monthStart(shiftMonth(m, -1)))}
               onNext={() => setMonth((m) => monthStart(shiftMonth(m, 1)))}
               onExport={() => {

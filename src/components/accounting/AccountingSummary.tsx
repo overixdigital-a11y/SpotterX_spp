@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Download, TrendingDown, TrendingUp } from "l
 import { formatMoney } from "@/lib/memberships";
 import { compliancePct, formatSigned, monthLabel, pctChange } from "@/lib/accounting";
 import type { AccountingData } from "@/lib/accounting";
+import { CaidosByMonth } from "./CaidosByMonth";
 
 interface Props {
   data: AccountingData;
@@ -19,6 +20,8 @@ interface Props {
   onExport?: () => void;
   /** Se inyecta lazy desde la pagina (recharts pesa; patron Lote 32). */
   chart?: ReactNode;
+  /** YYYY-MM-DD de hoy, para medir la antiguedad de los meses "caidos". */
+  today: string;
 }
 
 /**
@@ -41,6 +44,7 @@ export function AccountingSummary({
   onNext,
   onExport,
   chart,
+  today,
 }: Props) {
   const change = pctChange(data.total, data.prev_total);
   const compliance = compliancePct(data.total, data.esperado);
@@ -109,11 +113,21 @@ export function AccountingSummary({
             </span>
           )}
         </div>
-        {data.prev_total > 0 && (
-          <p className="mt-2 text-[11px] text-muted">
-            Mes anterior: {formatMoney(data.prev_total)} ({data.prev_cantidad} cuotas)
-          </p>
-        )}
+          {data.prev_total > 0 && (
+            <p className="mt-2 text-[11px] text-muted">
+              Mes anterior: {formatMoney(data.prev_total)} ({data.prev_cantidad} cuotas)
+            </p>
+          )}
+
+          {/* Caja acumulada: lo primero que se pregunta uno al abrir la pantalla
+              de un gym ("cuanto entro en total"). Antes solo se podia ver el mes. */}
+          {data.total_all > 0 && (
+            <p className="mt-2 text-[11px] text-muted">
+              Histórico: {formatMoney(data.total_all)} en total ·{" "}
+              {formatMoney(data.total_year)} este año
+            </p>
+          )}
+
 
         {/* Cumplimiento: cuanto de lo que vencia este mes se facturo */}
         {data.esperado > 0 && (
@@ -204,6 +218,9 @@ export function AccountingSummary({
           </div>
         )}
       </div>
+
+      {/* Se quedaron sin renovar, por mes */}
+      <CaidosByMonth buckets={data.caidos} today={today} />
 
       {/* Metodos de pago */}
       {methods.length > 0 && (

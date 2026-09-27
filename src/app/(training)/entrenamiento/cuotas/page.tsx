@@ -168,7 +168,12 @@ export default function CuotasPage() {
       p_month: month,
     });
     if (error) {
-      if (error.message.includes("trainer_accounting_summary") || error.message.includes("does not exist")) {
+      // Mismo criterio que en /gimnasio/contabilidad: SOLO "no existe la funcion"
+      // es la 00046 faltante. Cualquier otro error se muestra crudo.
+      const missingRpc =
+        error.message.includes("Could not find the function") ||
+        (error.message.includes("does not exist") && error.message.includes("schema cache"));
+      if (missingRpc) {
         setAccMissing(true);
       } else {
         toast(`No se pudo cargar el resumen: ${error.message}`, "error");

@@ -66,8 +66,14 @@ export default function GymContabilidadPage() {
     });
 
     if (error) {
-      // Sin la 00046 la RPC no existe: degradar con gracia como el resto del repo.
-      if (error.message.includes("gym_accounting_summary") || error.message.includes("does not exist")) {
+      // Solo "no existe la funcion" significa que falta la 00046. CUALQUIER otro
+      // error (permisos, SQL interno, guard de ownership) se muestra tal cual:
+      // antes el chequeo era "el mensaje menciona el nombre de la funcion?" y
+      // eso disfrazaba un permission denied como "falta correr la migracion".
+      const missingRpc =
+        error.message.includes("Could not find the function") ||
+        (error.message.includes("does not exist") && error.message.includes("schema cache"));
+      if (missingRpc) {
         setMissing(true);
       } else {
         toast(`No se pudo cargar la contabilidad: ${error.message}`, "error");

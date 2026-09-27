@@ -108,7 +108,11 @@ begin
   end if;
 
   with pagos as (
-    select p.amount, p.method, p.note, p.user_id, p.paid_at::date as dia
+    -- OJO: `id` tiene que estar en la lista. `detalle` lo usa para armar el CSV
+    -- y si falta, la funcion revienta en runtime con "column p.id does not exist".
+    -- Los cuerpos de plpgsql NO se validan al crear la funcion: el error aparece
+    -- recien en la primera llamada (por eso el draft pasaba los chequeos estaticos).
+    select p.id, p.amount, p.method, p.note, p.user_id, p.paid_at::date as dia
       from public.gym_payments p
      where p.gym_id = p_gym
        and p.paid_at::date >= v_from
@@ -266,7 +270,8 @@ begin
   end if;
 
   with pagos as (
-    select p.amount, p.method, p.note, p.student_id, p.paid_at::date as dia
+    -- `id` en la lista: lo usa `detalle` (ver la nota en la version del gym).
+    select p.id, p.amount, p.method, p.note, p.student_id, p.paid_at::date as dia
       from public.trainer_membership_payments p
      where p.trainer_id = v_uid
        and p.paid_at::date >= v_from

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import {
   BadgeDollarSign,
   Check,
@@ -17,7 +18,17 @@ import { useAuthState } from "@/lib/auth-context";
 import { useModuleGuard } from "@/lib/gym-modules";
 import { BottomSheet } from "@/components/core/BottomSheet";
 import { useToast } from "@/components/core/ToastProvider";
+import { AccountingSummary } from "@/components/accounting/AccountingSummary";
 import { todayLocal } from "@/lib/format";
+import {
+  currentMonth,
+  fillSeries,
+  monthStart,
+  normalizeAccounting,
+  paymentsCsv,
+  shiftMonth,
+  type AccountingData,
+} from "@/lib/accounting";
 import {
   DURATIONS,
   STATE_CLASS,
@@ -33,6 +44,12 @@ import {
   type TrainerMembership,
 } from "@/lib/memberships";
 
+// recharts pesa (~100 KB): lazy (patron Lote 32).
+const MonthIncomeChart = dynamic(
+  () => import("@/components/accounting/MonthIncomeChart").then((m) => m.MonthIncomeChart),
+  { ssr: false }
+);
+
 interface Row {
   student: { id: string; username: string; full_name: string | null };
   membership: TrainerMembership | null;
@@ -40,6 +57,7 @@ interface Row {
 }
 
 type Filter = "todos" | "al_dia" | "por_vencer" | "vencido" | "sin_membresia";
+type Tab = "resumen" | "alumnos";
 
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "todos", label: "Todos" },
@@ -58,6 +76,11 @@ export default function CuotasPage() {
   const [payments, setPayments] = useState<Record<string, MembershipPayment[]>>({});
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>("todos");
+  const [tab, setTab] = useState<Tab>("resumen");
+  const [month, setMonth] = useState<string>(() => currentMonth());
+  const [acc, setAcc] = useState<AccountingData | null>(null);
+  const [accNames, setAccNames] = useState<Map<string, string>>(new Map());
+  const [accMissing, setAccMissing] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const [formFor, setFormFor] = useState<Row | null>(null);
@@ -135,6 +158,51 @@ export default function CuotasPage() {
       alive = false;
     };
   }, [load]);
+
+  // Contabilidad del profe: la RPC calcula todo en el servidor (mismo shape que
+  // la del gym) y las consultas separadas resuelven los nombres para el CSV.
+  const loadAccounting = useCallback(async () => {
+    if (!userId) return;
+    const supabase = createClient();
+    const { data, error } = await supabase.rpc("trainer_accounting_summary", {
+      p_month: month,
+    });
+    if (error) {
+      if (error.message.includes("trainer_accounting_summary") || error.message.includes("does not exist")) {
+        setAccMissing(true);
+      } else {
+        toast(`No se pudo cargar el resumen: ${error.message}`, "error");
+      }
+      setAcc(null);
+      return;
+    }
+    setAccMissing(false);
+    const next = normalizeAccounting(data);
+    setAcc(next);
+
+    const ids = [...new Set(next.detalle.map((p) => p.socio))];
+    if (ids.length) {
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id, full_name, username")
+        .in("id", ids);
+      setAccNames(new Map((profs ?? []).map((p) => [p.id, p.full_name || p.username || "Alumno"])));
+    } else {
+      setAccNames(new Map());
+    }
+  }, [userId, month, toast]);
+
+  // Patron anti-lint del repo: setState nunca sincrono en el cuerpo del efecto.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      await loadAccounting();
+      if (!alive) return;
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [loadAccounting]);
 
   const loadPayments = useCallback(async (membershipId: string) => {
     const supabase = createClient();
@@ -356,6 +424,68 @@ export default function CuotasPage() {
         y el vencimiento se extiende solo.
       </p>
 
+      {/* Pestañas: el resumen contable vive aca, la gestion por alumno queda
+          igual que estaba (Lote 38) para no romper nada de lo ya usado. */}
+      <div className="mt-4 flex gap-1 rounded-xl border border-edge bg-card p-1">
+        {(
+          [
+            { key: "resumen", label: "Resumen" },
+            { key: "alumnos", label: "Alumnos" },
+          ] as { key: Tab; label: string }[]
+        ).map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`flex-1 rounded-lg py-2 text-xs font-bold transition ${
+              tab === t.key ? "bg-ember text-bg" : "text-muted hover:text-ink"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "resumen" && (
+        <div className="mt-4">
+          {accMissing ? (
+            <p className="rounded-xl border border-ember/30 bg-ember/5 p-4 text-center text-xs text-muted">
+              Falta correr la migracion <span className="font-semibold text-ember">00046</span> para
+              ver el resumen. La gestion de alumnos ya funciona igual.
+            </p>
+          ) : !acc ? (
+            <div className="flex justify-center py-10">
+              <Loader2 className="h-5 w-5 animate-spin text-ember" />
+            </div>
+          ) : (
+            <AccountingSummary
+              data={acc}
+              month={month}
+              isCurrentMonth={month >= currentMonth()}
+              onPrev={() => setMonth((m) => monthStart(shiftMonth(m, -1)))}
+              onNext={() => setMonth((m) => monthStart(shiftMonth(m, 1)))}
+              onExport={() => {
+                if (acc.detalle.length === 0) {
+                  toast("No hay cobros en este mes para exportar", "info");
+                  return;
+                }
+                const csv = paymentsCsv(acc.detalle, (id) => accNames.get(id) ?? "Alumno");
+                const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `cuotas-profesor-${month}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+                toast("Movimiento exportado", "success");
+              }}
+              chart={<MonthIncomeChart data={fillSeries(acc.serie, month)} />}
+            />
+          )}
+        </div>
+      )}
+
+      {tab === "alumnos" && (
+      <>
       <div className="mt-4 grid grid-cols-2 gap-2">
         <div className="rounded-xl border border-ember/40 bg-ember/10 p-3">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-ember">
@@ -498,6 +628,8 @@ export default function CuotasPage() {
         SpotterX no cobra comision de las cuotas: la plata se mueve fuera de la
         app y queda registrada en el historial.
       </p>
+      </>
+      )}
 
       {/* Crear / editar */}
       <BottomSheet

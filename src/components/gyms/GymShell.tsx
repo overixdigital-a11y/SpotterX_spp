@@ -16,6 +16,7 @@ import {
   MonitorPlay,
   ShoppingBag,
   Menu,
+  ClipboardList,
 } from "lucide-react";
 import { AuthProvider, useAuthState } from "@/lib/auth-context";
 import { createClient } from "@/lib/supabase/client";
@@ -270,6 +271,17 @@ function DesktopGymSidebar() {
             <ShoppingBag className="h-4 w-4 text-neon" />
             <span>Artículos del gym</span>
           </Link>
+          <Link
+            href="/gimnasio/contabilidad"
+            className={`flex items-center gap-3 rounded-xl border px-3.5 py-2.5 text-xs font-medium transition ${
+              pathname === "/gimnasio/contabilidad"
+                ? "border-neon/40 bg-elevated/60 text-neon font-semibold"
+                : "border-edge bg-elevated/40 text-ink hover:border-neon/40 hover:text-neon"
+            }`}
+          >
+            <ClipboardList className={`h-4 w-4 ${pathname === "/gimnasio/contabilidad" ? "text-neon" : "text-neon"}`} />
+            <span>Contabilidad</span>
+          </Link>
           {feedOn && (
             <Link
               href="/home"
@@ -367,6 +379,18 @@ function GymDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
         >
           <ShoppingBag className="h-4 w-4 text-neon" />
           <span>Artículos del gym</span>
+        </Link>
+        <Link
+          href="/gimnasio/contabilidad"
+          onClick={onClose}
+          className={`flex items-center gap-3 rounded-xl border px-3.5 py-2.5 text-xs font-medium transition ${
+            pathname === "/gimnasio/contabilidad"
+              ? "border-neon/40 bg-elevated/60 text-neon font-semibold"
+              : "border-edge bg-elevated/40 text-ink hover:border-neon/40 hover:text-neon"
+          }`}
+        >
+          <ClipboardList className="h-4 w-4 text-neon" />
+          <span>Contabilidad</span>
         </Link>
         {feedOn && (
           <Link

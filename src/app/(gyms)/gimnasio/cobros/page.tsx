@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Wallet, CheckCircle2, Clock3 } from "lucide-react";
+import { Loader2, Wallet, CheckCircle2, Clock3, ClipboardList } from "lucide-react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
+import { todayLocal } from "@/lib/format";
 
 interface Gym {
   id: string;
@@ -38,6 +40,7 @@ export default function GymCobrosPage() {
   const [gym, setGym] = useState<Gym | null>(null);
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [monthCollected, setMonthCollected] = useState(0);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -71,8 +74,19 @@ export default function GymCobrosPage() {
         .order("paid_at", { ascending: false })
         .limit(30);
 
+      // "Cobrado este mes" necesita el total REAL del mes, no la suma de los
+      // ultimos 30 pagos que se muestran en el historial (bug del Lote 39).
+      const monthStartIso = `${todayLocal().slice(0, 7)}-01`;
+      const { data: monthRow } = await supabase
+        .from("gym_payments")
+        .select("amount")
+        .eq("gym_id", g.id)
+        .gte("paid_at", monthStartIso);
+      const monthTotal = (monthRow ?? []).reduce((acc, p) => acc + (p.amount || 0), 0);
+
       if (active) setMemberships((membershipsData ?? []) as Membership[]);
       if (active) setPayments((paymentsData ?? []) as Payment[]);
+      if (active) setMonthCollected(monthTotal);
       if (active) setLoading(false);
     })();
     return () => {
@@ -136,7 +150,6 @@ export default function GymCobrosPage() {
 
   const paidCount = memberships.filter((m) => m.pay_status === "pagado").length;
   const pendingCount = memberships.filter((m) => m.pay_status !== "pagado").length;
-  const totalCollected = payments.reduce((acc, p) => acc + (p.amount || 0), 0);
 
   return (
     <main className="mx-auto max-w-5xl px-4 pt-2 md:pt-4">
@@ -147,13 +160,20 @@ export default function GymCobrosPage() {
         <p className="mt-0.5 text-sm text-muted">
           Controlá la cobrabilidad de membresías, acreditá cuotas manuales y revisá el historial de caja.
         </p>
+        <Link
+          href="/gimnasio/contabilidad"
+          className="mt-3 inline-flex items-center gap-2 rounded-lg border border-neon/40 bg-neon/5 px-3 py-2 text-xs font-semibold text-neon transition hover:bg-neon/10"
+        >
+          <ClipboardList className="h-4 w-4" />
+          Ver contabilidad completa
+        </Link>
       </div>
 
       {/* KPI Cards Grid */}
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-2xl border border-edge bg-card p-4 space-y-1">
-          <p className="text-xs font-semibold text-muted">Total Recaudado (Reciente)</p>
-          <p className="text-2xl font-black text-neon">${totalCollected.toLocaleString("es-AR")}</p>
+          <p className="text-xs font-semibold text-muted">Cobrado este mes</p>
+          <p className="text-2xl font-black text-neon">${monthCollected.toLocaleString("es-AR")}</p>
         </div>
         <div className="rounded-2xl border border-edge bg-card p-4 space-y-1">
           <p className="text-xs font-semibold text-muted">Miembros al Día</p>

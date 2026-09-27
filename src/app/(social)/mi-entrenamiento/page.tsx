@@ -18,6 +18,7 @@ import {
   Flame,
   Share2,
   MapPin,
+  UserMinus,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -26,6 +27,7 @@ import { useModuleGuard } from "@/lib/gym-modules";
 import { todayLocal } from "@/lib/format";
 import { getDisciplineFields, isSeriesDiscipline, resolveSeries, formatSeries, type FieldDef } from "@/lib/disciplines";
 import { MEALS, getDietData, formatQuantity } from "@/lib/diets";
+import { useToast } from "@/components/core/ToastProvider";
 import PostComposer from "@/components/social/PostComposer";
 import MediaPicker from "@/components/core/MediaPicker";
 import dynamic from "next/dynamic";
@@ -135,8 +137,10 @@ interface Msg {
 export default function MiEntrenamientoPage() {
   const { userId } = useAuthState();
   const { busy } = useModuleGuard("entrenamiento");
+  const toast = useToast();
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [trainerId, setTrainerId] = useState<string | null>(null);
+  const [unlinking, setUnlinking] = useState(false);
   const [tab, setTab] = useState<"planes" | "rutinas" | "historial" | "chat">("planes");
   const [plans, setPlans] = useState<Plan[]>([]);
   const [items, setItems] = useState<PlanItem[]>([]);
@@ -534,6 +538,36 @@ export default function MiEntrenamientoPage() {
     setPosted((prev) => ({ ...prev, [composer.key]: id }));
   };
 
+  const unlinkTrainer = async () => {
+    const targetId = trainerId ?? trainers[0]?.id;
+    if (!targetId) return;
+    const ok = window.confirm(
+      "Dejar de entrenar con este profe? Se corta el vinculo pero NO se borra tu cuenta ni tus datos. Si te vuelve a agregar, los recuperas."
+    );
+    if (!ok) return;
+    setUnlinking(true);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.rpc("unlink_student", {
+        p_trainer_id: targetId,
+      });
+      if (error) throw new Error(error.message);
+      setTrainers((prev) => prev.filter((t) => t.id !== targetId));
+      setTrainerId(null);
+      toast("Vinculo desvinculado", "success");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast(
+        msg.includes("unlink_student")
+          ? "Falta correr la migracion 00043 para desvincular"
+          : `No se pudo desvincular: ${msg}`,
+        "error"
+      );
+    } finally {
+      setUnlinking(false);
+    }
+  };
+
   if (loading) {
     return (
       <main className="flex justify-center py-20">
@@ -611,6 +645,18 @@ export default function MiEntrenamientoPage() {
           <p className="text-sm font-bold text-ink">{trainer?.full_name || trainer?.username}</p>
           <p className="text-xs text-muted">Tu profe {trainer?.source === "gym" ? "del gimnasio" : "personal"}</p>
         </div>
+        <button
+          onClick={unlinkTrainer}
+          disabled={unlinking}
+          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-edge px-2.5 py-1.5 text-xs font-medium text-muted transition hover:border-ember/50 hover:text-ember disabled:opacity-60"
+        >
+          {unlinking ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <UserMinus className="h-3.5 w-3.5" />
+          )}
+          Desvincular
+        </button>
       </div>
 
       <div className="mt-4 grid grid-cols-4 gap-2 rounded-xl bg-card p-1">

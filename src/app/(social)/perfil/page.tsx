@@ -43,7 +43,8 @@ export default function PerfilPage() {
       const { data: ts } = await createClient()
         .from("trainer_students")
         .select("trainer_id")
-        .eq("student_id", userId);
+        .eq("student_id", userId)
+        .eq("active", true);
       const ids = (ts as { trainer_id: string }[] | null)?.map((t) => t.trainer_id) ?? [];
       if (ids.length === 0) return;
       const { data: ps } = await createClient()

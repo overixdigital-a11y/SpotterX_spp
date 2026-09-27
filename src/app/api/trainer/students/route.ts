@@ -36,6 +36,39 @@ async function getCaller(supabase: ReturnType<typeof getServiceClient>, token: s
   return { caller: user } as const;
 }
 
+// Puede crear alumnos: profesor, admin, dueño de gym o staff autorizado.
+// Para dueño/staff se devuelven también los gyms donde puede crear.
+async function resolvePermissions(
+  supabase: ReturnType<typeof getServiceClient>,
+  callerId: string,
+  role: string | null | undefined,
+  isAdmin: boolean | null | undefined
+) {
+  if (role === "profesor" || isAdmin) {
+    return { allowed: true, gymIds: [] as string[] };
+  }
+
+  const [{ data: staff }, { data: owned }] = await Promise.all([
+    supabase
+      .from("gym_staff")
+      .select("gym_id")
+      .eq("user_id", callerId)
+      .eq("authorized", true),
+    supabase.from("gyms").select("id").eq("owner_id", callerId),
+  ]);
+
+  const gymIds = Array.from(
+    new Set(
+      [
+        ...(staff ?? []).map((s) => s.gym_id as string),
+        ...(owned ?? []).map((g) => g.id as string),
+      ].filter(Boolean)
+    )
+  );
+
+  return { allowed: gymIds.length > 0, gymIds };
+}
+
 export async function POST(req: Request) {
   if (!isServiceRoleConfigured()) {
     return NextResponse.json({ error: MISSING_SERVICE_ROLE_ERROR }, { status: 500 });
@@ -62,9 +95,16 @@ export async function POST(req: Request) {
       .eq("id", caller.id)
       .maybeSingle();
 
-    if (callerProfile?.role !== "profesor" && !callerProfile?.is_admin) {
+    const perms = await resolvePermissions(
+      supabase,
+      caller.id,
+      callerProfile?.role,
+      callerProfile?.is_admin
+    );
+
+    if (!perms.allowed) {
       return NextResponse.json(
-        { error: "Solo los profesores pueden crear alumnos propios" },
+        { error: "Solo los profesores, admins y dueños o staff de un gym pueden crear alumnos" },
         { status: 403 }
       );
     }
@@ -72,6 +112,7 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
     const fullName = String(body?.full_name ?? "").trim();
     const emailRaw = String(body?.email ?? "").trim().toLowerCase();
+    const gymId = String(body?.gym_id ?? "").trim() || null;
 
     if (fullName.length < 3) {
       return NextResponse.json(
@@ -82,6 +123,16 @@ export async function POST(req: Request) {
     if (emailRaw && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw)) {
       return NextResponse.json({ error: "El email no es válido" }, { status: 400 });
     }
+
+    // Un gym elegido tiene que ser uno donde el caller sea dueño o staff autorizado
+    if (gymId && !perms.gymIds.includes(gymId)) {
+      return NextResponse.json(
+        { error: "No trabajás en ese gimnasio" },
+        { status: 403 }
+      );
+    }
+
+    const source: "propio" | "gym" = gymId ? "gym" : "propio";
 
     const { firstName, lastName } = splitName(fullName);
     const email = emailRaw || `pendiente-${randomCode(8).toLowerCase()}@spotterx.app`;
@@ -112,7 +163,7 @@ export async function POST(req: Request) {
         {
           trainer_id: caller.id,
           student_id: studentId,
-          source: "propio",
+          source,
           active: true,
         },
         { onConflict: "trainer_id,student_id" }
@@ -125,10 +176,11 @@ export async function POST(req: Request) {
       return NextResponse.json({
         ok: true,
         existing: true,
+        source,
         user_id: existingProfile.id,
         username: existingProfile.username,
         full_name: existingProfile.full_name,
-        message: `@${existingProfile.username} ya tenía cuenta y quedó vinculado a tu lista.`,
+        message: `@${existingProfile.username} ya tenía cuenta y quedó vinculado a tu lista de ${source === "gym" ? "alumnos del gym" : "alumnos propios"}.`,
       });
     }
 
@@ -176,6 +228,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       existing: false,
+      source,
       user_id: newUserId,
       username,
       full_name: fullName,

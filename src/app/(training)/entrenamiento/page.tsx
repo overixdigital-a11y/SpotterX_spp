@@ -11,6 +11,7 @@ import {
   Copy,
   Check,
   X,
+  Info,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
@@ -23,6 +24,11 @@ interface StudentProfile {
   username: string;
   full_name: string | null;
   role: string;
+}
+
+interface GymOption {
+  id: string;
+  name: string;
 }
 
 interface Student {
@@ -38,6 +44,7 @@ interface CreatedStudent {
   provisional_password?: string;
   existing?: boolean;
   pending_email?: boolean;
+  source?: "propio" | "gym";
   message?: string;
 }
 
@@ -54,7 +61,10 @@ export default function EntrenamientoPage() {
   const [results, setResults] = useState<StudentProfile[]>([]);
 
   const [canCreate, setCanCreate] = useState(false);
+  const [canCreateOwn, setCanCreateOwn] = useState(false);
+  const [gymOptions, setGymOptions] = useState<GymOption[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
+  const [createGymId, setCreateGymId] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -110,13 +120,46 @@ export default function EntrenamientoPage() {
     let active = true;
     (async () => {
       const supabase = createClient();
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role, is_admin")
-        .eq("id", userId)
-        .maybeSingle();
+      const [{ data: profile }, { data: staff }, { data: owned }] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("role, is_admin")
+          .eq("id", userId)
+          .maybeSingle(),
+        supabase
+          .from("gym_staff")
+          .select("gym_id")
+          .eq("user_id", userId)
+          .eq("authorized", true),
+        supabase.from("gyms").select("id").eq("owner_id", userId),
+      ]);
+
+      const gymIds = Array.from(
+        new Set(
+          [
+            ...((staff ?? []) as { gym_id: string }[]).map((s) => s.gym_id),
+            ...((owned ?? []) as { id: string }[]).map((g) => g.id),
+          ].filter(Boolean)
+        )
+      );
+
+      let options: GymOption[] = [];
+      if (gymIds.length > 0) {
+        const { data: gyms } = await supabase
+          .from("gyms")
+          .select("id, name")
+          .in("id", gymIds);
+        options = ((gyms ?? []) as { id: string; name: string | null }[]).map((g) => ({
+          id: g.id,
+          name: g.name || "Gimnasio",
+        }));
+      }
+
+      const isTrainer = profile?.role === "profesor" || Boolean(profile?.is_admin);
       if (active) {
-        setCanCreate(profile?.role === "profesor" || Boolean(profile?.is_admin));
+        setCanCreateOwn(isTrainer);
+        setGymOptions(options);
+        setCanCreate(isTrainer || options.length > 0);
       }
       await load();
       if (active) setLoading(false);
@@ -127,6 +170,14 @@ export default function EntrenamientoPage() {
   }, [userId, load]);
 
   const filtered = students.filter((s) => s.source === tab);
+
+  const showCreateButton =
+    canCreate && (tab === "propio" ? canCreateOwn : gymOptions.length > 0);
+
+  const openCreate = () => {
+    setCreateGymId(tab === "gym" && gymOptions.length > 0 ? gymOptions[0].id : "");
+    setCreateOpen(true);
+  };
 
   const search = async (text: string) => {
     setQ(text);
@@ -149,14 +200,25 @@ export default function EntrenamientoPage() {
     const supabase = createClient();
     const { data, error } = await supabase
       .from("trainer_students")
-      .insert({ trainer_id: userId, student_id: p.id, source: tab, active: true })
+      .upsert(
+        { trainer_id: userId, student_id: p.id, source: tab, active: true },
+        { onConflict: "trainer_id,student_id" }
+      )
       .select()
       .maybeSingle();
     if (!error && data) {
+      const rowSource = (data.source === "gym" ? "gym" : "propio") as "gym" | "propio";
+      const rowId = data.id as string;
       setStudents((prev) => [
-        ...prev,
-        { id: data.id as string, source: tab, profile: p },
+        ...prev.filter((s) => s.id !== rowId),
+        { id: rowId, source: rowSource, profile: p },
       ]);
+      toast(
+        `@${p.username} quedó en tus alumnos ${rowSource === "gym" ? "del gym" : "propios"}`,
+        "success"
+      );
+    } else {
+      toast(error?.message ?? "No se pudo agregar el alumno", "error");
     }
     setResults([]);
     setQ("");
@@ -182,7 +244,11 @@ export default function EntrenamientoPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session?.access_token ?? ""}`,
         },
-        body: JSON.stringify({ full_name: full, email: email.trim() }),
+        body: JSON.stringify({
+          full_name: full,
+          email: email.trim(),
+          gym_id: createGymId || null,
+        }),
       });
       const data = await res.json();
 
@@ -265,13 +331,23 @@ export default function EntrenamientoPage() {
         <Search className="h-4 w-4" /> Agregar alumno ({tab === "propio" ? "propio" : "del gym"})
       </button>
 
-      {canCreate && tab === "propio" && (
+      {showCreateButton && (
         <button
-          onClick={() => setCreateOpen(true)}
+          onClick={openCreate}
           className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-neon/40 bg-neon/10 py-3 text-sm font-semibold text-neon"
         >
           <UserPlus className="h-4 w-4" /> Crear cuenta de alumno
         </button>
+      )}
+
+      {!canCreate && (
+        <p className="mt-2 flex items-start gap-2 rounded-xl border border-edge bg-card px-3 py-2.5 text-[11px] text-muted">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            Tu cuenta todavia no puede crear alumnos. Solo pueden hacerlo los
+            profesores, los admins y los duenos o staff de un gimnasio.
+          </span>
+        </p>
       )}
 
       {adding && (
@@ -288,9 +364,7 @@ export default function EntrenamientoPage() {
           {results.length > 0 && (
             <div className="mt-2">
               {results.map((r) => {
-                const already = students.some(
-                  (s) => s.profile.id === r.id && s.source === tab
-                );
+                const linked = students.find((s) => s.profile.id === r.id);
                 return (
                   <div
                     key={r.id}
@@ -302,8 +376,10 @@ export default function EntrenamientoPage() {
                       </p>
                       <p className="text-xs text-muted">@{r.username}</p>
                     </div>
-                    {already ? (
-                      <span className="text-xs text-muted">Ya agregado</span>
+                    {linked ? (
+                      <span className="text-xs text-muted">
+                        Ya en {linked.source === "gym" ? "del gym" : "propios"}
+                      </span>
                     ) : (
                       <button
                         onClick={() => addStudent(r)}
@@ -418,11 +494,50 @@ export default function EntrenamientoPage() {
         title="Crear cuenta de alumno"
       >
         <p className="text-xs text-muted">
-          Se crea la cuenta y queda en tu lista de alumnos propios. El alumno carga
-          sus datos la primera vez que entra.
+          Se crea la cuenta y queda en tu lista. El alumno carga sus datos la
+          primera vez que entra.
         </p>
 
         <div className="mt-4 space-y-3">
+          <div>
+            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted">
+              Lo agrego a
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {canCreateOwn && (
+                <button
+                  onClick={() => setCreateGymId("")}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+                    createGymId === ""
+                      ? "border-neon bg-neon/15 text-neon"
+                      : "border-edge text-muted"
+                  }`}
+                >
+                  Alumno propio
+                </button>
+              )}
+              {gymOptions.map((g) => (
+                <button
+                  key={g.id}
+                  onClick={() => setCreateGymId(g.id)}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+                    createGymId === g.id
+                      ? "border-ember bg-ember/15 text-ember"
+                      : "border-edge text-muted"
+                  }`}
+                >
+                  {g.name}
+                </button>
+              ))}
+            </div>
+            {createGymId && (
+              <p className="mt-1.5 text-[11px] text-muted">
+                Solo se crea el vinculo con vos. La membresia del gym se
+                administra desde el panel del gimnasio.
+              </p>
+            )}
+          </div>
+
           <input
             value={firstName}
             onChange={(e) => setFirstName(e.target.value)}
@@ -458,6 +573,12 @@ export default function EntrenamientoPage() {
           {creating ? "Creando..." : "Crear alumno"}
         </button>
       </BottomSheet>
+
+      <div className="pointer-events-none fixed inset-x-0 bottom-20 z-[60] flex justify-center px-4 md:bottom-6">
+        <span className="rounded-full border border-neon/40 bg-card/90 px-3 py-1 text-[11px] font-bold text-neon shadow-neon">
+          v37-L37
+        </span>
+      </div>
     </main>
   );
 }

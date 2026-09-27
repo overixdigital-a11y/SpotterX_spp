@@ -577,12 +577,6 @@ export default function EntrenamientoPage() {
           {creating ? "Creando..." : "Crear alumno"}
         </button>
       </BottomSheet>
-
-      <div className="pointer-events-none fixed inset-x-0 bottom-20 z-[60] flex justify-center px-4 md:bottom-6">
-        <span className="rounded-full border border-neon/40 bg-card/90 px-3 py-1 text-[11px] font-bold text-neon shadow-neon">
-          v37-L37
-        </span>
-      </div>
     </main>
   );
 }

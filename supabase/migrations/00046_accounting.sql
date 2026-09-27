@@ -163,7 +163,9 @@ begin
        and m.expires_on <  current_date
   ),
   metodos as (
-    select coalesce(jsonb_object_agg(m.method, m.s), '{}'::jsonb) as por_metodo
+    -- method es nullable en el schema: sin el coalesce, una fila con metodo null
+    -- hace fallar la funcion entera ("field name must not be null").
+    select coalesce(jsonb_object_agg(coalesce(m.method, 'manual'), m.s), '{}'::jsonb) as por_metodo
       from (
         select p.method, sum(p.amount) as s from pagos p group by p.method
       ) m
@@ -180,6 +182,7 @@ begin
           from public.gym_payments p
          where p.gym_id = p_gym
            and p.paid_at >= (v_from - interval '5 months')
+           and p.paid_at <  v_to
          group by 1
       ) s
   ),
@@ -250,8 +253,17 @@ declare
   v_uid  uuid := auth.uid();
   v_from date := date_trunc('month', p_month)::date;
   v_to   date := (date_trunc('month', p_month) + interval '1 month')::date;
+  v_base jsonb;
 begin
   if v_uid is null then raise exception 'No autenticado'; end if;
+
+  -- Solo alumnos PROPIOS: los alumnos del gym le pagan al gym, no al profe.
+  if not exists (
+    select 1 from public.trainer_students ts
+     where ts.trainer_id = v_uid and ts.active = true and ts.source = 'propio'
+  ) then
+    raise exception 'No autorizado';
+  end if;
 
   with pagos as (
     select p.amount, p.method, p.note, p.student_id, p.paid_at::date as dia
@@ -307,7 +319,7 @@ begin
        and m.expires_on <  current_date
   ),
   metodos as (
-    select coalesce(jsonb_object_agg(m.method, m.s), '{}'::jsonb) as por_metodo
+    select coalesce(jsonb_object_agg(coalesce(m.method, 'manual'), m.s), '{}'::jsonb) as por_metodo
       from (
         select p.method, sum(p.amount) as s from pagos p group by p.method
       ) m
@@ -324,6 +336,7 @@ begin
           from public.trainer_membership_payments p
          where p.trainer_id = v_uid
            and p.paid_at >= (v_from - interval '5 months')
+           and p.paid_at <  v_to
          group by 1
       ) s
   ),

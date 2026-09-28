@@ -6,6 +6,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { Loader2, DoorOpen, DoorClosed, X, ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
+import { fetchProfiles } from "@/lib/profiles";
 
 interface Gym {
   id: string;
@@ -26,14 +27,6 @@ interface Entry {
   created_at: string;
   type: string;
   person: Person | null;
-}
-
-interface EntryRow {
-  id: string;
-  user_id: string;
-  created_at: string;
-  type: string;
-  profiles: Person[] | null;
 }
 
 interface PresenceUser {
@@ -108,7 +101,7 @@ export default function GymPantallaPage() {
       const todayStr = new Date().toISOString().slice(0, 10);
       const { data: logs } = await supabase
         .from("gym_access_logs")
-        .select("id, user_id, created_at, type, profiles:gym_access_logs_user_id_fkey(full_name, username, avatar_url)")
+        .select("id, user_id, created_at, type")
         .eq("gym_id", g.id)
         .gte("created_at", todayStr)
         .order("created_at", { ascending: false })
@@ -116,12 +109,29 @@ export default function GymPantallaPage() {
 
       if (!active) return;
 
-      const rows = (logs ?? []) as EntryRow[];
+      const profileMap = await fetchProfiles(
+        supabase,
+        (logs ?? []).map((l) => l.user_id)
+      );
+      if (!active) return;
+
+      const personOf = (userId: string): Person | null => {
+        const p = profileMap.get(userId);
+        if (!p) return null;
+        return {
+          user_id: userId,
+          full_name: p.full_name ?? null,
+          username: p.username ?? null,
+          avatar_url: p.avatar_url ?? null,
+        };
+      };
+
+      const rows = (logs ?? []) as Entry[];
       const logsToday = rows.map((l) => ({
         user_id: l.user_id,
         type: l.type,
         created_at: l.created_at,
-        person: l.profiles?.[0] ?? null,
+        person: personOf(l.user_id),
       }));
 
       const userState: Record<string, { count: number; lastIn: string; person: Person | null }> = {};

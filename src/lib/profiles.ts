@@ -4,6 +4,7 @@ export interface ProfileLite {
   full_name: string | null;
   username: string | null;
   email: string | null;
+  avatar_url?: string | null;
 }
 
 export function displayName(p: ProfileLite | null | undefined): string {
@@ -20,7 +21,7 @@ export async function fetchProfiles(
 
   const { data } = await supabase
     .from("profiles")
-    .select("id, full_name, username, email")
+    .select("id, full_name, username, email, avatar_url")
     .in("id", unique);
 
   for (const row of data ?? []) {
@@ -28,6 +29,7 @@ export async function fetchProfiles(
       full_name: row.full_name ?? null,
       username: row.username ?? null,
       email: row.email ?? null,
+      avatar_url: row.avatar_url ?? null,
     });
   }
   return map;

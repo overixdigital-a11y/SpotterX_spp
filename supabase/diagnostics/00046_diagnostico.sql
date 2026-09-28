@@ -1,14 +1,38 @@
 -- ============================================================
 -- DIAGNOSTICO 00046 - contabilidad de cuotas
--- Pegalo en el SQL Editor y mandame el resultado de la 2da consulta.
--- No modifica nada: es solo lectura + una simulacion de sesion.
+-- Pegalo COMPLETO en el SQL Editor y mandame el resultado de la ultima consulta.
+--
+-- ########################################################################
+-- #  LEER ANTES DE CORRER.  ESTE ARCHIVO SE CORRE DENTRO DE UNA           #
+-- #  TRANSACCION QUE HACE ROLLBACK, Y LAS FUNCIONES TIENEN EXECUTE        #
+-- #  REVOCADO.  LAS DOS COSAS SON OBLIGATORIAS, POR SEPARADO.             #
+-- #                                                                      #
+-- #  Por que: una funcion creada aca sin `revoke` queda con                #
+-- #  EXECUTE TO PUBLIC, o sea que es un endpoint REST PUBLICO:             #
+-- #  cualquiera con la anon key (que esta en el bundle del navegador)     #
+-- #  puede pegarle POST /rest/v1/rpc/<nombre> y ver lo que devuelva.      #
+-- #  Ya se exploto de verdad: `_diag_00046_datos` respondio con            #
+-- #  cuantos socios activos y en que mes vencen, de cada gym.             #
+-- #  Mismo error que la 00045 con notify_trainer_membership_due.          #
+-- #                                                                      #
+-- #  El ROLLBACK es la red que salva: aunque el `revoke` falle o alguien  #
+-- #  corra solo una parte del archivo, la funcion no queda en la base.     #
+-- #  Copiar y pegar UN SOLO `create or replace` suelta = fuga.            #
+-- ########################################################################
+--
+-- Solo lectura: consulta permisos y simula la sesion de cada dueno con
+-- `set_config` sobre `request.jwt.claim.sub` (asi `auth.uid()` devuelve el
+-- owner). No inserta ni actualiza nada.
 -- ============================================================
 
+begin;
+
 -- ---------- 1) Quien puede ejecutar las RPCs ----------
+-- Aca se ve el `revoke` de la migracion: si alguna aparece sin `{=X/...}`,
+-- significa que PUBLIC todavia puede llamarla.
 select
   p.proname,
-  p.proacl::text                                   as permisos,
-  array_to_string(p.proacl, ' | ')                 as permisos_legible
+  array_to_string(p.proacl, ' | ') as permisos
 from pg_proc p
 join pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public'
@@ -18,9 +42,14 @@ order by p.proname;
 -- ---------- 2) Ejecutar la RPC de verdad, por cada gym, como su dueno ----------
 -- Recorre TODOS los gyms, se pone en los shoes del dueno (auth.uid simulado)
 -- y llama a la funcion. Si algo esta mal, lo captura y lo muestra.
+--
+-- `security invoker` explicito + `revoke` abajo: aunque el rollback final
+-- borre la funcion, si alguien copia solo este bloque la funcion nace sin
+-- permiso para anon. El `revoke` va en su propia sentencia.
 create or replace function public._diag_00046()
 returns jsonb
 language plpgsql
+security invoker
 as $$
 declare
   r record;
@@ -68,6 +97,7 @@ select public._diag_00046() as diagnostico_por_gym;
 create or replace function public._diag_00046_datos()
 returns jsonb
 language plpgsql
+security invoker
 as $$
 declare
   r record;
@@ -104,3 +134,17 @@ end;
 $$;
 
 select public._diag_00046_datos() as datos_por_gym;
+
+-- ---------- 3) Cerrar y deshacer todo ----------
+-- Sin esto, estas dos funciones quedan con EXECUTE TO PUBLIC y cualquiera con
+-- la anon key las llama por REST. Verificado: `_diag_00046_datos` devolvio
+-- cuantos socios activos y en que mes vencen, de cada gym, a una peticion anon.
+revoke execute on function public._diag_00046() from public, anon, authenticated;
+revoke execute on function public._diag_00046_datos() from public, anon, authenticated;
+
+-- Y el rollback las borra del todo.
+rollback;
+
+-- Verificacion opcional: despues del rollback no deberia existir nada.
+-- select proname from pg_proc join pg_namespace on pg_namespace.oid = pronamespace
+--   where nspname = 'public' and proname like '\_diag%';   -- tiene que dar 0 filas

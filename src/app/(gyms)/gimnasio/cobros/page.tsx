@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { todayLocal } from "@/lib/format";
+import { fetchProfiles, displayName, type ProfileLite } from "@/lib/profiles";
 
 interface Gym {
   id: string;
@@ -18,21 +19,14 @@ interface Membership {
   pay_status: string;
   status: string;
   expires_on: string | null;
-  profiles: ProfileRef[] | null;
-}
-
-interface ProfileRef {
-  full_name: string | null;
-  username: string | null;
-  email: string | null;
 }
 
 interface Payment {
   id: string;
+  user_id: string;
   amount: number;
   method: string;
   paid_at: string;
-  profiles: ProfileRef[] | null;
 }
 
 export default function GymCobrosPage() {
@@ -40,6 +34,7 @@ export default function GymCobrosPage() {
   const [gym, setGym] = useState<Gym | null>(null);
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [profileMap, setProfileMap] = useState<Map<string, ProfileLite>>(new Map());
   const [monthCollected, setMonthCollected] = useState(0);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -62,17 +57,22 @@ export default function GymCobrosPage() {
 
       const { data: membershipsData } = await supabase
         .from("gym_memberships")
-        .select("id, user_id, plan_name, pay_status, status, expires_on, profiles:profiles!gym_memberships_user_id_fkey(full_name, username, email)")
+        .select("id, user_id, plan_name, pay_status, status, expires_on")
         .eq("gym_id", g.id)
         .eq("status", "activa")
         .order("created_at", { ascending: false });
 
       const { data: paymentsData } = await supabase
         .from("gym_payments")
-        .select("id, amount, method, paid_at, profiles:gym_payments_user_id_fkey(full_name, username, email)")
+        .select("id, user_id, amount, method, paid_at")
         .eq("gym_id", g.id)
         .order("paid_at", { ascending: false })
         .limit(30);
+
+      const profileMap = await fetchProfiles(supabase, [
+        ...(membershipsData ?? []).map((m) => m.user_id),
+        ...(paymentsData ?? []).map((p) => p.user_id),
+      ]);
 
       // "Cobrado este mes" necesita el total REAL del mes, no la suma de los
       // ultimos 30 pagos que se muestran en el historial (bug del Lote 39).
@@ -86,6 +86,7 @@ export default function GymCobrosPage() {
 
       if (active) setMemberships((membershipsData ?? []) as Membership[]);
       if (active) setPayments((paymentsData ?? []) as Payment[]);
+      if (active) setProfileMap(profileMap);
       if (active) setMonthCollected(monthTotal);
       if (active) setLoading(false);
     })();
@@ -145,8 +146,7 @@ export default function GymCobrosPage() {
     );
   }
 
-  const nameOf = (profiles: ProfileRef[] | null | undefined) =>
-    profiles?.[0]?.full_name ?? profiles?.[0]?.username ?? profiles?.[0]?.email ?? "Usuario";
+  const nameOf = (userId: string) => displayName(profileMap.get(userId));
 
   const paidCount = memberships.filter((m) => m.pay_status === "pagado").length;
   const pendingCount = memberships.filter((m) => m.pay_status !== "pagado").length;
@@ -203,7 +203,7 @@ export default function GymCobrosPage() {
                 <div key={m.id} className="rounded-xl border border-edge bg-bg p-3.5 transition hover:border-neon/30">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-ink">{nameOf(m.profiles)}</p>
+                      <p className="truncate text-sm font-semibold text-ink">{nameOf(m.user_id)}</p>
                       <p className="text-xs text-muted">
                         {m.plan_name} · Vence: <span className="font-mono">{m.expires_on ? new Date(m.expires_on).toLocaleDateString("es-AR") : "—"}</span>
                       </p>
@@ -250,7 +250,7 @@ export default function GymCobrosPage() {
               {payments.map((p) => (
                 <div key={p.id} className="flex items-center justify-between rounded-xl border border-edge bg-bg p-3">
                   <div>
-                    <p className="text-sm font-semibold text-ink">{nameOf(p.profiles)}</p>
+                    <p className="text-sm font-semibold text-ink">{nameOf(p.user_id)}</p>
                     <p className="text-[11px] text-muted">
                       {new Date(p.paid_at).toLocaleString("es-AR", {
                         day: "2-digit",

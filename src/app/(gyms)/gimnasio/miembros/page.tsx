@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { UserPlus, Loader2, KeyRound, Copy, Check, Users, Gift } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
+import { fetchProfiles } from "@/lib/profiles";
 
 const FUNC_URL = "/api/invite-member";
 
@@ -40,13 +41,6 @@ interface MemberRow {
   status?: string | null;
   pay_status?: string | null;
   expires_on?: string | null;
-  profiles: ProfileRef[] | null;
-}
-
-interface ProfileRef {
-  full_name: string | null;
-  email: string | null;
-  username: string | null;
 }
 
 const PROMO_COUNT: Record<string, number> = { "2x1": 2, "3x2": 3, "4x3": 4 };
@@ -71,22 +65,27 @@ export default function GymMembersPage() {
     const supabase = createClient();
     const { data: staff } = await supabase
       .from("gym_staff")
-      .select("user_id, role, profiles:profiles!gym_staff_user_id_fkey(full_name, email, username)")
+      .select("user_id, role")
       .eq("gym_id", gymId);
 
     const { data: memberships } = await supabase
       .from("gym_memberships")
-      .select("user_id, plan_name, status, pay_status, expires_on, profiles:profiles!gym_memberships_user_id_fkey(full_name, email, username)")
+      .select("user_id, plan_name, status, pay_status, expires_on")
       .eq("gym_id", gymId)
       .order("created_at", { ascending: false });
+
+    const profileMap = await fetchProfiles(supabase, [
+      ...(staff ?? []).map((r) => r.user_id),
+      ...(memberships ?? []).map((r) => r.user_id),
+    ]);
 
     const mapMembers = (rows: MemberRow[] | null, type: string): Member[] =>
       (rows ?? []).map((r) => ({
         user_id: r.user_id,
         role: type,
-        full_name: r.profiles?.[0]?.full_name ?? null,
-        email: r.profiles?.[0]?.email ?? null,
-        username: r.profiles?.[0]?.username ?? null,
+        full_name: profileMap.get(r.user_id)?.full_name ?? null,
+        email: profileMap.get(r.user_id)?.email ?? null,
+        username: profileMap.get(r.user_id)?.username ?? null,
         plan_name: r.plan_name ?? null,
         status: r.status ?? null,
         pay_status: r.pay_status ?? "pendiente",
@@ -423,8 +422,10 @@ export default function GymMembersPage() {
                   {members.map((m, idx) => (
                     <tr key={`${m.user_id}-${m.role}-${idx}`} className="hover:bg-elevated/30 transition">
                       <td className="px-3 py-3">
-                        <p className="font-semibold text-ink">{m.full_name ?? m.username ?? m.email}</p>
-                        <p className="text-xs text-muted">@{m.username || "sin_username"} · {m.email}</p>
+                        <p className="font-semibold text-ink">
+                          {m.full_name ?? m.email ?? m.username ?? "Sin nombre"}
+                        </p>
+                        {m.username && <p className="text-xs text-muted">@{m.username}</p>}
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap">
                         <span

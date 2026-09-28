@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, Activity, Users, DoorOpen, DoorClosed } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { fetchProfiles, displayName, type ProfileLite } from "@/lib/profiles";
 import { useAuthState } from "@/lib/auth-context";
 
 interface Gym {
@@ -11,22 +12,18 @@ interface Gym {
   capacity: number | null;
 }
 
-interface ProfileRef {
-  full_name: string | null;
-  username: string | null;
-}
-
 interface Log {
   id: string;
+  user_id: string;
   type: string;
   created_at: string;
-  profiles: ProfileRef[] | null;
 }
 
 export default function GymAccessPage() {
   const { userId } = useAuthState();
   const [gym, setGym] = useState<Gym | null>(null);
   const [logs, setLogs] = useState<Log[]>([]);
+  const [profileMap, setProfileMap] = useState<Map<string, ProfileLite>>(new Map());
   const [presence, setPresence] = useState<number>(0);
   const [attendanceToday, setAttendanceToday] = useState<number>(0);
   const [loading, setLoading] = useState(true);
@@ -50,7 +47,7 @@ export default function GymAccessPage() {
       const [logRes, presRes, attendanceRes] = await Promise.all([
         supabase
           .from("gym_access_logs")
-          .select("id, type, created_at, profiles:gym_access_logs_user_id_fkey(full_name, username)")
+          .select("id, user_id, type, created_at")
           .eq("gym_id", g.id)
           .order("created_at", { ascending: false })
           .limit(40),
@@ -61,8 +58,14 @@ export default function GymAccessPage() {
         supabase.rpc("gym_attendance_today", { p_gym: g.id }),
       ]);
 
+      const profileMap = await fetchProfiles(
+        supabase,
+        (logRes.data ?? []).map((l) => l.user_id)
+      );
+
       if (active) {
         setLogs((logRes.data ?? []) as Log[]);
+        setProfileMap(profileMap);
         setPresence((presRes.data ?? []).length);
         setAttendanceToday(typeof attendanceRes.data === "number" ? attendanceRes.data : 0);
       }
@@ -167,7 +170,7 @@ export default function GymAccessPage() {
                   </span>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-ink">
-                      {l.profiles?.[0]?.full_name ?? l.profiles?.[0]?.username ?? "Usuario"}
+                      {displayName(profileMap.get(l.user_id))}
                     </p>
                     <p className="text-xs font-mono text-muted">
                       {new Date(l.created_at).toLocaleString("es-AR", {

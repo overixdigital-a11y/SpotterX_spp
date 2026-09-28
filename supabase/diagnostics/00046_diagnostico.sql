@@ -43,9 +43,18 @@ order by p.proname;
 -- Recorre TODOS los gyms, se pone en los shoes del dueno (auth.uid simulado)
 -- y llama a la funcion. Si algo esta mal, lo captura y lo muestra.
 --
--- `security invoker` explicito + `revoke` abajo: aunque el rollback final
--- borre la funcion, si alguien copia solo este bloque la funcion nace sin
--- permiso para anon. El `revoke` va en su propia sentencia.
+-- El `revoke` de mas abajo es lo que cierra la puerta, NO el
+-- `security invoker`. Ojo: el default de privilege de una funcion en
+-- PostgreSQL es `EXECUTE TO PUBLIC`, sin importar si es invoker o definer.
+-- Peor todavia en Supabase: hay `ALTER DEFAULT PRIVILEGES` sobre el schema
+-- public, asi que ademas nace con un grant EXPLICITO para anon. Por eso el
+-- `revoke` tiene que decir `from public, anon` y no solo `from public`; con
+-- `public` nomas, anon conserva el acceso.
+--
+-- O sea: `security invoker` esta bien para que el helper no corra con
+-- privilegios del owner, pero la unica razon por la que "copiar solo este
+-- bloque" no seria una fuga es que el `revoke` de abajo esta en el MISMO
+-- bloque. Si copiaste el `create or replace` y nada mas, si es una fuga.
 create or replace function public._diag_00046()
 returns jsonb
 language plpgsql

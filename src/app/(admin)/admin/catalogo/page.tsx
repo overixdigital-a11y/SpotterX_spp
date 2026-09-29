@@ -10,14 +10,15 @@ import {
   Plus,
   X,
   ImagePlus,
-  ImageOff,
   Copy,
+  Video,
+  VideoOff,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { useToast } from "@/components/core/ToastProvider";
 import { exerciseImage } from "@/lib/exercise-images";
-import { resetExercisePhotoMap } from "@/lib/exercise-photo-map";
+import { resetExerciseMediaMap, mediaPathFromUrl } from "@/lib/exercise-media-map";
 import { resetExerciseCatalogCache } from "@/components/training/ExercisePicker";
 import { resetFoodCatalogCache } from "@/components/training/FoodPicker";
 import { DISCIPLINES } from "@/lib/disciplines";
@@ -30,7 +31,8 @@ interface Exercise {
   name: string;
   muscle: string | null;
   discipline: string | null;
-  image_url: string | null;
+  image_urls: string[];
+  demo_url: string | null;
 }
 
 interface Food {
@@ -57,7 +59,17 @@ const th = "px-4 py-2.5 text-xs font-medium text-[#9ca3af]";
 const td = "px-4 py-2.5 text-sm";
 
 const MIGRATION_HINT =
-  "Falta correr la migracion 00048 en Supabase (SQL Editor). Sin ella no se pueden guardar fotos, editar ni agregar desde aca.";
+  "Falta correr la migracion 00049 en Supabase (SQL Editor). Sin ella no se pueden guardar fotos, videos, editar ni agregar desde aca.";
+
+/** Tope de fotos por ejercicio. El mismo limite esta en la RPC (00049). */
+const MAX_PHOTOS = 5;
+
+/**
+ * Tope del video demo. No se recomprime en el celu (el browser no lo hace bien):
+ * se avisa y el admin exporta el clip liviano. 8 MB es el default del bucket
+ * `media`, asi que hay que subirlos al limite de todos modos.
+ */
+const MAX_VIDEO_MB = 8;
 
 /** Convierte el error de la RPC en algo que se pueda leer. */
 function readableError(message: string): string {
@@ -89,36 +101,54 @@ export default function AdminCatalogoPage() {
   const [fcat, setFcat] = useState("");
   const [fnums, setFnums] = useState({ kcal: "", protein: "", fat: "", carbs: "", grams: "" });
 
-  const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  // Un input de archivo por ejercicio y por tipo (foto / video). Se guardan en
+  // refs para disparar el dialogo nativo del celu.
+  const photoRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const videoRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const load = useCallback(async () => {
     const supabase = createClient();
     const [exRes, foodRes] = await Promise.all([
-      supabase.from("exercises").select("id, name, muscle, discipline, image_url").order("name"),
+      supabase
+        .from("exercises")
+        .select("id, name, muscle, discipline, image_urls, demo_url")
+        .order("name"),
       supabase
         .from("foods")
         .select("id, name, category, kcal, protein_g, fat_g, carbs_g, unit_grams")
         .order("name"),
     ]);
 
-    // Sin la columna image_url la query entera falla: se avisa en vez de mostrar
-    // un catalogo vacio sin explicacion.
+    // Sin las columnas image_urls/demo_url la query entera falla: se avisa en
+    // vez de mostrar un catalogo vacio sin explicacion.
     setNeedsMigration(
-      Boolean(exRes.error && /image_url|column/i.test(exRes.error.message))
+      Boolean(exRes.error && /image_urls|demo_url|column/i.test(exRes.error.message))
     );
 
-    if (!exRes.error && exRes.data) setExercises(exRes.data as unknown as Exercise[]);
+    if (!exRes.error && exRes.data) {
+      // `image_urls` es `not null` pero igual se normaliza: si la columna no
+      // existe todavia la query no llega aca, y si llega en null (fila vieja
+      // migrada a mano) la lista quedaria con `null.length` => reventon.
+      setExercises(
+        (exRes.data as unknown as (Omit<Exercise, "image_urls"> & {
+          image_urls: string[] | null;
+        })[]).map((r) => ({
+          ...r,
+          image_urls: Array.isArray(r.image_urls) ? r.image_urls.filter(Boolean) : [],
+        }))
+      );
+    }
     if (!foodRes.error && foodRes.data) setFoods(foodRes.data as Food[]);
     setLoading(false);
   }, []);
 
   /**
    * Un cambio en el admin tiene que verse en el resto de la app sin que el
-   * usuario recargue: la foto propia, la lista de ejercicios y la de alimentos
-   * viven en caches de modulo, no en estado de componente.
+   * usuario recargue: el material propio, la lista de ejercicios y la de
+   * alimentos viven en caches de modulo, no en estado de componente.
    */
   const invalidate = () => {
-    resetExercisePhotoMap();
+    resetExerciseMediaMap();
     resetExerciseCatalogCache();
     resetFoodCatalogCache();
   };
@@ -290,13 +320,52 @@ export default function AdminCatalogoPage() {
     }
   };
 
-  // --------------------------------------------------------------- fotos
-  const pickFile = (id: string) => fileRefs.current[id]?.click();
+  // ------------------------------------------------------- material
+  const pickPhoto = (id: string) => photoRefs.current[id]?.click();
+  const pickVideo = (id: string) => videoRefs.current[id]?.click();
 
-  const onFile = async (ex: Exercise, file: File | null) => {
+  /** Escribe fotos + video de un ejercicio y refresca la fila en la tabla. */
+  const saveMedia = async (id: string, fotos: string[], video: string | null) => {
+    const { error } = await createClient().rpc("admin_set_exercise_media", {
+      p_exercise_id: id,
+      p_image_urls: fotos,
+      p_demo_url: video,
+    });
+    if (error) throw new Error(readableError(error.message));
+    // La app lee el mapa desde memoria: hay que invalidarlo para que las rutinas
+    // muestren el material nuevo sin recargar.
+    invalidate();
+    setExercises((prev) =>
+      prev.map((e) => (e.id === id ? { ...e, image_urls: fotos, demo_url: video } : e))
+    );
+  };
+
+  /**
+   *BORra el archivo de Storage de una URL, salvo que OTRA fila la siga
+   * usando. Esto importa por el boton "copiar a Nordic curl": las dos filas
+   * quedan apuntando al MISMO objeto, y borrar el de una dejaria a la otra
+   * apuntando al vacio.
+   */
+  const purgeObject = async (url: string, exceptExerciseId: string) => {
+    const path = mediaPathFromUrl(url);
+    if (!path) return;
+    const stillUsed = exercises.some(
+      (e) =>
+        e.id !== exceptExerciseId &&
+        (e.image_urls.includes(url) || e.demo_url === url)
+    );
+    if (stillUsed) return;
+    await createClient().storage.from("media").remove([path]);
+  };
+
+  const uploadPhoto = async (ex: Exercise, file: File | null) => {
     if (!file) return;
     if (!userId) {
       toast("No se pudo identificar tu usuario", "error");
+      return;
+    }
+    if (ex.image_urls.length >= MAX_PHOTOS) {
+      toast(`Maximo ${MAX_PHOTOS} fotos por ejercicio`, "error");
       return;
     }
     setBusy(`photo:${ex.id}`);
@@ -310,19 +379,12 @@ export default function AdminCatalogoPage() {
       if (upErr) throw new Error(upErr.message);
 
       const { data: pub } = supabase.storage.from("media").getPublicUrl(path);
-      const { error } = await supabase.rpc("admin_set_exercise_image", {
-        p_exercise_id: ex.id,
-        p_image_url: pub.publicUrl,
-      });
-      if (error) throw new Error(readableError(error.message));
-
-      // La app lee el mapa desde memoria: hay que invalidarlo para que las
-      // rutinas muestren la foto nueva sin recargar.
-      invalidate();
-      setExercises((prev) =>
-        prev.map((e) => (e.id === ex.id ? { ...e, image_url: pub.publicUrl } : e))
+      await saveMedia(ex.id, [...ex.image_urls, pub.publicUrl], ex.demo_url);
+      toast(
+        ex.image_urls.length === 0
+          ? `Foto de "${ex.name}" guardada`
+          : `Foto agregada (${ex.image_urls.length + 1}/${MAX_PHOTOS})`
       );
-      toast(`Foto de "${ex.name}" guardada`);
     } catch (err) {
       toast(readableError(err instanceof Error ? err.message : String(err)), "error");
     } finally {
@@ -330,17 +392,21 @@ export default function AdminCatalogoPage() {
     }
   };
 
-  const removePhoto = async (ex: Exercise) => {
-    if (!confirm(`¿Quitar la foto de "${ex.name}"?\n\nVuelve a la foto que trae la app, si tenia.`)) return;
+  const removePhoto = async (ex: Exercise, url: string) => {
+    const quedan = ex.image_urls.length - 1;
+    if (
+      !confirm(
+        quedan > 0
+          ? `¿Quitar esta foto de "${ex.name}"?\n\nQuedan ${quedan}. La primera es la que se ve en la lista.`
+          : `¿Quitar la foto de "${ex.name}"?\n\nVuelve a la que trae la app, si tenia.`
+      )
+    )
+      return;
     setBusy(`photo:${ex.id}`);
     try {
-      const { error } = await createClient().rpc("admin_set_exercise_image", {
-        p_exercise_id: ex.id,
-        p_image_url: null,
-      });
-      if (error) throw new Error(readableError(error.message));
-      invalidate();
-      setExercises((prev) => prev.map((e) => (e.id === ex.id ? { ...e, image_url: null } : e)));
+      const fotos = ex.image_urls.filter((u) => u !== url);
+      await saveMedia(ex.id, fotos, ex.demo_url);
+      await purgeObject(url, ex.id);
       toast("Foto quitada");
     } catch (err) {
       toast(readableError(err instanceof Error ? err.message : String(err)), "error");
@@ -349,7 +415,62 @@ export default function AdminCatalogoPage() {
     }
   };
 
-  /** Copia la foto propia al otro nombre del mismo movimiento (es/en). */
+  const uploadVideo = async (ex: Exercise, file: File | null) => {
+    if (!file) return;
+    if (!userId) {
+      toast("No se pudo identificar tu usuario", "error");
+      return;
+    }
+    if (!/^video\/(mp4|webm)$/i.test(file.type)) {
+      toast("El video tiene que ser MP4 o WebM", "error");
+      return;
+    }
+    if (file.size > MAX_VIDEO_MB * 1024 * 1024) {
+      toast(
+        `El video pesa ${(file.size / 1024 / 1024).toFixed(1)} MB y el maximo es ${MAX_VIDEO_MB} MB. ` +
+          `Exportalo a 720p (en el celu: Compartir -> Guardar en archivos ->Guardar como -> Pelicula 720p).`,
+        "error"
+      );
+      return;
+    }
+    setBusy(`video:${ex.id}`);
+    try {
+      const supabase = createClient();
+      const ext = file.type === "video/webm" ? "webm" : "mp4";
+      const path = `${userId}/ejercicios-video/${ex.id}-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("media")
+        .upload(path, file, { upsert: false });
+      if (upErr) throw new Error(upErr.message);
+
+      const { data: pub } = supabase.storage.from("media").getPublicUrl(path);
+      const anterior = ex.demo_url;
+      await saveMedia(ex.id, ex.image_urls, pub.publicUrl);
+      if (anterior) await purgeObject(anterior, ex.id);
+      toast(`Video de "${ex.name}" guardado`);
+    } catch (err) {
+      toast(readableError(err instanceof Error ? err.message : String(err)), "error");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const removeVideo = async (ex: Exercise) => {
+    if (!confirm(`¿Quitar el video de "${ex.name}"?`)) return;
+    setBusy(`video:${ex.id}`);
+    try {
+      const anterior = ex.demo_url;
+      await saveMedia(ex.id, ex.image_urls, null);
+      if (anterior) await purgeObject(anterior, ex.id);
+      toast("Video quitado");
+    } catch (err) {
+      toast(readableError(err instanceof Error ? err.message : String(err)), "error");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /** Copia fotos + video al otro nombre del mismo movimiento (es/en). */
   const copyToTwin = async (ex: Exercise, twinName: string) => {
     setBusy(`photo:${ex.id}`);
     try {
@@ -357,16 +478,9 @@ export default function AdminCatalogoPage() {
         (e) => e.name.trim().toLowerCase() === twinName.trim().toLowerCase()
       );
       if (!twin) throw new Error(`No encontre "${twinName}" en el catalogo`);
-      const { error } = await createClient().rpc("admin_set_exercise_image", {
-        p_exercise_id: twin.id,
-        p_image_url: ex.image_url,
-      });
-      if (error) throw new Error(readableError(error.message));
-      invalidate();
-      setExercises((prev) =>
-        prev.map((e) => (e.id === twin.id ? { ...e, image_url: ex.image_url } : e))
-      );
-      toast(`Foto copiada a "${twin.name}"`);
+      const fotos = ex.image_urls.slice(0, MAX_PHOTOS);
+      await saveMedia(twin.id, fotos, ex.demo_url);
+      toast(`Material copiado a "${twin.name}"`);
     } catch (err) {
       toast(readableError(err instanceof Error ? err.message : String(err)), "error");
     } finally {
@@ -383,7 +497,7 @@ export default function AdminCatalogoPage() {
         const u = await usage(kind === "ejercicios" ? "exercise" : "food", row.name);
         const where = describeUsage(kind === "ejercicios" ? "exercise" : "food", u);
         if (where) {
-          warn = `\n\nEsta en uso en ${where}. Las rutinas quedan con el nombre escrito y, si tenia foto propia, la pierden.`;
+          warn = `\n\nEsta en uso en ${where}. Las rutinas quedan con el nombre escrito y, si tenia fotos o video propios, los pierden.`;
         }
       } catch {
         // si no se puede medir el uso, se borra igual (el borrado va por RPC admin)
@@ -391,6 +505,18 @@ export default function AdminCatalogoPage() {
       if (!confirm(`¿Eliminar "${row.name}"?${warn}`)) {
         setBusy(null);
         return;
+      }
+      // Los archivos de Storage no los borra la RPC (esta no sabe de buckets):
+      // se limpian aca, antes de que la fila desaparezca del estado.
+      if (kind === "ejercicios") {
+        const ex = row as Exercise;
+        for (const url of [...ex.image_urls, ex.demo_url].filter(Boolean) as string[]) {
+          try {
+            await purgeObject(url, ex.id);
+          } catch {
+            // un archivo huerfano no puede bloquear el borrado de la fila
+          }
+        }
       }
       const supabase = createClient();
       const { error } =
@@ -411,8 +537,8 @@ export default function AdminCatalogoPage() {
 
   // --------------------------------------------------------------- filtro
   const q = search.trim().toLowerCase();
-  const hasOwn = (e: Exercise) => Boolean(e.image_url);
-  const hasAny = (e: Exercise) => Boolean(e.image_url) || Boolean(exerciseImage(e.name));
+  const hasOwn = (e: Exercise) => e.image_urls.length > 0 || Boolean(e.demo_url);
+  const hasAny = (e: Exercise) => hasOwn(e) || Boolean(exerciseImage(e.name));
 
   const visibleExercises = exercises.filter((e) => {
     if (q && !e.name.toLowerCase().includes(q) && !e.muscle?.toLowerCase().includes(q)) return false;
@@ -492,8 +618,8 @@ export default function AdminCatalogoPage() {
                 className="rounded-lg border border-[#1e2530] bg-[#121722] px-2.5 py-2 text-xs text-[#e4e8ee] focus:border-[#00e5c7]/50 focus:outline-none"
               >
                 <option value="todas">Todas ({exercises.length})</option>
-                <option value="sin">Sin foto ({missing})</option>
-                <option value="propia">Con foto propia ({withOwn})</option>
+                <option value="sin">Sin material ({missing})</option>
+                <option value="propia">Con material propio ({withOwn})</option>
               </select>
             </>
           )}
@@ -627,7 +753,8 @@ export default function AdminCatalogoPage() {
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-[#1e2530] bg-[#0c1017]">
-                <th className={th}>Foto</th>
+                <th className={th}>Fotos</th>
+                <th className={th}>Video</th>
                 <th className={th}>Nombre</th>
                 <th className={`hidden ${th} sm:table-cell`}>Grupo</th>
                 <th className={`hidden ${th} sm:table-cell`}>Disciplina</th>
@@ -642,61 +769,117 @@ export default function AdminCatalogoPage() {
                       (x) => x.name.trim().toLowerCase() === twinName.trim().toLowerCase()
                     )
                   : null;
-                const showCopy = Boolean(e.image_url && twin && !twin.image_url);
+                const showCopy = Boolean(
+                  hasOwn(e) && twin && !hasOwn(twin)
+                );
                 return (
                   <tr
                     key={e.id}
                     className="border-b border-[#1e2530]/50 last:border-0 hover:bg-[#121722]/50"
                   >
-                    {/* foto */}
+                    {/* fotos: hasta MAX_PHOTOS, la primera es la portada */}
                     <td className={td}>
-                      <div className="flex items-center gap-1.5">
-                        {e.image_url ? (
-                          <>
+                      <div className="flex flex-wrap items-center gap-1">
+                        {e.image_urls.map((u) => (
+                          <span key={u} className="relative inline-block">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
-                              src={e.image_url}
+                              src={u}
                               alt=""
                               width={40}
                               height={40}
-                              className="h-10 w-10 shrink-0 rounded-md object-cover"
+                              className="h-10 w-10 rounded-md object-cover"
                             />
                             <button
-                              onClick={() => removePhoto(e)}
+                              onClick={() => void removePhoto(e, u)}
                               disabled={busy === `photo:${e.id}`}
-                              title="Quitar la foto"
-                              className="rounded-md p-1.5 text-[#9ca3af] hover:bg-[#ef4444]/10 hover:text-[#ef4444] disabled:opacity-50"
+                              title="Quitar esta foto"
+                              className="absolute -right-1 -top-1 rounded-full bg-[#0c1017] p-0.5 text-[#9ca3af] hover:text-[#ef4444] disabled:opacity-50"
                             >
-                              {busy === `photo:${e.id}` ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                <ImageOff className="h-3.5 w-3.5" />
-                              )}
+                              <X className="h-3 w-3" />
                             </button>
-                          </>
-                        ) : (
+                          </span>
+                        ))}
+                        {e.image_urls.length < MAX_PHOTOS && (
                           <button
-                            onClick={() => pickFile(e.id)}
+                            onClick={() => pickPhoto(e.id)}
                             disabled={busy === `photo:${e.id}` || needsMigration}
-                            title="Subir foto"
+                            title={`Agregar foto (${e.image_urls.length}/${MAX_PHOTOS})`}
                             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-dashed border-[#1e2530] text-[#6b7280] hover:border-[#00e5c7]/50 hover:text-[#00e5c7] disabled:opacity-50"
                           >
                             {busy === `photo:${e.id}` ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
                               <ImagePlus className="h-4 w-4" />
                             )}
                           </button>
                         )}
+                        {e.image_urls.length === 0 && !e.demo_url && (
+                          <span className="text-[10px] text-[#6b7280]">sin foto</span>
+                        )}
+                      </div>
+                      <input
+                        ref={(el) => {
+                          photoRefs.current[e.id] = el;
+                        }}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(ev) => {
+                          void uploadPhoto(e, ev.target.files?.[0] ?? null);
+                          ev.target.value = "";
+                        }}
+                      />
+                    </td>
+
+                    {/* video demo */}
+                    <td className={td}>
+                      <div className="flex items-center gap-1.5">
+                        {e.demo_url ? (
+                          <>
+                            <video
+                              src={e.demo_url}
+                              muted
+                              playsInline
+                              preload="metadata"
+                              className="h-10 w-10 shrink-0 rounded-md bg-black object-cover"
+                            />
+                            <button
+                              onClick={() => void removeVideo(e)}
+                              disabled={busy === `video:${e.id}`}
+                              title="Quitar el video"
+                              className="rounded-md p-1.5 text-[#9ca3af] hover:bg-[#ef4444]/10 hover:text-[#ef4444] disabled:opacity-50"
+                            >
+                              {busy === `video:${e.id}` ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <VideoOff className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => pickVideo(e.id)}
+                            disabled={busy === `video:${e.id}` || needsMigration}
+                            title={`Subir video demo (max ${MAX_VIDEO_MB} MB)`}
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-dashed border-[#1e2530] text-[#6b7280] hover:border-[#00e5c7]/50 hover:text-[#00e5c7] disabled:opacity-50"
+                          >
+                            {busy === `video:${e.id}` ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Video className="h-4 w-4" />
+                            )}
+                          </button>
+                        )}
                         <input
                           ref={(el) => {
-                            fileRefs.current[e.id] = el;
+                            videoRefs.current[e.id] = el;
                           }}
                           type="file"
-                          accept="image/*"
+                          accept="video/mp4,video/webm"
                           className="hidden"
                           onChange={(ev) => {
-                            void onFile(e, ev.target.files?.[0] ?? null);
+                            void uploadVideo(e, ev.target.files?.[0] ?? null);
                             ev.target.value = "";
                           }}
                         />
@@ -707,14 +890,14 @@ export default function AdminCatalogoPage() {
                       {e.name}
                       {!hasAny(e) && (
                         <span className="ml-2 rounded bg-[#1a1f2e] px-1.5 py-0.5 text-[10px] text-[#6b7280]">
-                          sin foto
+                          sin material
                         </span>
                       )}
                       {showCopy && (
                         <button
                           onClick={() => void copyToTwin(e, twinName as string)}
                           disabled={busy === `photo:${e.id}`}
-                          title={`Copiar la foto a "${twinName}" (es el mismo movimiento con otro nombre)`}
+                          title={`Copiar las fotos y el video a "${twinName}" (es el mismo movimiento con otro nombre)`}
                           className="ml-2 inline-flex items-center gap-1 rounded bg-[#00e5c7]/10 px-1.5 py-0.5 text-[10px] text-[#00e5c7] hover:bg-[#00e5c7]/20 disabled:opacity-50"
                         >
                           <Copy className="h-2.5 w-2.5" /> copiar a &quot;{twinName}&quot;

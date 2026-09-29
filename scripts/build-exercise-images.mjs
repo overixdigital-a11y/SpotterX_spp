@@ -348,7 +348,7 @@ const SHOW_EXERCISE_IMAGES = true;
 
 /**
  * Normaliza un nombre de ejercicio a la clave del mapa. Se EXPORTA porque la
- * usa tambien el mapa de fotos propias de la base (src/lib/exercise-photo-map.ts):
+ * usa tambien el mapa de material propio de la base (src/lib/exercise-media-map.ts):
  * si cada uno normalizara por su cuenta, las dos mitades dejarian de coincidir
  * y las fotos propias no aparecerian nunca.
  */

@@ -32,7 +32,7 @@ import { todayLocal } from "@/lib/format";
 import { useToast } from "@/components/core/ToastProvider";
 import ExercisePicker from "@/components/training/ExercisePicker";
 import ExerciseThumb from "@/components/training/ExerciseThumb";
-import { loadExercisePhotoMap } from "@/lib/exercise-photo-map";
+import { loadExerciseMediaMap } from "@/lib/exercise-media-map";
 import { MembershipCard } from "@/components/training/MembershipCard";
 import FoodPicker, { type Food } from "@/components/training/FoodPicker";
 import { MEALS, getDietData, formatQuantity } from "@/lib/diets";
@@ -227,7 +227,7 @@ export default function AlumnoPage() {
       // texto, no id), asi que este mapa tiene que estar listo antes de que
       // aparezcan los items. Se cachea a nivel de modulo: la segunda pantalla
       // que lo pide no vuelve a pegarle a la base.
-      await loadExercisePhotoMap();
+      await loadExerciseMediaMap();
 
       const { data: p } = await supabase
         .from("profiles")
@@ -1121,7 +1121,7 @@ export default function AlumnoPage() {
                           </p>
                           {dayItems.map((it) => (
                             <div key={it.id} className="mb-1 flex items-start gap-2 rounded-lg border-b border-edge py-2">
-                              <ExerciseThumb name={it.exercise} size={40} />
+                              <ExerciseThumb name={it.exercise} size={40} interactive />
                               <div className="flex-1">
                                 <p className="text-sm font-medium text-ink">{it.exercise}</p>
                                 <p className="text-xs text-muted">
@@ -1701,7 +1701,7 @@ export default function AlumnoPage() {
                             : [];
                           return (
                             <div key={ri.id} className="mb-1 flex items-start gap-2 rounded-lg border-b border-edge py-1.5">
-                              <ExerciseThumb name={ri.exercise} size={40} />
+                              <ExerciseThumb name={ri.exercise} size={40} interactive />
                               <div className="flex-1">
                                 <p className="text-sm font-medium text-ink">{ri.exercise}</p>
                                 {series.length > 0 ? (

@@ -17,7 +17,14 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    // Sin esto, arrastrar sobre el contenido del sheet (una foto grande, un
+    // video) hace scroll de la pagina de fondo, que queda moviendose atras.
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
   }, [open, onClose]);
 
   if (!open) return null;

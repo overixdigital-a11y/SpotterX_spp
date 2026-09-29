@@ -30,7 +30,7 @@ import { MEALS, getDietData, formatQuantity } from "@/lib/diets";
 import { useToast } from "@/components/core/ToastProvider";
 import { StudentMembershipCard } from "@/components/training/StudentMembershipCard";
 import ExerciseThumb from "@/components/training/ExerciseThumb";
-import { loadExercisePhotoMap } from "@/lib/exercise-photo-map";
+import { loadExerciseMediaMap } from "@/lib/exercise-media-map";
 import PostComposer from "@/components/social/PostComposer";
 import MediaPicker from "@/components/core/MediaPicker";
 import dynamic from "next/dynamic";
@@ -232,7 +232,7 @@ export default function MiEntrenamientoPage() {
       // texto, no id), asi que este mapa tiene que estar listo antes de que
       // aparezcan los items. Se cachea a nivel de modulo: la segunda pantalla
       // que lo pide no vuelve a pegarle a la base.
-      await loadExercisePhotoMap();
+      await loadExerciseMediaMap();
 
       const { data: pl } = await supabase
         .from("trainer_plans")
@@ -806,7 +806,7 @@ export default function MiEntrenamientoPage() {
                           </p>
                           {dayItems.map((it) => (
                             <div key={it.id} className="flex items-start gap-2 rounded-lg border-b border-edge py-2">
-                              <ExerciseThumb name={it.exercise} size={40} />
+                              <ExerciseThumb name={it.exercise} size={40} interactive />
                               <div className="flex-1">
                                 <p className="text-sm font-medium text-ink">{it.exercise}</p>
                                 <p className="text-xs text-muted">
@@ -975,7 +975,7 @@ export default function MiEntrenamientoPage() {
                             return (
                               <div key={ri.id} className="rounded-lg border border-edge bg-bg p-2.5">
                                 <div className="flex items-start gap-2">
-                                  <ExerciseThumb name={ri.exercise} size={40} />
+                                  <ExerciseThumb name={ri.exercise} size={40} interactive />
                                   <div className="min-w-0 flex-1">
                                     <p className="text-sm font-medium text-ink">{ri.exercise}</p>
                                     {seriesDiscipline ? (

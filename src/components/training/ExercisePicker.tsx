@@ -7,7 +7,7 @@ import { useAuthState } from "@/lib/auth-context";
 import { useGymModuleAccess } from "@/lib/gym-modules";
 import { DISCIPLINES } from "@/lib/disciplines";
 import { MUSCLE_ORDER } from "@/lib/catalog";
-import { loadExercisePhotoMap } from "@/lib/exercise-photo-map";
+import { loadExerciseMediaMap } from "@/lib/exercise-media-map";
 import ExerciseThumb from "@/components/training/ExerciseThumb";
 
 interface Exercise {
@@ -78,7 +78,7 @@ export default function ExercisePicker({
     // de setearla: si no, las miniaturas aparecerian un instante despues de los
     // nombres (parpadeo). El mapa de module ya cachea, asi que el picker lo
     // comparte gratis con las rutinas de la misma pantalla.
-    Promise.all([loadExercises(), loadExercisePhotoMap()])
+    Promise.all([loadExercises(), loadExerciseMediaMap()])
       .then(([items]) => {
         if (!active) return;
         setList(items);

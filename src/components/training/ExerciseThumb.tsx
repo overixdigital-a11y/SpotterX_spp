@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import { Play } from "lucide-react";
 import { exerciseImage, normalizeExerciseName } from "@/lib/exercise-images";
-import { exerciseMediaMap } from "@/lib/exercise-media-map";
+import {
+  getExerciseMediaMap,
+  subscribeExerciseMedia,
+} from "@/lib/exercise-media-map";
 import ExerciseMediaSheet from "@/components/training/ExerciseMediaSheet";
 
 type Props = {
@@ -53,8 +56,20 @@ export default function ExerciseThumb({
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
 
+  // El mapa se lee con `useSyncExternalStore` y no con una llamada directa: asi
+  // la miniatura se repinta sola cuando el admin sube material desde OTRA
+  // pestaña, sin que la pantalla de rutina tenga que enterarse de nada. Sin
+  // esto la memoria del modulo queda con el snapshot viejo y se ve la imagen
+  // estatica hasta que se recarga a mano.
+  // El 3er argumento (getServerSnapshot) evita el warning de hidratacion.
+  const mediaMap = useSyncExternalStore(
+    subscribeExerciseMedia,
+    getExerciseMediaMap,
+    getExerciseMediaMap
+  );
+
   const key = name ? normalizeExerciseName(name) : "";
-  const media = key ? exerciseMediaMap()[key] : undefined;
+  const media = key ? mediaMap[key] : undefined;
   const fotos = media?.fotos ?? [];
   const video = media?.video ?? null;
 

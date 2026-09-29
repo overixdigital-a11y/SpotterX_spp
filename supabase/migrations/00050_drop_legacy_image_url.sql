@@ -1,0 +1,51 @@
+-- ============================================================
+-- SpotterX - 00050: Limpieza de la columna image_url y su RPC.
+--
+-- Ejecutar en SQL Editor DESPUES de la 00049 (que ya esta corrida).
+--
+-- QUE LIMPIA:
+--   1. admin_set_exercise_image(uuid, text)  -> reemplazada por
+--      admin_set_exercise_media de la 00049
+--   2. exercises.image_url                   -> reemplazada por
+--      exercises.image_urls (array) de la 00049
+--
+-- POR QUE AHORA Y NO EN LA 00049:
+--   La app en produccion estaba usando ambas. Dropearlas antes del deploy
+--   rompe la subida de fotos. Recien con el codigo nuevo desplegado y la 00049
+--   corrida se puede limpiar. Verificado por grep: 0 referencias en el codigo.
+--
+-- ORDEN IMPORTANTE:
+--   Primero la FUNCION, despues la COLUMNA. Al reves, la funcion queda con el
+--   cuerpo apuntando a una columna inexistente.
+--
+-- ATENCION: la 00048 esta SUPERADA por la 00049. Si alguien la vuelve a correr,
+-- el `add column if not exists image_url` vuelve a crear la columna muerta y
+-- hay que correr esta 00050 de nuevo. No volver a correr migraciones viejas.
+--
+-- NO borra filas del catalogo. Una revision posterior (29/09/2026) dio que
+-- `Espalda`, `Pecho` y `Mariposa`, marcadas como basura en una anotacion
+-- anterior, estan bien sembradas: `discipline = 'natacion'`, `muscle = 'tecnica'`,
+-- y son estilos/tecicas legitimos de natacion (espalda, braza, mariposa,
+-- alongside crol, aguante con snorkel y patada con tabla). Verlas con:
+--   select name, muscle, discipline from exercises where discipline = 'natacion';
+-- ============================================================
+
+-- 1) La RPC vieja. Si no esta (porque la 00048 no llego a correr), no pasa nada.
+drop function if exists public.admin_set_exercise_image(uuid, text);
+
+-- 2) La columna vieja. `image_urls` (plural, de la 00049) NO se toca.
+alter table public.exercises drop column if exists image_url;
+
+-- 3) Verificacion (solo lectura, corre esto al final). Debe devolver 0 filas.
+--   select c.relname, a.attname
+--     from pg_attribute a
+--     join pg_class c on c.oid = a.attrelid
+--    where c.relname = 'exercises'
+--      and a.attname in ('image_url', 'image_urls', 'demo_url')
+--      and a.attnum > 0
+--      and not a.attisdropped;
+--
+--   Y la RPC vieja no debe existir (0 filas):
+--   select proname, pg_get_function_identity_arguments(oid)
+--     from pg_proc
+--    where proname = 'admin_set_exercise_image';

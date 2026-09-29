@@ -5,6 +5,7 @@ import { Search, Plus, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { useGymModuleAccess } from "@/lib/gym-modules";
+import { FOOD_CATEGORY_ORDER as CATEGORY_ORDER } from "@/lib/catalog";
 
 export interface Food {
   id: string;
@@ -17,25 +18,18 @@ export interface Food {
   unit_grams: number | null;
 }
 
-const CATEGORY_ORDER = [
-  "Proteínas",
-  "Carbohidratos",
-  "Frutas",
-  "Verduras",
-  "Lácteos",
-  "Grasas y frutos secos",
-  "Panadería y tostadas",
-  "Comidas preparadas",
-  "Bebidas",
-  "Snacks y ultraprocesados",
-  "Conservas",
-  "Condimentos y especias",
-  "Otros",
-];
-
 const fmt = (n: number | null | undefined) => (typeof n === "number" ? (Number.isInteger(n) ? String(n) : String(Number(n.toFixed(1)))) : "");
 
 let cache: Food[] | null = null;
+
+/**
+ * Invalida la cache del catalogo de alimentos. La consume /admin/catalogo: si
+ * el admin agrega o renombra un alimento y despues abre una dieta SIN recargar,
+ * el picker seguiria ofreciendo el catalogo viejo.
+ */
+export function resetFoodCatalogCache(): void {
+  cache = null;
+}
 
 async function loadFoods(): Promise<Food[]> {
   if (cache) return cache;

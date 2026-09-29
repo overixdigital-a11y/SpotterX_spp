@@ -32,6 +32,7 @@ import { todayLocal } from "@/lib/format";
 import { useToast } from "@/components/core/ToastProvider";
 import ExercisePicker from "@/components/training/ExercisePicker";
 import ExerciseThumb from "@/components/training/ExerciseThumb";
+import { loadExercisePhotoMap } from "@/lib/exercise-photo-map";
 import { MembershipCard } from "@/components/training/MembershipCard";
 import FoodPicker, { type Food } from "@/components/training/FoodPicker";
 import { MEALS, getDietData, formatQuantity } from "@/lib/diets";
@@ -222,6 +223,12 @@ export default function AlumnoPage() {
     let active = true;
 
     const load = async () => {
+      // Las miniaturas de ejercicios se buscan por NOMBRE (las rutinas guardan
+      // texto, no id), asi que este mapa tiene que estar listo antes de que
+      // aparezcan los items. Se cachea a nivel de modulo: la segunda pantalla
+      // que lo pide no vuelve a pegarle a la base.
+      await loadExercisePhotoMap();
+
       const { data: p } = await supabase
         .from("profiles")
         .select("id, username, full_name")

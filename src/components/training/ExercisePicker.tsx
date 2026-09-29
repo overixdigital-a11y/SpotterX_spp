@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { useGymModuleAccess } from "@/lib/gym-modules";
 import { DISCIPLINES } from "@/lib/disciplines";
+import { MUSCLE_ORDER } from "@/lib/catalog";
+import { loadExercisePhotoMap } from "@/lib/exercise-photo-map";
 import ExerciseThumb from "@/components/training/ExerciseThumb";
 
 interface Exercise {
@@ -15,13 +17,18 @@ interface Exercise {
   muscle: string | null;
 }
 
-const MUSCLE_ORDER = [
-  "pecho", "espalda", "hombros", "bíceps", "tríceps", "antebrazo",
-  "cuádriceps", "femoral", "glúteos", "pantorrilla",
-  "core", "full body", "cardio", "técnica", "movilidad", "otro",
-];
-
 let cache: Exercise[] | null = null;
+
+/**
+ * Invalida la cache del catalogo de ejercicios.
+ *
+ * La consume /admin/catalogo: si el admin agrega, renombra o borra un ejercicio
+ * y despues navega a una rutina SIN recargar la pagina, el picker seguiria
+ * mostrando la lista vieja (la cache vive en el modulo, no en el componente).
+ */
+export function resetExerciseCatalogCache(): void {
+  cache = null;
+}
 
 async function loadExercises(): Promise<Exercise[]> {
   if (cache) return cache;
@@ -67,13 +74,19 @@ export default function ExercisePicker({
   useEffect(() => {
     if (blocked) return;
     let active = true;
-    loadExercises().then((items) => {
-      if (!active) return;
-      setList(items);
-      setAvailable(true);
-    }).catch(() => {
-      if (active) setAvailable(false);
-    });
+    // El mapa de fotos propias se pide en paralelo a la lista y se ESPERA antes
+    // de setearla: si no, las miniaturas aparecerian un instante despues de los
+    // nombres (parpadeo). El mapa de module ya cachea, asi que el picker lo
+    // comparte gratis con las rutinas de la misma pantalla.
+    Promise.all([loadExercises(), loadExercisePhotoMap()])
+      .then(([items]) => {
+        if (!active) return;
+        setList(items);
+        setAvailable(true);
+      })
+      .catch(() => {
+        if (active) setAvailable(false);
+      });
     return () => { active = false; };
   }, [blocked]);
 

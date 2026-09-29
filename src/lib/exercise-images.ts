@@ -100,7 +100,13 @@ const IMAGES: Record<string, string> = {
 
 const SHOW_EXERCISE_IMAGES = true;
 
-const normalize = (s: string) =>
+/**
+ * Normaliza un nombre de ejercicio a la clave del mapa. Se EXPORTA porque la
+ * usa tambien el mapa de fotos propias de la base (src/lib/exercise-photo-map.ts):
+ * si cada uno normalizara por su cuenta, las dos mitades dejarian de coincidir
+ * y las fotos propias no aparecerian nunca.
+ */
+export const normalizeExerciseName = (s: string) =>
   s
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -111,5 +117,5 @@ const normalize = (s: string) =>
 /** Ruta de la miniatura del ejercicio, o null si todavia no tiene. */
 export const exerciseImage = (name: string | null | undefined): string | null => {
   if (!SHOW_EXERCISE_IMAGES || !name) return null;
-  return IMAGES[normalize(name)] ?? null;
+  return IMAGES[normalizeExerciseName(name)] ?? null;
 };

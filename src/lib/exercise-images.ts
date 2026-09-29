@@ -3,7 +3,7 @@
 // Imagenes de `yuhonas/free-exercise-db` (Unlicense), hotlinkeadas a GitHub.
 // Para regenerar o cambiar la muestra: node scripts/build-exercise-images.mjs
 //
-// Solo cubre 26 de los ~156 ejercicios del catalogo, y a proposito:
+// Solo cubre 25 de los ~156 ejercicios del catalogo, y a proposito:
 // los que no estan en este mapa NO muestran imagen y la fila se renderiza
 // exactamente como antes (sin thumbnail). Ver `exerciseImage()`.
 
@@ -54,8 +54,6 @@ const IMAGES: Record<string, string> = {
   "Kettlebell clean and press":
     "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Clean_and_Press/0.jpg",
   "Handstand push-up":
-    "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Handstand_Push-Ups/0.jpg",
-  "Flexión de pino":
     "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Handstand_Push-Ups/0.jpg",
   "Mountain climbers":
     "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Mountain_Climbers/0.jpg",

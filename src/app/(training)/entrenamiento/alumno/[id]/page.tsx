@@ -1420,6 +1420,16 @@ export default function AlumnoPage() {
                     Otras
                   </button>
                 </div>
+                {!routineForm.discipline ? (
+                  <p className="mt-1.5 rounded-lg border border-ember/30 bg-ember/5 px-2.5 py-1.5 text-[11px] text-ember">
+                    Elegí una disciplina para poder cargar reps y series.
+                  </p>
+                ) : !isSeriesDiscipline(routineForm.discipline) ? (
+                  <p className="mt-1.5 text-[11px] text-muted">
+                    {DISCIPLINES.find((d) => d.id === routineForm.discipline)?.label ?? "Esta disciplina"} no usa
+                    series: los campos se cargan directo.
+                  </p>
+                ) : null}
               </div>
 
               {routineForm.discipline === "otras" && (

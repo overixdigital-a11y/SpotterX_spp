@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { useGymModuleAccess } from "@/lib/gym-modules";
 import { DISCIPLINES } from "@/lib/disciplines";
+import ExerciseThumb from "@/components/training/ExerciseThumb";
 
 interface Exercise {
   id: string;
@@ -271,9 +272,10 @@ export default function ExercisePicker({
                     key={e.id}
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => selectExercise(e.name)}
-                    className="flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left text-xs text-ink transition hover:bg-neon/10"
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs text-ink transition hover:bg-neon/10"
                   >
-                    <span className="truncate">{e.name}</span>
+                    <ExerciseThumb name={e.name} size={36} />
+                    <span className="min-w-0 flex-1 truncate">{e.name}</span>
                     {e.name.toLowerCase() === q && <Check className="h-3.5 w-3.5 shrink-0 text-neon" />}
                   </button>
                 ))}
@@ -291,9 +293,10 @@ export default function ExercisePicker({
                     key={e.id}
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => selectExercise(e.name)}
-                    className="flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left text-xs text-ink transition hover:bg-neon/10"
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs text-ink transition hover:bg-neon/10"
                   >
-                    <span className="truncate">{e.name}</span>
+                    <ExerciseThumb name={e.name} size={36} />
+                    <span className="min-w-0 flex-1 truncate">{e.name}</span>
                     {e.name.toLowerCase() === q && <Check className="h-3.5 w-3.5 shrink-0 text-neon" />}
                   </button>
                 ))}

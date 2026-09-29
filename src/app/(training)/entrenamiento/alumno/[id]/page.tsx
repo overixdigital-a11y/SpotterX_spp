@@ -33,6 +33,7 @@ import { useToast } from "@/components/core/ToastProvider";
 import ExercisePicker from "@/components/training/ExercisePicker";
 import { MembershipCard } from "@/components/training/MembershipCard";
 import FoodPicker, { type Food } from "@/components/training/FoodPicker";
+import ExerciseThumb from "@/components/training/ExerciseThumb";
 import { MEALS, getDietData, formatQuantity } from "@/lib/diets";
 import { DISCIPLINES, getDisciplineFields, getSeries, resolveSeries, legacyToSeries, formatSeries, isSeriesDiscipline, type FieldDef, type Series } from "@/lib/disciplines";
 import dynamic from "next/dynamic";
@@ -1113,7 +1114,8 @@ export default function AlumnoPage() {
                           </p>
                           {dayItems.map((it) => (
                             <div key={it.id} className="mb-1 flex items-start gap-2 rounded-lg border-b border-edge py-2">
-                              <div className="flex-1">
+                              <ExerciseThumb name={it.exercise} size={40} />
+                              <div className="min-w-0 flex-1">
                                 <p className="text-sm font-medium text-ink">{it.exercise}</p>
                                 <p className="text-xs text-muted">
                                   {it.sets ?? "—"}×{it.reps ?? "—"}
@@ -1682,19 +1684,24 @@ export default function AlumnoPage() {
                             : [];
                           return (
                             <div key={ri.id} className="mb-1 rounded-lg border-b border-edge py-1.5">
-                              <p className="text-sm font-medium text-ink">{ri.exercise}</p>
-                              {series.length > 0 ? (
-                                series.map((s, si) => (
-                                  <p key={si} className="text-xs text-muted">
-                                    Serie {si + 1}: {formatSeries(s)}
-                                  </p>
-                                ))
-                              ) : (
-                                plannedSummary && (
-                                  <p className="text-xs text-muted">{plannedSummary}</p>
-                                )
-                              )}
-                              {ri.notes && <p className="text-[11px] text-muted italic">{ri.notes}</p>}
+                              <div className="flex items-start gap-2">
+                                <ExerciseThumb name={ri.exercise} size={40} />
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-medium text-ink">{ri.exercise}</p>
+                                  {series.length > 0 ? (
+                                    series.map((s, si) => (
+                                      <p key={si} className="text-xs text-muted">
+                                        Serie {si + 1}: {formatSeries(s)}
+                                      </p>
+                                    ))
+                                  ) : (
+                                    plannedSummary && (
+                                      <p className="text-xs text-muted">{plannedSummary}</p>
+                                    )
+                                  )}
+                                  {ri.notes && <p className="text-[11px] text-muted italic">{ri.notes}</p>}
+                                </div>
+                              </div>
                             </div>
                           );
                         })}

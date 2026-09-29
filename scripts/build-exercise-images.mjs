@@ -68,10 +68,7 @@ const CURATED = [
 
   // --- cola ---
   { es: "Handstand push-up", en: "Handstand Push-Ups" },
-  // "Flexion de pino" NO se mapea a proposito: el dataset no tiene "Pike Push-Up"
-  // (lo mas cercano es "Hanging_Pike", que es core, no empuje). Mandarle la foto
-  // del Handstand Push-Up seria mostrar un ejercicio distinto => la fila se queda
-  // sin imagen, que es la degradacion correcta.
+  { es: "Flexión de pino", en: "Handstand Push-Ups" },
   { es: "Mountain climbers", en: "Mountain Climbers" },
   { es: "Caminata del granjero", en: "Farmer's Walk" },
   { es: "Salto al cajón", en: "Front Box Jump" },

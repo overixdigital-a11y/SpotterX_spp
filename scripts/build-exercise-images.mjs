@@ -15,6 +15,11 @@
  *  3. `--check` prueba el LOOKUP REAL (`exerciseImage`) sobre cada clave y exige
  *     100% de acierto. Verificar que el nombre exista en los seeds no alcanza:
  *     asi paso el primer piloto con 0 de 25 imagenes.
+ *
+ * DEPENDENCIA: sharp SOLO se usa aca, para redimensionar. La app no lo necesita
+ * (sirve archivos estaticos de public/), asi que NO esta declarado en package.json
+ * a proposito: el repo tiene lockfile de npm y de pnpm a la vez y declararlo
+ * rompe `pnpm install` en Vercel. Para regenerar imagenes: `npm i -D sharp`.
  */
 
 import { readFile, writeFile, mkdir, access } from "node:fs/promises";
@@ -23,7 +28,17 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import path from "node:path";
 import os from "node:os";
-import sharp from "sharp";
+let sharp;
+try {
+  sharp = (await import("sharp")).default;
+} catch {
+  console.error(
+    "\n  Falta 'sharp', que solo hace falta para regenerar las miniaturas.\n" +
+      "    npm i -D sharp\n" +
+      "  (Las imagenes ya generadas estan en public/exercises/, la app anda sin esto.)\n"
+  );
+  process.exit(1);
+}
 
 const DATASET_URL = "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises.json";
 const IMAGE_BASE = "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/";

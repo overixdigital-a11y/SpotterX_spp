@@ -1,0 +1,115 @@
+// GENERADO POR scripts/build-exercise-images.mjs - no editar a mano.
+// Correr `npm run build:images` para regenerar.
+// Un ejercicio solo aparece aca si el dataset tiene ese movimiento EXACTO.
+
+const IMAGES: Record<string, string> = {
+  "press de banca": "/exercises/Barbell_Bench_Press_-_Medium_Grip.webp",
+  "press inclinado con mancuernas": "/exercises/Incline_Dumbbell_Press.webp",
+  "press de hombros": "/exercises/Dumbbell_Shoulder_Press.webp",
+  "press militar": "/exercises/Standing_Military_Press.webp",
+  "press frances": "/exercises/EZ-Bar_Skullcrusher.webp",
+  "sentadilla": "/exercises/Barbell_Squat.webp",
+  "sentadilla frontal": "/exercises/Front_Barbell_Squat.webp",
+  "sentadilla bulgara": "/exercises/Barbell_Side_Split_Squat.webp",
+  "peso muerto": "/exercises/Barbell_Deadlift.webp",
+  "peso muerto rumano": "/exercises/Romanian_Deadlift.webp",
+  "remo con barra": "/exercises/Bent_Over_Barbell_Row.webp",
+  "remo con mancuerna": "/exercises/One-Arm_Dumbbell_Row.webp",
+  "remo en polea baja": "/exercises/Seated_Cable_Rows.webp",
+  "jalon al pecho": "/exercises/Wide-Grip_Lat_Pulldown.webp",
+  "dominadas": "/exercises/Pullups.webp",
+  "dominadas lastradas": "/exercises/Weighted_Pull_Ups.webp",
+  "curl de biceps con barra": "/exercises/Barbell_Curl.webp",
+  "curl de biceps con mancuerna": "/exercises/Dumbbell_Bicep_Curl.webp",
+  "curl martillo": "/exercises/Hammer_Curls.webp",
+  "extensiones de triceps en polea": "/exercises/Triceps_Pushdown_-_Rope_Attachment.webp",
+  "aperturas con mancuernas": "/exercises/Dumbbell_Flyes.webp",
+  "elevaciones laterales": "/exercises/Side_Lateral_Raise.webp",
+  "pajaros vuelos inversos": "/exercises/Reverse_Flyes.webp",
+  "hip thrust": "/exercises/Barbell_Hip_Thrust.webp",
+  "prensa de piernas": "/exercises/Leg_Press.webp",
+  "extensiones de cuadriceps": "/exercises/Leg_Extensions.webp",
+  "curl de femoral en maquina": "/exercises/Lying_Leg_Curls.webp",
+  "peso muerto sumo": "/exercises/Sumo_Deadlift.webp",
+  "zancadas": "/exercises/Barbell_Walking_Lunge.webp",
+  "zancadas con mancuernas": "/exercises/Dumbbell_Lunges.webp",
+  "elevacion de pantorrillas": "/exercises/Standing_Calf_Raises.webp",
+  "crunch abdominal": "/exercises/Crunches.webp",
+  "plancha abdominal": "/exercises/Plank.webp",
+  "russian twist": "/exercises/Russian_Twist.webp",
+  "ab wheel": "/exercises/Ab_Roller.webp",
+  "cruce de poleas": "/exercises/Cable_Crossover.webp",
+  "apertura en peck deck": "/exercises/Butterfly.webp",
+  "press de pecho en maquina": "/exercises/Leverage_Chest_Press.webp",
+  "pull over con mancuerna": "/exercises/Bent-Arm_Dumbbell_Pullover.webp",
+  "remo en maquina": "/exercises/Leverage_High_Row.webp",
+  "jalon con agarre cerrado": "/exercises/Close-Grip_Front_Lat_Pulldown.webp",
+  "dominada asistida": "/exercises/Band_Assisted_Pull-Up.webp",
+  "encogimiento de hombros": "/exercises/Barbell_Shrug.webp",
+  "curl concentrado": "/exercises/Concentration_Curls.webp",
+  "curl en predicador": "/exercises/Preacher_Curl.webp",
+  "press de banca con agarre cerrado": "/exercises/Close-Grip_Barbell_Bench_Press.webp",
+  "extension de triceps con mancuerna": "/exercises/Dumbbell_One-Arm_Triceps_Extension.webp",
+  "puente de gluteos": "/exercises/Barbell_Glute_Bridge.webp",
+  "sentadilla goblet": "/exercises/Goblet_Squat.webp",
+  "plancha lateral": "/exercises/Side_Bridge.webp",
+  "superman": "/exercises/Superman.webp",
+  "thruster": "/exercises/Kettlebell_Thruster.webp",
+  "clean": "/exercises/Clean.webp",
+  "snatch": "/exercises/Snatch.webp",
+  "clean jerk": "/exercises/Clean_and_Jerk.webp",
+  "box jump": "/exercises/Box_Jump_Multiple_Response.webp",
+  "lanzamiento de balon medicinal": "/exercises/Medicine_Ball_Chest_Pass.webp",
+  "sandbag over shoulder": "/exercises/Sandbag_Load.webp",
+  "sled push": "/exercises/Sled_Push.webp",
+  "assault bike": "/exercises/Air_Bike.webp",
+  "pull up kipping": "/exercises/Kipping_Muscle_Up.webp",
+  "ring muscle up": "/exercises/Muscle_Up.webp",
+  "handstand push up": "/exercises/Handstand_Push-Ups.webp",
+  "cargada de fuerza": "/exercises/Power_Clean.webp",
+  "arrancada": "/exercises/Snatch.webp",
+  "envion": "/exercises/Power_Snatch.webp",
+  "salto al cajon": "/exercises/Box_Jump_Multiple_Response.webp",
+  "balon a la pared": "/exercises/Medicine_Ball_Chest_Pass.webp",
+  "doble salto a la cuerda": "/exercises/Rope_Jumping.webp",
+  "flexiones de brazos": "/exercises/Pushups.webp",
+  "flexiones diamante": "/exercises/Pushups_Close_and_Wide_Hand_Positions.webp",
+  "flexiones declinadas": "/exercises/Decline_Push-Up.webp",
+  "flexiones con palmas": "/exercises/Pushups.webp",
+  "dominadas pronas": "/exercises/Chin-Up.webp",
+  "fondos en paralelas": "/exercises/Parallel_Bar_Dip.webp",
+  "fondos en banco": "/exercises/Bench_Dips.webp",
+  "dips con lastre": "/exercises/Weighted_Bench_Dip.webp",
+  "muscle up en barra": "/exercises/Kipping_Muscle_Up.webp",
+  "pistol squat": "/exercises/Kettlebell_Pistol_Squat.webp",
+  "sentadilla pistola": "/exercises/Kettlebell_Pistol_Squat.webp",
+  "plancha l sit": "/exercises/Hanging_Pike.webp",
+  "muscle up en anillas": "/exercises/Muscle_Up.webp",
+  "mountain climbers": "/exercises/Mountain_Climbers.webp",
+  "kettlebell goblet squat": "/exercises/Goblet_Squat.webp",
+  "goblet squat": "/exercises/Goblet_Squat.webp",
+  "kettlebell clean and press": "/exercises/Clean_and_Press.webp",
+  "medicine ball slam": "/exercises/One-Arm_Medicine_Ball_Slam.webp",
+  "farmer walk": "/exercises/Farmers_Walk.webp",
+  "caminata del granjero": "/exercises/Farmers_Walk.webp",
+  "lunge walk": "/exercises/Barbell_Walking_Lunge.webp",
+  "split jump": "/exercises/Split_Jump.webp",
+  "empuje de trineo": "/exercises/Sled_Push.webp",
+  "sentadilla con salto": "/exercises/Weighted_Jump_Squat.webp",
+};
+
+const SHOW_EXERCISE_IMAGES = true;
+
+const normalize = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+/** Ruta de la miniatura del ejercicio, o null si todavia no tiene. */
+export const exerciseImage = (name: string | null | undefined): string | null => {
+  if (!SHOW_EXERCISE_IMAGES || !name) return null;
+  return IMAGES[normalize(name)] ?? null;
+};

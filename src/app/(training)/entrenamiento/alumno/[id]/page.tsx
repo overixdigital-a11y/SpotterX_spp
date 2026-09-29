@@ -31,6 +31,7 @@ import { useModuleGuard } from "@/lib/gym-modules";
 import { todayLocal } from "@/lib/format";
 import { useToast } from "@/components/core/ToastProvider";
 import ExercisePicker from "@/components/training/ExercisePicker";
+import ExerciseThumb from "@/components/training/ExerciseThumb";
 import { MembershipCard } from "@/components/training/MembershipCard";
 import FoodPicker, { type Food } from "@/components/training/FoodPicker";
 import { MEALS, getDietData, formatQuantity } from "@/lib/diets";
@@ -1113,6 +1114,7 @@ export default function AlumnoPage() {
                           </p>
                           {dayItems.map((it) => (
                             <div key={it.id} className="mb-1 flex items-start gap-2 rounded-lg border-b border-edge py-2">
+                              <ExerciseThumb name={it.exercise} size={40} />
                               <div className="flex-1">
                                 <p className="text-sm font-medium text-ink">{it.exercise}</p>
                                 <p className="text-xs text-muted">
@@ -1691,20 +1693,23 @@ export default function AlumnoPage() {
                             ? resolveSeries(ri.data, r.discipline)
                             : [];
                           return (
-                            <div key={ri.id} className="mb-1 rounded-lg border-b border-edge py-1.5">
-                              <p className="text-sm font-medium text-ink">{ri.exercise}</p>
-                              {series.length > 0 ? (
-                                series.map((s, si) => (
-                                  <p key={si} className="text-xs text-muted">
-                                    Serie {si + 1}: {formatSeries(s)}
-                                  </p>
-                                ))
-                              ) : (
-                                plannedSummary && (
-                                  <p className="text-xs text-muted">{plannedSummary}</p>
-                                )
-                              )}
-                              {ri.notes && <p className="text-[11px] text-muted italic">{ri.notes}</p>}
+                            <div key={ri.id} className="mb-1 flex items-start gap-2 rounded-lg border-b border-edge py-1.5">
+                              <ExerciseThumb name={ri.exercise} size={40} />
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-ink">{ri.exercise}</p>
+                                {series.length > 0 ? (
+                                  series.map((s, si) => (
+                                    <p key={si} className="text-xs text-muted">
+                                      Serie {si + 1}: {formatSeries(s)}
+                                    </p>
+                                  ))
+                                ) : (
+                                  plannedSummary && (
+                                    <p className="text-xs text-muted">{plannedSummary}</p>
+                                  )
+                                )}
+                                {ri.notes && <p className="text-[11px] text-muted italic">{ri.notes}</p>}
+                              </div>
                             </div>
                           );
                         })}

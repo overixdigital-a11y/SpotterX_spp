@@ -31,7 +31,6 @@ import { useToast } from "@/components/core/ToastProvider";
 import { StudentMembershipCard } from "@/components/training/StudentMembershipCard";
 import PostComposer from "@/components/social/PostComposer";
 import MediaPicker from "@/components/core/MediaPicker";
-import ExerciseThumb from "@/components/training/ExerciseThumb";
 import dynamic from "next/dynamic";
 const ProgressLine = dynamic(
   () => import("@/components/training/HistoryCharts").then((m) => m.ProgressLine),
@@ -799,17 +798,12 @@ export default function MiEntrenamientoPage() {
                           </p>
                           {dayItems.map((it) => (
                             <div key={it.id} className="rounded-lg border-b border-edge py-2">
-                              <div className="flex items-start gap-2">
-                                <ExerciseThumb name={it.exercise} size={40} />
-                                <div className="min-w-0 flex-1">
-                                  <p className="text-sm font-medium text-ink">{it.exercise}</p>
-                                  <p className="text-xs text-muted">
-                                    {it.sets ?? "—"}×{it.reps ?? "—"}
-                                    {it.rest_seconds ? ` · ${it.rest_seconds}s` : ""}
-                                    {it.notes ? ` · ${it.notes}` : ""}
-                                  </p>
-                                </div>
-                              </div>
+                              <p className="text-sm font-medium text-ink">{it.exercise}</p>
+                              <p className="text-xs text-muted">
+                                {it.sets ?? "—"}×{it.reps ?? "—"}
+                                {it.rest_seconds ? ` · ${it.rest_seconds}s` : ""}
+                                {it.notes ? ` · ${it.notes}` : ""}
+                              </p>
                             </div>
                           ))}
                         </div>
@@ -969,35 +963,32 @@ export default function MiEntrenamientoPage() {
 
                             return (
                               <div key={ri.id} className="rounded-lg border border-edge bg-bg p-2.5">
-                                <div className="flex items-start gap-2">
-                                  <ExerciseThumb name={ri.exercise} size={40} />
-                                  <div className="flex min-w-0 flex-1 items-start justify-between">
-                                    <div className="min-w-0">
-                                      <p className="text-sm font-medium text-ink">{ri.exercise}</p>
-                                      {seriesDiscipline ? (
-                                        plannedSeries.length > 0
-                                          ? (
-                                            <p className="text-[11px] text-muted">
-                                              {doneCount}/{plannedSeries.length} series hechas
-                                            </p>
-                                          )
-                                          : (
-                                            <p className="text-[11px] text-muted">Sin series todavía</p>
-                                          )
-                                      ) : (
-                                        plannedSummary && (
-                                          <p className="text-[11px] text-muted">Plan: {plannedSummary}</p>
+                                <div className="flex items-start justify-between">
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium text-ink">{ri.exercise}</p>
+                                    {seriesDiscipline ? (
+                                      plannedSeries.length > 0
+                                        ? (
+                                          <p className="text-[11px] text-muted">
+                                            {doneCount}/{plannedSeries.length} series hechas
+                                          </p>
                                         )
-                                      )}
-                                    </div>
-                                    <button
-                                      onClick={() => loadProgress(r.id, ri.exercise)}
-                                      className="shrink-0 rounded p-1 text-muted hover:text-neon"
-                                      title="Ver progreso"
-                                    >
-                                      <TrendingUp className="h-3.5 w-3.5" />
-                                    </button>
+                                        : (
+                                          <p className="text-[11px] text-muted">Sin series todavía</p>
+                                        )
+                                    ) : (
+                                      plannedSummary && (
+                                        <p className="text-[11px] text-muted">Plan: {plannedSummary}</p>
+                                      )
+                                    )}
                                   </div>
+                                  <button
+                                    onClick={() => loadProgress(r.id, ri.exercise)}
+                                    className="shrink-0 rounded p-1 text-muted hover:text-neon"
+                                    title="Ver progreso"
+                                  >
+                                    <TrendingUp className="h-3.5 w-3.5" />
+                                  </button>
                                 </div>
 
                                 {seriesDiscipline ? (

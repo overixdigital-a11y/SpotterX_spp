@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { AuthProvider } from "@/lib/auth-context";
 
 export default async function AdminLayout({
   children,
@@ -22,5 +23,9 @@ export default async function AdminLayout({
 
   if (!profile?.is_admin) redirect("/home");
 
-  return <AdminShell>{children}</AdminShell>;
+  return (
+    <AuthProvider>
+      <AdminShell>{children}</AdminShell>
+    </AuthProvider>
+  );
 }

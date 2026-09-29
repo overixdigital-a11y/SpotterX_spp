@@ -81,7 +81,7 @@ function readableError(message: string): string {
 }
 
 export default function AdminCatalogoPage() {
-  const { userId } = useAuthState();
+  const { userId, loading: authLoading } = useAuthState();
   const toast = useToast();
 
   const [tab, setTab] = useState<Tab>("ejercicios");
@@ -744,7 +744,7 @@ export default function AdminCatalogoPage() {
       )}
 
       {/* -------------------------------------------------------- tabla */}
-      {loading ? (
+      {loading || authLoading ? (
         <div className="py-16 text-center">
           <Loader2 className="mx-auto h-6 w-6 animate-spin text-[#00e5c7]" />
         </div>

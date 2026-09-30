@@ -36,7 +36,14 @@ drop function if exists public.admin_set_exercise_image(uuid, text);
 -- 2) La columna vieja. `image_urls` (plural, de la 00049) NO se toca.
 alter table public.exercises drop column if exists image_url;
 
--- 3) Verificacion (solo lectura, corre esto al final). Debe devolver 0 filas.
+-- 3) Verificacion (solo lectura, corre esto al final).
+--
+--    OJO: esta consulta devuelve 2 filas en el estado CORRECTO, no 0. La 2a
+--    version de este archivo decia "debe devolver 0 filas" e incluia
+--    `image_urls` y `demo_url` en el `in (...)`, que son las columnas NUEVAS
+--    (de la 00049) y tienen que seguir existiendo. El filtro correcto es un
+--    `not in` sobre las dos que se dropean:
+--
 --   select c.relname, a.attname
 --     from pg_attribute a
 --     join pg_class c on c.oid = a.attrelid
@@ -45,7 +52,14 @@ alter table public.exercises drop column if exists image_url;
 --      and a.attnum > 0
 --      and not a.attisdropped;
 --
+--    Debe devolver EXACTAMENTE 2 filas: `image_urls` y `demo_url`.
+--    Si devuelve 3, la columna vieja `image_url` no se borro.
+--    Si devuelve menos de 2, se borro algo de la 00049 y hay que revisarlo.
+--
 --   Y la RPC vieja no debe existir (0 filas):
 --   select proname, pg_get_function_identity_arguments(oid)
 --     from pg_proc
 --    where proname = 'admin_set_exercise_image';
+--
+--   Las dos lineas de arriba son idempotentes: correrlas de nuevo no hace
+--   nada (por eso el `if exists`). Es seguro repetirlas.

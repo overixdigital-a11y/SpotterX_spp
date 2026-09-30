@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuthState } from "@/lib/auth-context";
 import { useGymModuleAccess } from "@/lib/gym-modules";
 import { DISCIPLINES } from "@/lib/disciplines";
-import { MUSCLE_ORDER } from "@/lib/catalog";
+import { MUSCLE_ORDER, exerciseMatchesQuery } from "@/lib/catalog";
 import { loadExerciseMediaMap } from "@/lib/exercise-media-map";
 import ExerciseThumb from "@/components/training/ExerciseThumb";
 
@@ -180,11 +180,10 @@ export default function ExercisePicker({
   };
 
   const q = (query || value).trim().toLowerCase();
-  const match = (e: Exercise) =>
-    !q ||
-    e.name.toLowerCase().includes(q) ||
-    (e.muscle ?? "").toLowerCase().includes(q) ||
-    (e.discipline ?? "").toLowerCase().includes(q);
+  // El matcher es el compartido con /admin/catalogo: matchea por nombre, grupo
+  // y disciplina (slug Y etiqueta, sin acentos). Antes comparaba solo contra el
+  // valor crudo, asi que "musculación" y "fuerza" no encontraban nada.
+  const match = (e: Exercise) => exerciseMatchesQuery(e, q);
   const groupMatch = (e: Exercise) => !groupFilter || (e.muscle ?? "").toLowerCase() === groupFilter;
   const filtered = list
     .filter((e) => match(e) && groupMatch(e))

@@ -22,7 +22,13 @@ import { resetExerciseMediaMap, mediaPathFromUrl } from "@/lib/exercise-media-ma
 import { resetExerciseCatalogCache } from "@/components/training/ExercisePicker";
 import { resetFoodCatalogCache } from "@/components/training/FoodPicker";
 import { DISCIPLINES } from "@/lib/disciplines";
-import { MUSCLE_ORDER, FOOD_CATEGORY_ORDER, findEquivalentExercise } from "@/lib/catalog";
+import {
+  MUSCLE_ORDER,
+  FOOD_CATEGORY_ORDER,
+  findEquivalentExercise,
+  exerciseMatchesQuery,
+  disciplineLabel,
+} from "@/lib/catalog";
 
 type Tab = "ejercicios" | "alimentos";
 
@@ -47,6 +53,17 @@ interface Food {
 }
 
 type PhotoFilter = "todas" | "sin" | "propia";
+
+/**
+ * Disciplina por la que se acota la tabla. `"todas"` = sin filtro; el resto son
+ * los `id` de `DISCIPLINES`, mas `SIN_CLASIFICAR` para los ejercicios que
+ * tengan una disciplina fuera de la lista (hoy no hay ninguno, pero si se
+ * cargara una nueva tiene que seguir siendo filtrable y no desaparecer).
+ */
+type DisciplineFilter = "todas" | "sin_clasificar" | (string & {});
+
+/** Valor del filtro para los ejercicios sin disciplina reconocida. */
+const SIN_CLASIFICAR = "sin_clasificar" satisfies DisciplineFilter;
 
 const input =
   "w-full rounded-lg border border-[#1e2530] bg-[#121722] px-3 py-2.5 text-sm text-[#e4e8ee] placeholder:text-[#6b7280] focus:border-[#00e5c7]/50 focus:outline-none";
@@ -91,6 +108,7 @@ export default function AdminCatalogoPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [photoFilter, setPhotoFilter] = useState<PhotoFilter>("todas");
+  const [disciplineFilter, setDisciplineFilter] = useState<DisciplineFilter>("todas");
   const [needsMigration, setNeedsMigration] = useState(false);
 
   // Formulario: null = cerrado. `__nuevo__` = agregar.
@@ -540,8 +558,21 @@ export default function AdminCatalogoPage() {
   const hasOwn = (e: Exercise) => e.image_urls.length > 0 || Boolean(e.demo_url);
   const hasAny = (e: Exercise) => hasOwn(e) || Boolean(exerciseImage(e.name));
 
+  /**
+   * Un ejercicio cae bajo "(sin clasificar)" cuando su `discipline` no es uno
+   * de los `id` de DISCIPLINES (no cuando es null: una disciplina vacia si
+   * cuenta como desconocida y tiene que poder filtrarse tambien).
+   */
+  const knownDiscipline = (e: Exercise) => DISCIPLINES.some((d) => d.id === e.discipline);
+  const matchesDiscipline = (e: Exercise) => {
+    if (disciplineFilter === "todas") return true;
+    if (disciplineFilter === SIN_CLASIFICAR) return !knownDiscipline(e);
+    return e.discipline === disciplineFilter;
+  };
+
   const visibleExercises = exercises.filter((e) => {
-    if (q && !e.name.toLowerCase().includes(q) && !e.muscle?.toLowerCase().includes(q)) return false;
+    if (!exerciseMatchesQuery(e, q)) return false;
+    if (!matchesDiscipline(e)) return false;
     if (photoFilter === "sin") return !hasAny(e);
     if (photoFilter === "propia") return hasOwn(e);
     return true;
@@ -554,6 +585,29 @@ export default function AdminCatalogoPage() {
 
   const missing = exercises.filter((e) => !hasAny(e)).length;
   const withOwn = exercises.filter(hasOwn).length;
+
+  /**
+   * Opciones del desplegable de disciplina, ordenadas por cantidad de
+   * ejercicios. Se arman desde DISCIPLINES (las 12, aunque tengan 0) y se
+   * agrega "(sin clasificar)" solo si de verdad hay ejercicios sin disciplina
+   * reconocida, para no ofrecer una opcion que nunca lleva a ningun lado.
+   */
+  const disciplineOptions = [
+    ...DISCIPLINES.map((d) => ({
+      value: d.id,
+      label: d.label,
+      count: exercises.filter((e) => e.discipline === d.id).length,
+    })),
+    ...(exercises.some((e) => !knownDiscipline(e))
+      ? [
+          {
+            value: SIN_CLASIFICAR,
+            label: "(sin clasificar)",
+            count: exercises.filter((e) => !knownDiscipline(e)).length,
+          },
+        ]
+      : []),
+  ].sort((a, b) => b.count - a.count);
 
   const isOpen = form !== null;
 
@@ -573,6 +627,7 @@ export default function AdminCatalogoPage() {
               setTab(key);
               setSearch("");
               setPhotoFilter("todas");
+              setDisciplineFilter("todas");
               closeForm();
             }}
             className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium ${
@@ -620,6 +675,20 @@ export default function AdminCatalogoPage() {
                 <option value="todas">Todas ({exercises.length})</option>
                 <option value="sin">Sin material ({missing})</option>
                 <option value="propia">Con material propio ({withOwn})</option>
+              </select>
+              <select
+                value={disciplineFilter}
+                onChange={(e) =>
+                  setDisciplineFilter(e.target.value as DisciplineFilter)
+                }
+                className="max-w-[10rem] rounded-lg border border-[#1e2530] bg-[#121722] px-2.5 py-2 text-xs text-[#e4e8ee] focus:border-[#00e5c7]/50 focus:outline-none"
+              >
+                <option value="todas">Todas las disciplinas</option>
+                {disciplineOptions.map((d) => (
+                  <option key={d.value} value={d.value}>
+                    {d.label} ({d.count})
+                  </option>
+                ))}
               </select>
             </>
           )}
@@ -888,6 +957,16 @@ export default function AdminCatalogoPage() {
 
                     <td className={`${td} font-medium text-[#e4e8ee]`}>
                       {e.name}
+                      {/* En movil la columna Disciplina esta oculta, asi que el
+                          dato se repite aca como chip (es el mismo patron que
+                          "sin material" y "copiar a", que ya viven en esta
+                          celda). No engorda la fila ni obliga a scrollear la
+                          tabla en horizontal. */}
+                      {e.discipline && (
+                        <span className="ml-2 rounded bg-[#1a1f2e] px-1.5 py-0.5 text-[10px] text-[#9ca3af] sm:hidden">
+                          {disciplineLabel(e.discipline)}
+                        </span>
+                      )}
                       {!hasAny(e) && (
                         <span className="ml-2 rounded bg-[#1a1f2e] px-1.5 py-0.5 text-[10px] text-[#6b7280]">
                           sin material
@@ -911,7 +990,10 @@ export default function AdminCatalogoPage() {
                       </span>
                     </td>
                     <td className={`hidden ${td} sm:table-cell text-xs text-[#9ca3af]`}>
-                      {e.discipline ?? "-"}
+                      {/* Etiqueta y no el valor crudo: antes decia "musculacion"
+                          y no coincidia con lo que muestra el desplegable ni
+                          con lo que el usuario escribe en el buscador. */}
+                      {e.discipline ? disciplineLabel(e.discipline) : "-"}
                     </td>
 
                     <td className={td}>
